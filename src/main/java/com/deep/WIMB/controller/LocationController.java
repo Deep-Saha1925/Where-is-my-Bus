@@ -16,7 +16,12 @@ public class LocationController {
     // Driver sends GPS
     @PostMapping("/update")
     public Location updateLocation(@RequestBody LocationUpdateRequest request){
-        return locationService.updateLocation(request);
+        return locationService.addLocation(
+                request.getRideId(),
+                request.getLatitude(),
+                request.getLongitude(),
+                request.getSpeed()
+        );
     }
 
     // user fetches last user location

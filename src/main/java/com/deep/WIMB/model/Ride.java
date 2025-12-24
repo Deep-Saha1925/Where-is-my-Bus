@@ -28,7 +28,7 @@ public class Ride {
 
     private LocalDateTime startTime;
     private LocalDateTime endTime;
-
+    
     @Enumerated(EnumType.STRING)
     private RideStatus status;
 

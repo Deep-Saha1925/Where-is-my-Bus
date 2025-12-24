@@ -18,30 +18,28 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final RideRepository rideRepository;
 
-    public Location updateLocation(LocationUpdateRequest request){
-        Ride ride = rideRepository.findById(request.getRideId())
-                .orElseThrow(() -> new RuntimeException("Ride not found!!"));
+    public Location addLocation(Long rideId, double lat, double lng, Double speed) {
 
-        if (ride.getStatus() != RideStatus.ACTIVE){
-            throw new RuntimeException("Ride is not Active.");
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new RuntimeException("Ride not found"));
+
+        if (ride.getStatus() != RideStatus.ACTIVE) {
+            throw new RuntimeException("Ride is not active");
         }
 
         Location location = new Location();
         location.setRide(ride);
-        location.setLatitude(request.getLatitude());
-        location.setLongitude(request.getLongitude());
-        location.setSpeed(request.getSpeed());
+        location.setLatitude(lat);
+        location.setLongitude(lng);
+        location.setSpeed(speed);
         location.setTimestamp(LocalDateTime.now());
 
         return locationRepository.save(location);
     }
 
-    public Location getLastKnownLocation(Long rideId){
-        Ride ride = rideRepository.findById(rideId)
-                .orElseThrow(() -> new RuntimeException("No ride found"));
-
+    public Location getLastKnownLocation(Long rideId) {
         return locationRepository
-                .findTopByRideOrderByTimestampDesc(ride)
+                .findTopByRideIdOrderByTimestampDesc(rideId)
                 .orElseThrow(() -> new RuntimeException("Location not found"));
     }
 }

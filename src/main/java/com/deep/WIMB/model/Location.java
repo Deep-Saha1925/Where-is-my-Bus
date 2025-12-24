@@ -24,7 +24,7 @@ public class Location {
 
     private double latitude;
     private double longitude;
-    private double speed;   // km/h
+    private Double speed;   // km/h
 
     private LocalDateTime timestamp;
 

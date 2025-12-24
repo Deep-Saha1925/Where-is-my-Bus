@@ -10,4 +10,6 @@ public class StartRideRequest {
     private String busNumber;
     private String source;
     private String destination;
+    private double latitude;
+    private double longitude;
 }

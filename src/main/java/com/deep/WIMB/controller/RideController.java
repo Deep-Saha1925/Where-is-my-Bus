@@ -1,7 +1,10 @@
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.dto.LocationUpdateRequest;
 import com.deep.WIMB.dto.StartRideRequest;
+import com.deep.WIMB.model.Location;
 import com.deep.WIMB.model.Ride;
+import com.deep.WIMB.service.LocationService;
 import com.deep.WIMB.service.RideService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,24 +17,39 @@ import java.util.List;
 public class RideController {
 
     private final RideService rideService;
+    private final LocationService locationService;
 
-    // Driver starts the ride
-    @PostMapping("/start")
-    public Ride startRide(@RequestBody StartRideRequest request){
-        return rideService.startRide(
-                request.getBusNumber(),
-                request.getSource(),
-                request.getDestination()
-        );
-    }
-
-    //user searches buses on route
     @GetMapping("/active")
     public List<Ride> getActiveRides(
             @RequestParam String source,
             @RequestParam String destination
-    ){
+    ) {
         return rideService.getActiveRidesByRoute(source, destination);
     }
 
+    @PostMapping("/start")
+    public Ride startRide(@RequestBody StartRideRequest request) {
+
+        Ride ride = rideService.startRide(request);
+
+        // Create FIRST location
+        locationService.addLocation(
+                ride.getId(),
+                request.getLatitude(),
+                request.getLongitude(),
+                null
+        );
+
+        return ride;
+    }
+
+    @PostMapping("/location")
+    public Location updateLocation(@RequestBody LocationUpdateRequest request) {
+        return locationService.addLocation(
+                request.getRideId(),
+                request.getLatitude(),
+                request.getLongitude(),
+                request.getSpeed()
+        );
+    }
 }

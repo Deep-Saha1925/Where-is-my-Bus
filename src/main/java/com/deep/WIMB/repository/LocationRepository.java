@@ -8,5 +8,5 @@ import java.util.Optional;
 
 public interface LocationRepository extends JpaRepository<Location, Long> {
 
-    Optional<Location> findTopByRideOrderByTimestampDesc(Ride ride);
+    Optional<Location> findTopByRideIdOrderByTimestampDesc(Long rideId);
 }
