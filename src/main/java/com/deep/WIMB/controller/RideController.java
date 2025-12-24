@@ -1,5 +1,6 @@
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.dto.ActiveRideResponse;
 import com.deep.WIMB.dto.LocationUpdateRequest;
 import com.deep.WIMB.dto.StartRideRequest;
 import com.deep.WIMB.model.Location;
@@ -20,7 +21,7 @@ public class RideController {
     private final LocationService locationService;
 
     @GetMapping("/active")
-    public List<Ride> getActiveRides(
+    public List<ActiveRideResponse> getActiveRides(
             @RequestParam String source,
             @RequestParam String destination
     ) {
@@ -52,4 +53,10 @@ public class RideController {
                 request.getSpeed()
         );
     }
+
+    @PutMapping("/cancel/{rideId}")
+    public Ride cancelRide(@PathVariable Long rideId) {
+        return rideService.cancelRide(rideId);
+    }
+
 }

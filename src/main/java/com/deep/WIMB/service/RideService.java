@@ -1,9 +1,9 @@
 package com.deep.WIMB.service;
 
+import com.deep.WIMB.dto.ActiveRideResponse;
 import com.deep.WIMB.dto.StartRideRequest;
 import com.deep.WIMB.enums.RideStatus;
 import com.deep.WIMB.model.Bus;
-import com.deep.WIMB.model.Location;
 import com.deep.WIMB.model.Ride;
 import com.deep.WIMB.repository.BusRepository;
 import com.deep.WIMB.repository.LocationRepository;
@@ -21,6 +21,7 @@ public class RideService {
 
     private final BusRepository busRepository;
     private final RideRepository rideRepository;
+    private final LocationRepository locationRepository;
 
     @Transactional
     public Ride startRide(StartRideRequest request) {
@@ -49,8 +50,39 @@ public class RideService {
         return rideRepository.save(ride);
     }
 
-    public List<Ride> getActiveRidesByRoute(String source, String destination) {
-        return rideRepository.findBySourceAndDestinationAndStatus(
-                source, destination, RideStatus.ACTIVE);
+    @Transactional
+    public Ride cancelRide(Long rideId){
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new RuntimeException("Ride not found."));
+
+        if (ride.getStatus() == RideStatus.ENDED){
+            throw new RuntimeException("Ride already ended.");
+        }
+
+        ride.setStatus(RideStatus.ENDED);
+        ride.setEndTime(LocalDateTime.now());
+        return rideRepository.save(ride);
+    }
+
+    public List<ActiveRideResponse> getActiveRidesByRoute(String source, String destination) {
+        List<Ride> rides = rideRepository
+                .findBySourceAndDestinationAndStatus(source, destination, RideStatus.ACTIVE);
+
+        return rides.stream().map(ride -> {
+            ActiveRideResponse dto = new ActiveRideResponse();
+            dto.setRideId(ride.getId());
+            dto.setBusNumber(ride.getBus().getBusNumber());
+            dto.setDestination(ride.getDestination());
+            dto.setSource(ride.getSource());
+
+            locationRepository
+                    .findTopByRideIdOrderByTimestampDesc(ride.getId())
+                    .ifPresent(loc -> {
+                        dto.setLatitude(loc.getLatitude());
+                        dto.setLongitude(loc.getLongitude());
+                    });
+
+            return dto;
+        }).toList();
     }
 }
