@@ -1,0 +1,93 @@
+<!--<!DOCTYPE html>-->
+<!--<html lang="en">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <title>Title</title>-->
+<!--</head>-->
+<!--<body>-->
+<!--    <ul id="busList"></ul>-->
+<!--    <script>-->
+<!--        async function loadBuses() {-->
+<!--          const source = document.getElementById("source").value;-->
+<!--          const destination = document.getElementById("destination").value;-->
+
+<!--          const res = await fetch(-->
+<!--            `/api/ride/active?source=${source}&destination=${destination}`-->
+<!--          );-->
+<!--          const buses = await res.json();-->
+
+<!--          const list = document.getElementById("busList");-->
+<!--          list.innerHTML = "";-->
+
+<!--          buses.forEach(bus => {-->
+<!--            const li = document.createElement("li");-->
+<!--            li.innerHTML = `-->
+<!--              <b>${bus.bus.busNumber}</b>-->
+<!--              (${bus.source} → ${bus.destination})-->
+<!--              <button onclick="trackBus(${bus.id})">Track</button>-->
+<!--            `;-->
+<!--            list.appendChild(li);-->
+<!--          });-->
+<!--        }-->
+
+<!--        function trackBus(rideId) {-->
+<!--          window.location.href = `track.html?rideId=${rideId}`;-->
+<!--        }-->
+<!--    </script>-->
+
+<!--</body>-->
+<!--</html>-->
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Where Is My Bus</title>
+</head>
+<body>
+
+<h2>Select Route</h2>
+
+<input id="source" placeholder="Source (C)">
+<input id="destination" placeholder="Destination (D)">
+<button onclick="searchBuses()">Search</button>
+
+<ul id="busList"></ul>
+
+<script>
+    async function searchBuses() {
+      const src = document.getElementById("source").value;
+      const dest = document.getElementById("destination").value;
+
+      const res = await fetch(
+        `http://localhost:8080/api/ride/active?source=${src}&destination=${dest}`
+      );
+
+      const buses = await res.json();
+      busList.innerHTML = "";
+
+      buses.forEach(b => {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <b>Bus:</b> ${b.busNumber}<br>
+            <b>Route:</b> ${b.source} <span>→<span> ${b.destination}
+            <button onclick="track(${b.rideId})">Track</button>
+          `;
+          busList.appendChild(li);
+      });
+
+    }
+
+    function track(rideId) {
+      if (!rideId) {
+        alert("Ride ID missing");
+        return;
+      }
+      window.location.href = `track.html?rideId=${rideId}`;
+    }
+
+</script>
+
+</body>
+</html>

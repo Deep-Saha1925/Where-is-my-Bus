@@ -22,7 +22,6 @@ public class RideService {
     private final BusRepository busRepository;
     private final RideRepository rideRepository;
     private final LocationRepository locationRepository;
-    private final GeocodingService geocodingService;
 
     @Transactional
     public Ride startRide(StartRideRequest request) {
