@@ -11,6 +11,23 @@
           font-size: 26px;
           color: #1976d2;
         }
+        #backBtn {
+          position: absolute;
+          top: 23px;
+          left: 64px;
+          z-index: 1000;
+          padding: 8px 12px;
+          background: white;
+          border: 1px solid #ccc;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: bold;
+        }
+
+        #backBtn:hover {
+          background: #f0f0f0;
+        }
+
     </style>
     <link
             rel="stylesheet"
@@ -19,6 +36,7 @@
 </head>
 
 <body>
+<button id="backBtn" onclick="goBack()">⬅ Back</button>
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
