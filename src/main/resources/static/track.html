@@ -38,6 +38,20 @@
 <body>
 <button id="backBtn" onclick="goBack()">⬅ Back</button>
 <div id="map"></div>
+<div id="etaTable" style="padding:10px;">
+    <h3>Route Stops</h3>
+    <table border="1" cellpadding="6">
+        <thead>
+        <tr>
+            <th>Stop</th>
+            <th>Distance (km)</th>
+            <th>Slack Time (min)</th>
+        </tr>
+        </thead>
+        <tbody id="etaBody"></tbody>
+    </table>
+</div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/track.js"></script>

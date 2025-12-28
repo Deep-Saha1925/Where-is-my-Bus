@@ -15,6 +15,63 @@ const busIcon = L.divIcon({
 
 let marker;
 
+let stopMarkers = [];
+let routeLine = null;
+
+async function loadRouteStops(routeKey){
+    const res = await fetch(`/api/routes/${routeKey}`);
+    const stops = await res.json();
+
+    const latlngs = [];
+    stops.forEach(stop => {
+        const latlng = [stop.latitude, stop.longitude];
+        latlngs.push(latlng);
+
+        const marker = L.circleMarker(latlng, {
+            radius: 6,
+            color: "#1d4ed8",
+            fillColor: "#3b82f6",
+            fillOpacity: 0.9
+        })
+        .addTo(map)
+        .bindPopup(`
+          <b>${stop.stopName}</b><br>
+          Distance: ${stop.distanceFromStartKm} km<br>
+          Halt: ${stop.slackTimeMin} min
+        `);
+
+        stopMarkers.push(marker);
+    });
+
+    // Draw route line
+    if (routeLine) map.removeLayer(routeLine);
+
+    routeLine = L.polyline(latlngs, {
+        color: "#2563eb",
+        weight: 4
+    }).addTo(map);
+
+    map.fitBounds(routeLine.getBounds());
+    renderETATable(stops);
+}
+
+loadRouteStops("SLG_NJP");
+function renderETATable(stops) {
+  const body = document.getElementById("etaBody");
+  body.innerHTML = "";
+
+  stops.forEach(s => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${s.stopName}</td>
+      <td>${s.distanceFromStartKm}</td>
+      <td>${s.slackTimeMin}</td>
+    `;
+    body.appendChild(row);
+  });
+}
+
+
 const locationCache = {};
 
 async function reverseGeocode(lat, lng) {
