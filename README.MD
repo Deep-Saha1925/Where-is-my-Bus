@@ -1,134 +1,196 @@
+
 # 🚌 Where Is My Bus (WIMB)
 
 ## 📌 Project Description
 
-**Where Is My Bus (WIMB)** is a real-time bus tracking system designed
-to solve the common problem of **uncertain bus timings and locations**.\
-Passengers often wait without knowing whether a bus is nearby or
-delayed. This project provides **live bus locations on a map**, helping
-users make informed travel decisions.
+**Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system designed to solve the problem of **uncertain bus timings and locations**, especially in semi-urban and rural regions like North Bengal.
 
-------------------------------------------------------------------------
+Unlike traditional systems that rely only on databases, WIMB uses a **hybrid approach**:
+- **Dynamic data** (bus location, rides) from backend APIs
+- **Static route data** (stops, distances, halt times) loaded from **Excel sheets**
+
+This makes the system **easy to maintain, scalable, and realistic for government/private transport use**.
+
+---
 
 ## ❓ Problem Statement
 
--   No real-time visibility of buses
--   Passengers depend on guesswork and delays
--   No centralized system to track active buses on a route
+- Passengers wait without knowing the bus position
+- No ETA or stop-level visibility
+- Route data is hardcoded or poorly maintained
+- No single platform to view live buses on a route
 
-### ✅ Solution
+---
 
-WIMB provides: - Live bus tracking using GPS updates - Route-based bus
-search (Source → Destination) - Real-time map updates using polling -
-Clean, user-friendly UI
+## ✅ Solution Overview
 
-------------------------------------------------------------------------
+WIMB provides:
 
-## 🛠️ Technology Stack & Approach
+- 🔴 **Live bus tracking on map**
+- 🗺️ **Route visualization with stops**
+- 🧾 **Excel-based static route management**
+- ⏱️ **Auto-updating bus location (no click required)**
+- 🔎 **Search buses using Source → Destination**
+- 📍 **Reverse-geocoded human-readable location**
 
-### 🔹 Backend (Spring Boot)
+---
 
--   Java + Spring Boot
--   REST APIs
--   JPA + Hibernate
--   MySQL
--   Handles ride lifecycle and GPS updates
+## 🛠️ Technology Stack
+
+### 🔹 Backend
+- Java 17
+- Spring Boot
+- RESTful APIs
+- Apache POI (Excel reading)
+- MySQL (for rides & locations)
 
 ### 🔹 Frontend
+- HTML, CSS, JavaScript
+- Leaflet.js (Maps)
+- OpenStreetMap tiles
+- Font Awesome icons
 
--   HTML, CSS, JavaScript
--   Leaflet.js for maps
--   Font Awesome for icons
--   OpenStreetMap tiles
+---
 
-### 🔹 Architecture
+## 🧱 Architecture
 
-    Driver App → Location API → Database
-    User UI → Active Ride API → Live Map
+```
+Driver App (GPS)
+      ↓
+Location API (Spring Boot)
+      ↓
+Database (Live Data)
+      ↓
+User UI (Leaflet Map)
 
-------------------------------------------------------------------------
+Excel Route File
+      ↓
+Route Loader Service
+      ↓
+Route API
+      ↓
+Map + ETA Table
+```
+
+---
+
+## 📂 Static Route Management (Excel)
+
+Routes are stored in Excel files like:
+
+```
+ABC.xlsx
+```
+
+### 📑 Excel Format (Mandatory)
+
+| routeKey | stopName | latitude | longitude | distanceFromStartKm | slackTimeMin |
+|--------|----------|----------|-----------|---------------------|--------------|
+| SLG_NJP | Siliguri | 26.7271  | 88.3953   | 0                   | 0            |
+| SLG_NJP | Bagdogra | 26.6986  | 88.3110   | 12                  | 5            |
+| SLG_NJP | NJP      | 26.6812  | 88.3290   | 18                  | 0            |
+
+✔ Loaded once at application startup  
+✔ No DB required for route data  
+✔ Easy to update by non-technical staff
+
+---
 
 ## 🔗 Backend API Endpoints
 
 ### ▶ Start Ride
+```
+POST /api/ride/start
+```
 
-    POST /api/ride/start
-
-``` json
+```json
 {
   "busId": 1,
-  "source": "C",
-  "destination": "D",
-  "latitude": 22.5726,
-  "longitude": 88.3639
+  "source": "SLG",
+  "destination": "NJP",
+  "latitude": 26.7271,
+  "longitude": 88.3953
 }
 ```
 
+---
+
 ### ▶ Update Location (Driver GPS)
+```
+POST /api/location/update
+```
 
-    POST /api/location/update
-
-``` json
+```json
 {
   "rideId": 5,
-  "latitude": 22.5730,
-  "longitude": 88.3642,
+  "latitude": 26.7210,
+  "longitude": 88.3821,
   "speed": 32.5
 }
 ```
 
+---
+
 ### ▶ Get Active Buses on Route
-
-    GET /api/ride/active?source=C&destination=D
-
-``` json
-[
-  {
-    "rideId": 5,
-    "busNumber": "WB-23A-1245",
-    "source": "C",
-    "destination": "D",
-    "latitude": 22.5730,
-    "longitude": 88.3642
-  }
-]
+```
+GET /api/ride/active?source=SLG&destination=NJP
 ```
 
-### ▶ Cancel Ride
+---
 
-    PUT /api/ride/cancel/{rideId}
+### ▶ Get Route Stops (Excel-backed)
+```
+GET /api/routes/{routeKey}
+```
 
-------------------------------------------------------------------------
+Example:
+```
+/api/routes/SLG_NJP
+```
 
-## 🖥️ Frontend Structure
+---
 
-    /frontend
-    │
-    ├── index.html   → Search buses by route
-    ├── track.html   → Live tracking of selected bus
+## 🖥️ Frontend Flow
 
-### ✔ Features
+### index.html
+- Enter **Source & Destination**
+- View **all active buses**
+- Click **Track Bus**
 
--   Route-based bus listing
--   Click to track individual bus
--   Live movement on map
--   Bus icons using Font Awesome
--   Automatic cleanup of inactive buses
+### track.html
+- Full route drawn from Excel
+- Stops marked on map
+- Live bus icon moves automatically
+- Popup always shows current location
+- ETA table rendered from route data
 
-------------------------------------------------------------------------
+---
+
+## ✨ Key Features Implemented
+
+- ✅ Route visualization from Excel
+- ✅ Auto-moving bus marker
+- ✅ No click needed to see location
+- ✅ Reverse geocoding (OpenStreetMap)
+- ✅ Smooth map pan with movement
+- ✅ Works for multiple routes
+- ✅ Clean and scalable design
+
+---
 
 ## 🚀 Future Enhancements
 
--   WebSocket-based real-time updates
--   ETA prediction
--   Driver mobile app
--   User authentication
--   Notifications & alerts
+- WebSocket-based live updates
+- ETA prediction per stop
+- Admin panel for Excel upload
+- Driver mobile app
+- Alerts & notifications
+- Historical route analytics
 
-------------------------------------------------------------------------
+---
 
 ## 👨‍💻 Author
 
-**Deep Saha**\
-Backend & System Design Enthusiast\
-Java \| Spring Boot \| Maps \| Real-time Systems
+**Deep Saha**  
+Backend & System Design Enthusiast  
+Java | Spring Boot | Maps | Real-Time Systems
