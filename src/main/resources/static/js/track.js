@@ -15,15 +15,12 @@ const busIcon = L.divIcon({
 });
 
 let marker;
-
 let stopMarkers = [];
 let routeLine = null;
 
-// If rideId is not present
+/* ---------------- AUTO SELECT BUS ---------------- */
 async function autoSelectRideId() {
-  if (rideId) return; // already available
-
-  if (!routeKey) return;
+  if (rideId || !routeKey) return;
 
   const [source, destination] = routeKey.split("_");
 
@@ -35,7 +32,7 @@ async function autoSelectRideId() {
     const buses = await res.json();
 
     if (buses.length > 0) {
-      rideId = buses[0].rideId; // ✅ auto pick first bus
+      rideId = buses[0].rideId; // auto pick first bus
       updateLocation();
     }
   } catch (err) {
@@ -43,46 +40,52 @@ async function autoSelectRideId() {
   }
 }
 
+/* ---------------- LOAD ROUTE STOPS (PARTIAL) ---------------- */
+async function loadRouteStops(routeKey, src, dest) {
+  const res = await fetch(
+    `/api/routes/${routeKey}?source=${src}&destination=${dest}`
+  );
 
+  const stops = await res.json();
 
+  // cleanup old markers
+  stopMarkers.forEach(m => map.removeLayer(m));
+  stopMarkers = [];
 
-async function loadRouteStops(routeKey){
-    const res = await fetch(`/api/routes/${routeKey}`);
-    const stops = await res.json();
+  const latlngs = [];
 
-    const latlngs = [];
-    stops.forEach(stop => {
-        const latlng = [stop.latitude, stop.longitude];
-        latlngs.push(latlng);
+  stops.forEach(stop => {
+    const latlng = [stop.latitude, stop.longitude];
+    latlngs.push(latlng);
 
-        const marker = L.circleMarker(latlng, {
-            radius: 6,
-            color: "#1d4ed8",
-            fillColor: "#3b82f6",
-            fillOpacity: 0.9
-        })
-        .addTo(map)
-        .bindPopup(`
-          <b>${stop.stopName}</b><br>
-          Distance: ${stop.distanceFromStartKm} km<br>
-          Halt: ${stop.slackTimeMin} min
-        `);
+    const m = L.circleMarker(latlng, {
+      radius: 6,
+      color: "#1d4ed8",
+      fillColor: "#3b82f6",
+      fillOpacity: 0.9
+    })
+      .addTo(map)
+      .bindPopup(`
+        <b>${stop.stopName}</b><br>
+        Distance: ${stop.distanceFromStartKm} km<br>
+        Halt: ${stop.slackTimeMin} min
+      `);
 
-        stopMarkers.push(marker);
-    });
+    stopMarkers.push(m);
+  });
 
-    // Draw route line
-    if (routeLine) map.removeLayer(routeLine);
+  if (routeLine) map.removeLayer(routeLine);
 
-    routeLine = L.polyline(latlngs, {
-        color: "#2563eb",
-        weight: 4
-    }).addTo(map);
+  routeLine = L.polyline(latlngs, {
+    color: "#2563eb",
+    weight: 4
+  }).addTo(map);
 
-    map.fitBounds(routeLine.getBounds());
-    renderETATable(stops);
+  map.fitBounds(routeLine.getBounds());
+  renderETATable(stops);
 }
 
+/* ---------------- ETA TABLE ---------------- */
 function renderETATable(stops) {
   const body = document.getElementById("etaBody");
   body.innerHTML = "";
@@ -98,11 +101,11 @@ function renderETATable(stops) {
   });
 }
 
+/* ---------------- REVERSE GEO ---------------- */
 const locationCache = {};
 
 async function reverseGeocode(lat, lng) {
   const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-
   if (locationCache[key]) return locationCache[key];
 
   try {
@@ -120,13 +123,14 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-
+/* ---------------- LIVE BUS LOCATION ---------------- */
 async function updateLocation() {
   if (!rideId) return;
 
   const res = await fetch(
     `http://localhost:8080/api/location/last-loc/${rideId}`
   );
+
   if (!res.ok) return;
 
   const loc = await res.json();
@@ -135,30 +139,31 @@ async function updateLocation() {
   const pos = [loc.latitude, loc.longitude];
   const locationName = await reverseGeocode(loc.latitude, loc.longitude);
 
-  const popupContent = `<b>Current Location:</b><br>${locationName}`;
+  const popup = `<b>Current Location:</b><br>${locationName}`;
 
   if (!marker) {
     marker = L.marker(pos, { icon: busIcon })
       .addTo(map)
-      .bindPopup(popupContent)
+      .bindPopup(popup)
       .openPopup();
   } else {
     marker.setLatLng(pos);
-    marker.setPopupContent(popupContent);
+    marker.setPopupContent(popup);
     marker.openPopup();
   }
 
   map.panTo(pos, { animate: true, duration: 0.5 });
 }
 
-function goBack() {
-  window.history.back();
-}
-
-
+/* ---------------- INIT ---------------- */
 if (routeKey) {
-  loadRouteStops(routeKey);
+  const [src, dest] = routeKey.split("_");
+  loadRouteStops(routeKey, src, dest);
 }
 
 autoSelectRideId();
 setInterval(updateLocation, 3000);
+
+function goBack() {
+  window.history.back();
+}

@@ -51,7 +51,38 @@
             wb.close();
         }
 
-        public List<RouteStop> getRoute(String routeKey) {
-            return routeCache.get(routeKey);
+        public List<RouteStop> getRouteBetween(
+                String routeKey,
+                String source,
+                String destination
+        ){
+            List<RouteStop> fullRoute = routeCache.get(routeKey);
+
+            int startIdx = -1;
+            int endIdx = -1;
+
+            for (int i = 0; i < fullRoute.size(); i++) {
+                String stopName = fullRoute.get(i).getStopName();
+
+                if (stopName.equalsIgnoreCase(source)){
+                    startIdx = i;
+                }
+
+                if (stopName.equalsIgnoreCase(destination)){
+                    endIdx = i;
+                }
+            }
+
+            if (startIdx == -1 || endIdx == -1){
+                throw new RuntimeException("Invalid source or destination");
+            }
+
+            if (startIdx > endIdx) {
+                throw new RuntimeException("Destination comes before source");
+            }
+
+            return fullRoute.subList(startIdx, endIdx+1);
         }
+
+
     }

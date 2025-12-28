@@ -18,7 +18,7 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final RideRepository rideRepository;
 
-    public Location addLocation(Long rideId, double lat, double lng, Double speed) {
+    public Location addLocation(Long rideId, double lat, double lng) {
 
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new RuntimeException("Ride not found"));
