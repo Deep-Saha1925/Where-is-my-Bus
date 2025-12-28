@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Driver Panel | WIMB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+<div class="bg-white p-6 rounded-xl shadow-lg w-96">
+
+    <h2 class="text-xl font-bold mb-4 text-center">
+        Driver Panel
+    </h2>
+
+    <label class="block text-sm font-medium">Bus Number</label>
+    <input
+            id="busNumber"
+            type="text"
+            required
+            class="w-full border rounded p-2 mb-3 bg-gray-100"
+            placeholder="Enter Bus Number (WB-23A-1245)"
+    />
+
+    <label class="block text-sm font-medium">Start Location</label>
+    <input
+            id="source"
+            required
+            class="w-full border rounded p-2 mb-3 bg-gray-100"
+    />
+
+    <label class="block text-sm font-medium">Destination</label>
+    <input
+            id="destination"
+            required
+            placeholder="Enter destination (e.g. NJP)"
+            class="w-full border rounded p-2 mb-4"
+    />
+
+    <button
+            id="startBtn"
+            onclick="startRide()"
+            class="w-full bg-green-600 text-white py-2 rounded mb-3"
+    >
+        Start Ride
+    </button>
+
+    <button
+            id="stopBtn"
+            onclick="stopRide()"
+            class="w-full bg-red-600 text-white py-2 rounded hidden"
+    >
+        Stop Ride
+    </button>
+
+    <p id="status" class="text-center text-sm text-gray-600 mt-3"></p>
+</div>
+
+<script src="/js/driver.js"></script>
+</body>
+</html>
