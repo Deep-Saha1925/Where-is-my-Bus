@@ -31,7 +31,6 @@ public class LocationService {
         location.setRide(ride);
         location.setLatitude(lat);
         location.setLongitude(lng);
-        location.setSpeed(speed);
         location.setTimestamp(LocalDateTime.now());
 
         return locationRepository.save(location);
