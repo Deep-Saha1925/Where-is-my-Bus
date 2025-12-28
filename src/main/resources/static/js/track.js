@@ -1,5 +1,5 @@
 const params = new URLSearchParams(window.location.search);
-const rideId = params.get("rideId");
+let rideId = params.get("rideId");
 const routeKey = params.get("routeKey");
 
 const map = L.map("map").setView([26.7271, 88.3953], 13);
@@ -18,6 +18,33 @@ let marker;
 
 let stopMarkers = [];
 let routeLine = null;
+
+// If rideId is not present
+async function autoSelectRideId() {
+  if (rideId) return; // already available
+
+  if (!routeKey) return;
+
+  const [source, destination] = routeKey.split("_");
+
+  try {
+    const res = await fetch(
+      `http://localhost:8080/api/ride/active?source=${source}&destination=${destination}`
+    );
+
+    const buses = await res.json();
+
+    if (buses.length > 0) {
+      rideId = buses[0].rideId; // ✅ auto pick first bus
+      updateLocation();
+    }
+  } catch (err) {
+    console.error("Failed to auto-select bus", err);
+  }
+}
+
+
+
 
 async function loadRouteStops(routeKey){
     const res = await fetch(`/api/routes/${routeKey}`);
@@ -54,10 +81,6 @@ async function loadRouteStops(routeKey){
 
     map.fitBounds(routeLine.getBounds());
     renderETATable(stops);
-}
-
-if (routeKey) {
-  loadRouteStops(routeKey);
 }
 
 function renderETATable(stops) {
@@ -99,29 +122,33 @@ async function reverseGeocode(lat, lng) {
 
 
 async function updateLocation() {
+  if (!rideId) return;
+
   const res = await fetch(
     `http://localhost:8080/api/location/last-loc/${rideId}`
   );
-
   if (!res.ok) return;
 
   const loc = await res.json();
   if (!loc) return;
 
   const pos = [loc.latitude, loc.longitude];
-
   const locationName = await reverseGeocode(loc.latitude, loc.longitude);
 
-  if (!marker) {
-      marker = L.marker(pos, { icon: busIcon })
-        .addTo(map)
-        .bindPopup(`<b>Current Location:</b><br>${locationName}`);
-    } else {
-      marker.setLatLng(pos);
-      marker.setPopupContent(`<b>Current Location:</b><br>${locationName}`);
-    }
+  const popupContent = `<b>Current Location:</b><br>${locationName}`;
 
-  map.setView(pos);
+  if (!marker) {
+    marker = L.marker(pos, { icon: busIcon })
+      .addTo(map)
+      .bindPopup(popupContent)
+      .openPopup();
+  } else {
+    marker.setLatLng(pos);
+    marker.setPopupContent(popupContent);
+    marker.openPopup();
+  }
+
+  map.panTo(pos, { animate: true, duration: 0.5 });
 }
 
 function goBack() {
@@ -129,5 +156,9 @@ function goBack() {
 }
 
 
-updateLocation();
+if (routeKey) {
+  loadRouteStops(routeKey);
+}
+
+autoSelectRideId();
 setInterval(updateLocation, 3000);
