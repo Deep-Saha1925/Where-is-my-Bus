@@ -1,5 +1,6 @@
 const params = new URLSearchParams(window.location.search);
 const rideId = params.get("rideId");
+const routeKey = params.get("routeKey");
 
 const map = L.map("map").setView([26.7271, 88.3953], 13);
 
@@ -55,7 +56,10 @@ async function loadRouteStops(routeKey){
     renderETATable(stops);
 }
 
-loadRouteStops("SLG_NJP");
+if (routeKey) {
+  loadRouteStops(routeKey);
+}
+
 function renderETATable(stops) {
   const body = document.getElementById("etaBody");
   body.innerHTML = "";
@@ -70,7 +74,6 @@ function renderETATable(stops) {
     body.appendChild(row);
   });
 }
-
 
 const locationCache = {};
 

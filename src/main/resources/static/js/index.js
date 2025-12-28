@@ -1,6 +1,8 @@
 async function searchBuses() {
-  const source = document.getElementById("source").value.trim();
-  const destination = document.getElementById("destination").value.trim();
+  const source = document.getElementById("source").value.trim().toUpperCase();
+  const destination = document.getElementById("destination").value.trim().toUpperCase();
+
+  const routeKey = `${source}_${destination}`;
 
   const busList = document.getElementById("busList");
   const loading = document.getElementById("loading");
@@ -55,7 +57,7 @@ async function searchBuses() {
         </p>
 
         <button
-          onclick="track(${bus.rideId})"
+          onclick="track('${routeKey}', ${bus.rideId})"
           class="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2"
         >
           <i class="fa-solid fa-location-dot"></i>
@@ -73,10 +75,7 @@ async function searchBuses() {
   }
 }
 
-function track(rideId) {
-    if (!rideId) {
-        alert("Ride ID missing");
-        return;
-    }
-    window.location.href = `track.html?rideId=${rideId}`;
+function track(routeKey, rideId) {
+  window.location.href =
+    `track.html?routeKey=${routeKey}&rideId=${rideId}`;
 }
