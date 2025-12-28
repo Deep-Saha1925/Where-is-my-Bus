@@ -88,7 +88,7 @@ async function startRide() {
     if (!res.ok) throw new Error("Failed to start ride");
 
     const data = await res.json();
-    rideId = data.rideId; // 🔥 dynamic rideId
+    rideId = data.id; // dynamic rideId
 
     document.getElementById("startBtn").classList.add("hidden");
     document.getElementById("stopBtn").classList.remove("hidden");

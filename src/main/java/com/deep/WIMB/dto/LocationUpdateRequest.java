@@ -9,5 +9,4 @@ public class LocationUpdateRequest {
     private Long rideId;
     private double latitude;
     private double longitude;
-    private double speed;
 }

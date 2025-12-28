@@ -37,8 +37,7 @@ public class RideController {
         locationService.addLocation(
                 ride.getId(),
                 request.getLatitude(),
-                request.getLongitude(),
-                null
+                request.getLongitude()
         );
 
         return ride;
@@ -49,8 +48,7 @@ public class RideController {
         return locationService.addLocation(
                 request.getRideId(),
                 request.getLatitude(),
-                request.getLongitude(),
-                request.getSpeed()
+                request.getLongitude()
         );
     }
 

@@ -19,8 +19,7 @@ public class LocationController {
         return locationService.addLocation(
                 request.getRideId(),
                 request.getLatitude(),
-                request.getLongitude(),
-                request.getSpeed()
+                request.getLongitude()
         );
     }
 
