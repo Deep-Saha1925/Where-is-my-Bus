@@ -90,4 +90,25 @@ public class RideService {
             return dto;
         }).toList();
     }
+
+    public List<ActiveRideResponse> getAllActiveRides(){
+        List<Ride> rides = rideRepository.findByStatus(RideStatus.ACTIVE);
+
+        return rides.stream().map(ride -> {
+            ActiveRideResponse dto = new ActiveRideResponse();
+
+            dto.setRideId(ride.getId());
+            dto.setBusNumber(ride.getBus().getBusNumber());
+            dto.setRouteKey(ride.getRouteKey());
+
+            locationRepository
+                    .findTopByRideIdOrderByTimestampDesc(ride.getId())
+                    .ifPresent(loc -> {
+                        dto.setLatitude(loc.getLatitude());
+                        dto.setLongitude(loc.getLongitude());
+                    });
+
+            return dto;
+        }).toList();
+    }
 }

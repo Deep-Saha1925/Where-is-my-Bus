@@ -42,6 +42,12 @@ public class RideController {
         return ride;
     }
 
+    @GetMapping("/active/all")
+    public List<ActiveRideResponse> getAllActiveRides() {
+        return rideService.getAllActiveRides();
+    }
+
+
     @PostMapping("/location")
     public Location updateLocation(@RequestBody LocationUpdateRequest request) {
         return locationService.addLocation(

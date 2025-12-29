@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>All Active Buses | WIMB</title>
+
+    <!-- Leaflet -->
+    <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <!-- Font Awesome -->
+    <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <style>
+        body {
+          margin: 0;
+          font-family: Arial, sans-serif;
+        }
+
+        header {
+          background: #1e40af;
+          color: white;
+          padding: 12px 20px;
+          font-size: 18px;
+        }
+
+        #map {
+          height: calc(100vh - 50px);
+          width: 100%;
+        }
+
+        .bus-marker {
+          color: #dc2626;
+          font-size: 22px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    🚌 WIMB – All Active Buses (Live)
+</header>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/admin.js"></script>
+
+</body>
+</html>
