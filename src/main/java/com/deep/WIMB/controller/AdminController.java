@@ -13,6 +13,6 @@ public class AdminController {
 
     @GetMapping("/active/all-buses")
     public String getAllActiveRides() {
-        return "admin";
+        return "admin-buses";
     }
 }

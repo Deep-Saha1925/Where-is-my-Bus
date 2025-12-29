@@ -72,8 +72,7 @@ async function startRide() {
 
   const payload = {
     busNumber: document.getElementById("busNumber").value.trim(), // later make dynamic / logged-in driver
-    source,
-    destination,
+    routeKey: source + "_" + destination,
     latitude: currentPosition.coords.latitude,
     longitude: currentPosition.coords.longitude
   };

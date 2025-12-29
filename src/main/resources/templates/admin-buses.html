@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Active Buses | WIMB</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+<h1 class="text-2xl font-bold mb-4">🚌 Active Buses</h1>
+
+<div class="bg-white shadow rounded-lg overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-200">
+    <tr>
+      <th class="p-3 text-left">Bus No</th>
+      <th class="p-3 text-left">Source</th>
+      <th class="p-3 text-left">Destination</th>
+      <th class="p-3 text-left">Status</th>
+      <th class="p-3 text-center">Action</th>
+    </tr>
+    </thead>
+
+    <tbody id="busTableBody"></tbody>
+  </table>
+</div>
+
+<script src="/js/admin-buses.js"></script>
+</body>
+</html>

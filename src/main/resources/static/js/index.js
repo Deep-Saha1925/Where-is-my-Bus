@@ -57,7 +57,7 @@ async function searchBuses() {
         </p>
 
         <button
-          onclick="track('${routeKey}', ${bus.rideId})"
+          onclick="track('${routeKey}', ${bus.id})"
           class="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2"
         >
           <i class="fa-solid fa-location-dot"></i>

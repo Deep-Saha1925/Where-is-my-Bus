@@ -4,6 +4,7 @@ import com.deep.WIMB.dto.ActiveRideResponse;
 import com.deep.WIMB.dto.StartRideRequest;
 import com.deep.WIMB.enums.RideStatus;
 import com.deep.WIMB.model.Bus;
+import com.deep.WIMB.model.Location;
 import com.deep.WIMB.model.Ride;
 import com.deep.WIMB.repository.BusRepository;
 import com.deep.WIMB.repository.LocationRepository;
@@ -26,30 +27,40 @@ public class RideService {
     @Transactional
     public Ride startRide(StartRideRequest request) {
 
-        //  Find or create Bus
         Bus bus = busRepository.findByBusNumber(request.getBusNumber())
                 .orElseGet(() -> {
-                    Bus newBus = new Bus();
-                    newBus.setBusNumber(request.getBusNumber());
-                    return busRepository.save(newBus);
+                    Bus b = new Bus();
+                    b.setBusNumber(request.getBusNumber());
+                    return busRepository.save(b);
                 });
 
-        //  End any existing active ride for this bus
+        // End any existing active ride for this bus
         rideRepository.findByBusAndStatus(bus, RideStatus.ACTIVE)
-                .ifPresent(oldRide -> {
-                    oldRide.setStatus(RideStatus.ENDED);
-                    oldRide.setEndTime(LocalDateTime.now());
+                .ifPresent(r -> {
+                    r.setStatus(RideStatus.ENDED);
+                    r.setEndTime(LocalDateTime.now());
                 });
 
-        //  Create new Ride (ROUTE-BASED, not source/dest based)
         Ride ride = new Ride();
         ride.setBus(bus);
-        ride.setRouteKey(request.getRouteKey());   // 🔥 IMPORTANT
+        ride.setRouteKey(request.getRouteKey());
         ride.setStartTime(LocalDateTime.now());
         ride.setStatus(RideStatus.ACTIVE);
 
-        return rideRepository.save(ride);
+        ride = rideRepository.save(ride);
+
+        // Save initial location
+        Location loc = new Location();
+        loc.setRide(ride);
+        loc.setLatitude(request.getLatitude());
+        loc.setLongitude(request.getLongitude());
+        loc.setTimestamp(LocalDateTime.now());
+
+        locationRepository.save(loc);
+
+        return ride;
     }
+
 
     @Transactional
     public Ride cancelRide(Long rideId) {
