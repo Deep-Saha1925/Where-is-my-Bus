@@ -33,7 +33,7 @@ async function loadActiveBuses() {
         </td>
         <td class="p-3 text-center">
           <button
-            onclick="trackBus('${routeKey}', ${ride.id})"
+            onclick="trackBus('${routeKey}', ${ride.rideId})"
             class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
           >
             View Map
@@ -51,7 +51,7 @@ async function loadActiveBuses() {
 
 function trackBus(routeKey, rideId) {
   window.location.href =
-    `track.html?routeKey=${routeKey}&rideId=${rideId}`;
+    `http://localhost:8080/track.html?routeKey=${routeKey}&rideId=${rideId}`;
 }
 
 // initial load + auto refresh
