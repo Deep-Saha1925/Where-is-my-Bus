@@ -20,7 +20,7 @@ async function searchBuses() {
 
   try {
     const res = await fetch(
-      `http://localhost:8080/api/ride/active?source=${source}&destination=${destination}`
+      `http://localhost:8080/api/ride/active?routeKey=${routeKey}`
     );
 
     const buses = await res.json();
@@ -38,6 +38,13 @@ async function searchBuses() {
         hover:shadow-xl transition transform hover:-translate-y-1
       `;
 
+      let src = "N/A";
+      let dest = "N/A";
+
+      if (bus.routeKey && bus.routeKey.includes("_")) {
+        [src, dest] = bus.routeKey.split("_");
+      }
+
       card.innerHTML = `
         <div class="flex justify-between items-center mb-3">
           <div class="flex items-center gap-3">
@@ -53,11 +60,11 @@ async function searchBuses() {
         </div>
 
         <p class="text-sm text-gray-600 mb-2">
-          Route: <b>${bus.source}</b> → <b>${bus.destination}</b>
+          Route: <b>${src}</b> → <b>${dest}</b>
         </p>
 
         <button
-          onclick="track('${routeKey}', ${bus.id})"
+          onclick="track('${routeKey}', ${bus.rideId})"
           class="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2"
         >
           <i class="fa-solid fa-location-dot"></i>
