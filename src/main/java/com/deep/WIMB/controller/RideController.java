@@ -22,10 +22,9 @@ public class RideController {
 
     @GetMapping("/active")
     public List<ActiveRideResponse> getActiveRides(
-            @RequestParam String source,
-            @RequestParam String destination
+            @RequestParam String routeKey
     ) {
-        return rideService.getActiveRidesByRoute(source, destination);
+        return rideService.getActiveRidesByRoute(routeKey);
     }
 
     @PostMapping("/start")

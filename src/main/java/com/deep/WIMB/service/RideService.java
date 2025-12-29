@@ -26,6 +26,7 @@ public class RideService {
     @Transactional
     public Ride startRide(StartRideRequest request) {
 
+        //  Find or create Bus
         Bus bus = busRepository.findByBusNumber(request.getBusNumber())
                 .orElseGet(() -> {
                     Bus newBus = new Bus();
@@ -33,17 +34,17 @@ public class RideService {
                     return busRepository.save(newBus);
                 });
 
-        // End previous active ride
+        //  End any existing active ride for this bus
         rideRepository.findByBusAndStatus(bus, RideStatus.ACTIVE)
-                .ifPresent(ride -> {
-                    ride.setStatus(RideStatus.ENDED);
-                    ride.setEndTime(LocalDateTime.now());
+                .ifPresent(oldRide -> {
+                    oldRide.setStatus(RideStatus.ENDED);
+                    oldRide.setEndTime(LocalDateTime.now());
                 });
 
+        //  Create new Ride (ROUTE-BASED, not source/dest based)
         Ride ride = new Ride();
         ride.setBus(bus);
-        ride.setSource(request.getSource());
-        ride.setDestination(request.getDestination());
+        ride.setRouteKey(request.getRouteKey());   // 🔥 IMPORTANT
         ride.setStartTime(LocalDateTime.now());
         ride.setStatus(RideStatus.ACTIVE);
 
@@ -51,30 +52,34 @@ public class RideService {
     }
 
     @Transactional
-    public Ride cancelRide(Long rideId){
-        Ride ride = rideRepository.findById(rideId)
-                .orElseThrow(() -> new RuntimeException("Ride not found."));
+    public Ride cancelRide(Long rideId) {
 
-        if (ride.getStatus() == RideStatus.ENDED){
-            throw new RuntimeException("Ride already ended.");
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new RuntimeException("Ride not found"));
+
+        if (ride.getStatus() == RideStatus.ENDED) {
+            throw new RuntimeException("Ride already ended");
         }
 
         ride.setStatus(RideStatus.ENDED);
         ride.setEndTime(LocalDateTime.now());
+
         return rideRepository.save(ride);
     }
 
-    public List<ActiveRideResponse> getActiveRidesByRoute(String source, String destination) {
+    public List<ActiveRideResponse> getActiveRidesByRoute(String routeKey) {
+
         List<Ride> rides = rideRepository
-                .findBySourceAndDestinationAndStatus(source, destination, RideStatus.ACTIVE);
+                .findByRouteKeyAndStatus(routeKey, RideStatus.ACTIVE);
 
         return rides.stream().map(ride -> {
+
             ActiveRideResponse dto = new ActiveRideResponse();
             dto.setRideId(ride.getId());
             dto.setBusNumber(ride.getBus().getBusNumber());
-            dto.setDestination(ride.getDestination());
-            dto.setSource(ride.getSource());
+            dto.setRouteKey(ride.getRouteKey());
 
+            // Attach last known location
             locationRepository
                     .findTopByRideIdOrderByTimestampDesc(ride.getId())
                     .ifPresent(loc -> {

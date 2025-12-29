@@ -16,20 +16,35 @@ import java.time.LocalDateTime;
 @Setter
 public class Ride {
 
+//    @Id
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
+//    private Long id;
+//
+//    @ManyToOne
+//    private Bus bus;
+//
+//    private String source;
+//    private String destination;
+//
+//    private LocalDateTime startTime;
+//    private LocalDateTime endTime;
+//
+//    @Enumerated(EnumType.STRING)
+//    private RideStatus status;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    private Bus bus;
-
-    private String source;
-    private String destination;
+    private String routeKey;
 
     private LocalDateTime startTime;
     private LocalDateTime endTime;
-    
+
     @Enumerated(EnumType.STRING)
     private RideStatus status;
+
+    @ManyToOne
+    private Bus bus;
 
 }

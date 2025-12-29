@@ -8,8 +8,7 @@ import lombok.Setter;
 public class StartRideRequest {
 
     private String busNumber;
-    private String source;
-    private String destination;
+    private String routeKey;
     private double latitude;
     private double longitude;
 }
