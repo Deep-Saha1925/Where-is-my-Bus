@@ -150,6 +150,13 @@ Example:
 
 ---
 
+
+### ▶ Admin Dashboard (Track all bus location live)
+```
+GET /admin/active/all-buses
+```
+
+
 ## 🖥️ Frontend Flow
 
 ### index.html
@@ -163,6 +170,11 @@ Example:
 - Live bus icon moves automatically
 - Popup always shows current location
 - ETA table rendered from route data
+
+### admin-buses.html
+- Enter **See all live buses**
+- View **bus live location on map**
+- Click **Track Bus**
 
 ---
 
@@ -183,7 +195,6 @@ Example:
 - WebSocket-based live updates
 - ETA prediction per stop
 - Admin panel for Excel upload
-- Driver mobile app
 - Alerts & notifications
 - Historical route analytics
 
