@@ -110,8 +110,7 @@ function startLocationTracking() {
         body: JSON.stringify({
           rideId,
           latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          speed: pos.coords.speed || 0
+          longitude: pos.coords.longitude
         })
       });
     },

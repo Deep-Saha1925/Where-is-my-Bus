@@ -22,7 +22,7 @@
 
         @PostConstruct
         public void loadRoute() throws Exception {
-            loadRoute("SLG_NJP", "routes/route_SLG_NJP.xlsx");
+            loadRoute("DHUPGURI_SILIGURI", "routes/route_SLG_NJP.xlsx");
         }
 
         private void loadRoute(String routeKey, String path) throws Exception {

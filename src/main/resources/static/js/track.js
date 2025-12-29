@@ -26,7 +26,7 @@ async function autoSelectRideId() {
 
   try {
     const res = await fetch(
-      `http://localhost:8080/api/ride/active?source=${source}&destination=${destination}`
+      `http://localhost:8080/api/ride/active?routeKey=${routeKey}`
     );
 
     const buses = await res.json();
@@ -133,7 +133,7 @@ async function updateLocation() {
 
   if (!res.ok) return;
 
-  const loc = await res.json();
+const loc = await res.json();
   if (!loc) return;
 
   const pos = [loc.latitude, loc.longitude];
