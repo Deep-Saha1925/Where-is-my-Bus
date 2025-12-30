@@ -43,7 +43,7 @@ async function autoSelectRideId() {
 /* ---------------- LOAD ROUTE STOPS (PARTIAL) ---------------- */
 async function loadRouteStops(routeKey, src, dest) {
   const res = await fetch(
-    `/api/routes/${routeKey}?source=${src}&destination=${dest}`
+    `/api/routes?source=${src}&destination=${dest}`
   );
 
   const stops = await res.json();

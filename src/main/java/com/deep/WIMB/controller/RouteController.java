@@ -16,9 +16,8 @@ public class RouteController {
         this.loader = loader;
     }
 
-    @GetMapping("/{routeKey}")
+    @GetMapping("")
     public List<RouteStop> getRoute(
-            @PathVariable String routeKey,
             @RequestParam String source,
             @RequestParam String destination
     ) {

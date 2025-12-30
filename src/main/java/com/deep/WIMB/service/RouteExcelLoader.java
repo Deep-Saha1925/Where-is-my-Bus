@@ -54,11 +54,6 @@ public class RouteExcelLoader {
         routeCache.put(routeKey, stops);
         wb.close();
 
-        List<RouteStop> routeStops = routeCache.get(routeKey);
-        for (RouteStop r : routeStops){
-            System.out.println(r);
-        }
-
         System.out.println("Loaded route " + routeKey + " with " + stops.size() + " stops");
     }
 
@@ -97,24 +92,45 @@ public class RouteExcelLoader {
     ) {
         List<RouteStop> fullRoute = getFullRoute();
 
-        int startIdx = -1;
-        int endIdx = -1;
+        int sourceIdx = -1;
+        int destIdx = -1;
 
         for (int i = 0; i < fullRoute.size(); i++) {
             String stopName = fullRoute.get(i).getStopName();
 
-            if (stopName.equalsIgnoreCase(source)) startIdx = i;
-            if (stopName.equalsIgnoreCase(destination)) endIdx = i;
+            if (stopName.equalsIgnoreCase(source)) {
+                sourceIdx = i;
+            }
+            if (stopName.equalsIgnoreCase(destination)) {
+                destIdx = i;
+            }
         }
 
-        if (startIdx == -1 || endIdx == -1) {
+        if (sourceIdx == -1 || destIdx == -1) {
             throw new RuntimeException("Invalid source or destination");
         }
 
-        if (startIdx > endIdx) {
-            throw new RuntimeException("Destination comes before source");
+        List<RouteStop> segment;
+
+        // FORWARD
+        if (sourceIdx < destIdx) {
+            segment = new ArrayList<>(fullRoute.subList(sourceIdx, destIdx + 1));
         }
 
-        return fullRoute.subList(startIdx, endIdx + 1);
+        // BACKWARD
+        else{
+            segment = new ArrayList<>(fullRoute.subList(destIdx, sourceIdx + 1));
+            Collections.reverse(segment);
+        }
+
+        // Recalculate distance
+        double baseDistance = segment.get(0).getDistanceFromStartKm();
+
+        for (RouteStop stop : segment){
+            double adjustedDistance = Math.abs(stop.getDistanceFromStartKm() - baseDistance);
+            stop.setDistanceFromStartKm(adjustedDistance);
+        }
+
+        return segment;
     }
 }
