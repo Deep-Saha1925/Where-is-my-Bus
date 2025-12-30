@@ -1,4 +1,3 @@
-
 # 🚌 Where Is My Bus (WIMB)
 
 ## 📌 Project Description
@@ -6,19 +5,20 @@
 **Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system designed to solve the problem of **uncertain bus timings and locations**, especially in semi-urban and rural regions like North Bengal.
 
 Unlike traditional systems that rely only on databases, WIMB uses a **hybrid approach**:
-- **Dynamic data** (bus location, rides) from backend APIs
-- **Static route data** (stops, distances, halt times) loaded from **Excel sheets**
+- **Dynamic data** (live bus location, rides)
+- **Static route data** (stops, distance, halt times) loaded from **Excel files**
+- **Frontend dropdown data** synchronized via **JSON**
 
-This makes the system **easy to maintain, scalable, and realistic for government/private transport use**.
+This design makes the system **realistic, scalable, and easy to maintain** for government or private transport systems.
 
 ---
 
 ## ❓ Problem Statement
 
-- Passengers wait without knowing the bus position
-- No ETA or stop-level visibility
-- Route data is hardcoded or poorly maintained
-- No single platform to view live buses on a route
+- Passengers wait without knowing the exact bus position
+- No clarity on whether a bus has already crossed a stop
+- Static routes are hardcoded or poorly managed
+- No forward / reverse route intelligence
 
 ---
 
@@ -26,12 +26,12 @@ This makes the system **easy to maintain, scalable, and realistic for government
 
 WIMB provides:
 
-- 🔴 **Live bus tracking on map**
-- 🗺️ **Route visualization with stops**
-- 🧾 **Excel-based static route management**
-- ⏱️ **Auto-updating bus location (no click required)**
-- 🔎 **Search buses using Source → Destination**
-- 📍 **Reverse-geocoded human-readable location**
+- 🔴 **Live bus tracking**
+- 🗺️ **Excel-driven route visualization**
+- 🔁 **Automatic forward & reverse direction handling**
+- 🔎 **Source → Destination based bus search**
+- 📍 **Dropdown-based stop selection (real-world UX)**
+- ❌ **No false bus visibility after crossing source**
 
 ---
 
@@ -40,19 +40,23 @@ WIMB provides:
 ### 🔹 Backend
 - Java 17
 - Spring Boot
-- RESTful APIs
-- Apache POI (Excel reading)
-- MySQL (for rides & locations)
+- REST APIs
+- Apache POI (Excel processing)
+- MySQL
+- Jackson (JSON sync)
 
 ### 🔹 Frontend
-- HTML, CSS, JavaScript
-- Leaflet.js (Maps)
-- OpenStreetMap tiles
-- Font Awesome icons
+- HTML
+- Tailwind CSS
+- JavaScript
+- Leaflet.js
+- OpenStreetMap
+- Font Awesome
 
 ---
 
 ## 🧱 Architecture
+
 
 ```
 Driver App (GPS)
@@ -67,6 +71,8 @@ Excel Route File
       ↓
 Route Loader Service
       ↓
+In-Memory Route Cache
+      ↓
 Route API
       ↓
 Map + ETA Table
@@ -74,25 +80,65 @@ Map + ETA Table
 
 ---
 
-## 📂 Static Route Management (Excel)
+## 📂 Route Data Management
 
-Routes are stored in Excel files like:
+### 📘 Excel (Single Source of Truth)
 
-```
-ABC.xlsx
+Location:
+routes/ABC.xlsx
+
 ```
 
 ### 📑 Excel Format (Mandatory)
 
 | routeKey | stopName | latitude | longitude | distanceFromStartKm | slackTimeMin |
-|--------|----------|----------|-----------|---------------------|--------------|
+|----------|----------|----------|-----------|---------------------|--------------|
 | SLG_NJP | Siliguri | 26.7271  | 88.3953   | 0                   | 0            |
 | SLG_NJP | Bagdogra | 26.6986  | 88.3110   | 12                  | 5            |
 | SLG_NJP | NJP      | 26.6812  | 88.3290   | 18                  | 0            |
 
+```
 ✔ Loaded once at application startup  
 ✔ No DB required for route data  
 ✔ Easy to update by non-technical staff
+
+Defines:
+- stopOrder
+- stopName
+- latitude / longitude
+- distanceFromStartKm
+- slackTimeMin
+
+Loaded once at application startup.
+
+---
+
+### 📗 JSON (Frontend Dropdown)
+
+Location:
+data/stops.json
+
+- Automatically updated from **Excel stopName column**
+- Used only for UI dropdowns
+- Prevents typing errors
+- Enables direction detection
+
+---
+
+## 🔄 Direction Logic (Core Innovation)
+
+Direction is determined automatically:
+
+- **FORWARD** → sourceOrder < destinationOrder
+- **BACKWARD** → sourceOrder > destinationOrder
+
+### Passenger Visibility Rule
+
+A bus is shown **only if it has NOT crossed the passenger's source stop**.
+
+✔ Forward-safe  
+✔ Reverse-safe  
+✔ Real-world accurate
 
 ---
 
@@ -178,25 +224,23 @@ GET /admin/active/all-buses
 
 ---
 
-## ✨ Key Features Implemented
+## ✨ Key Highlights
 
-- ✅ Route visualization from Excel
-- ✅ Auto-moving bus marker
-- ✅ No click needed to see location
-- ✅ Reverse geocoding (OpenStreetMap)
-- ✅ Smooth map pan with movement
-- ✅ Works for multiple routes
-- ✅ Clean and scalable design
+- Excel = master data
+- JSON auto-synced
+- Direction-aware filtering
+- No false bus visibility
+- Designed for real transport systems
 
 ---
 
 ## 🚀 Future Enhancements
 
-- WebSocket-based live updates
-- ETA prediction per stop
-- Admin panel for Excel upload
+- WebSocket live tracking
+- ETA prediction
+- Admin Excel upload panel
 - Alerts & notifications
-- Historical route analytics
+- Multi-route support
 
 ---
 
