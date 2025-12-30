@@ -55,6 +55,20 @@ WIMB provides:
 
 ---
 
+## 📸 Application Screenshots
+
+### 🏠 Dashboard
+<img src="images/dashboard.png" width="600"/>
+
+### 🗺 Live Bus Tracking
+<img src="images/live-tracking.png" width="600"/>
+
+### 🛣 Route Management
+<img src="images/dashboard.png" width="600"/>
+
+### 🔐 Admin Panel
+<img src="images/admin-panel.png" width="600"/>
+
 ## 🧱 Architecture
 
 
