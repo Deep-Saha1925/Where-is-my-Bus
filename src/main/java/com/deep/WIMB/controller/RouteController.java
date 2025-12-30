@@ -23,7 +23,6 @@ public class RouteController {
             @RequestParam String destination
     ) {
         return loader.getRouteBetween(
-                routeKey,
                 source,
                 destination
         );

@@ -20,7 +20,7 @@ async function searchBuses() {
 
   try {
     const res = await fetch(
-      `http://localhost:8080/api/ride/active?routeKey=${routeKey}`
+      `http://localhost:8080/api/ride/active?source=${source}&destination=${destination}`
     );
 
     const buses = await res.json();
