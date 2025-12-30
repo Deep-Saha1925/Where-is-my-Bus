@@ -89,13 +89,12 @@ public class RideService {
             String userDestination
     ) {
 
-        List<RouteStop> routeSegment =
-                routeExcelLoader.getRouteBetween(
-                        userSource,
-                        userDestination
-                );
+        List<RouteStop> fullRoute = routeExcelLoader.getFullRoute();
 
-        int userSourceOrder = routeSegment.get(0).getStopOrder();
+        int sourceOrder = routeExcelLoader.getStopOrderByName(userSource);
+        int destOrder = routeExcelLoader.getStopOrderByName(userDestination);
+
+        boolean isForward = sourceOrder < destOrder;
 
         return rideRepository
                 .findByStatus(RideStatus.ACTIVE)
@@ -111,16 +110,31 @@ public class RideService {
 
                     if (lastLoc == null) return false;
 
-                    List<RouteStop> fullRoute = routeExcelLoader.getFullRoute();
+                    int busOrder = findStopOrder(fullRoute, lastLoc);
 
-                    int busCurrentOrder = findStopOrder(fullRoute, lastLoc);
+                    if (isForward) {
+                    /*
+                      FORWARD RULE:
+                      bus must NOT have crossed source
+                      AND destination must be ahead
+                     */
+                        return busOrder <= sourceOrder
+                                && sourceOrder <= destOrder;
 
-                    // IMPORTANT RULE
-                    return busCurrentOrder <= userSourceOrder;
+                    } else {
+                    /*
+                      BACKWARD RULE:
+                      bus must NOT have crossed source
+                      AND destination must be behind
+                     */
+                        return busOrder >= sourceOrder
+                                && sourceOrder >= destOrder;
+                    }
                 })
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
+
 
     // ================= ALL ACTIVE RIDES =================
 

@@ -62,7 +62,7 @@ public class RouteExcelLoader {
         System.out.println("Loaded route " + routeKey + " with " + stops.size() + " stops");
     }
 
-    // 🔧 Utility method
+    // Utility method
     private boolean isAnyCellMissing(Row row, int... idxs) {
         for (int idx : idxs) {
             Cell c = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
@@ -71,7 +71,17 @@ public class RouteExcelLoader {
         return false;
     }
 
-    // ---------------- API METHODS ----------------
+    public int getStopOrderByName(String stopName) {
+        return routeCache.values()
+                .stream()
+                .flatMap(List::stream)
+                .filter(s -> s.getStopName().equalsIgnoreCase(stopName))
+                .findFirst()
+                .orElseThrow(() ->
+                        new RuntimeException("Stop not found: " + stopName))
+                .getStopOrder();
+    }
+
 
     public List<RouteStop> getFullRoute() {
         List<RouteStop> route = routeCache.get(routeKey);
