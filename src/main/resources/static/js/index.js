@@ -1,6 +1,42 @@
+document.addEventListener("DOMContentLoaded", loadStops);
+
+function loadStops() {
+    fetch("data/stops.json")
+        .then(response => response.json())
+        .then(data => {
+            const sourceSelect = document.getElementById("source");
+            const destinationSelect = document.getElementById("destination");
+
+            data.stops.forEach(stop => {
+                const option1 = document.createElement("option");
+                option1.value = stop;
+                option1.textContent = stop;
+
+                const option2 = option1.cloneNode(true);
+
+                sourceSelect.appendChild(option1);
+                destinationSelect.appendChild(option2);
+            });
+        })
+        .catch(error => {
+            console.error("Error loading stops:", error);
+        });
+}
+
+
 async function searchBuses() {
   const source = document.getElementById("source").value.trim().toUpperCase();
   const destination = document.getElementById("destination").value.trim().toUpperCase();
+
+  if (!source || !destination) {
+      alert("Please select both source and destination");
+      return;
+  }
+
+  if (source === destination) {
+      alert("Source and destination cannot be the same");
+      return;
+  }
 
   const routeKey = `${source}_${destination}`;
 
@@ -10,11 +46,6 @@ async function searchBuses() {
 
   busList.innerHTML = "";
   noResults.classList.add("hidden");
-
-  if (!source || !destination) {
-    alert("Please enter both source and destination");
-    return;
-  }
 
   loading.classList.remove("hidden");
 

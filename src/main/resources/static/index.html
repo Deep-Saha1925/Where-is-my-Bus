@@ -35,19 +35,19 @@
         </h2>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
+            <select
                     id="source"
-                    type="text"
-                    placeholder="Source"
-                    class="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <option value="">Select Source</option>
+            </select>
 
-            <input
+            <select
                     id="destination"
-                    type="text"
-                    placeholder="Destination"
-                    class="border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+                <option value="">Select Destination</option>
+            </select>
 
             <button
                     onclick="searchBuses()"
