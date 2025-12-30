@@ -1,11 +1,13 @@
 package com.deep.WIMB.service;
 
 import com.deep.WIMB.dto.RouteStop;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.*;
 
@@ -14,7 +16,10 @@ public class RouteExcelLoader {
 
     private final Map<String, List<RouteStop>> routeCache = new HashMap<>();
 
-    public final String routeKey = "DEMO_ROUTES";
+    private final String routeKey = "DEMO_ROUTES";
+    private static final String STOPS_JSON_PATH = "data/stops.json";
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostConstruct
     public void loadRoute() throws Exception {
@@ -28,6 +33,7 @@ public class RouteExcelLoader {
         Sheet sheet = wb.getSheetAt(0);
 
         List<RouteStop> stops = new ArrayList<>();
+        List<String> stopNames = new ArrayList<>();
 
         for (int i = 1; i <= sheet.getLastRowNum(); i++) {
 
@@ -40,22 +46,53 @@ public class RouteExcelLoader {
                 continue;
             }
 
+            String stopName = r.getCell(1)
+                    .getStringCellValue()
+                    .trim();
+
             RouteStop stop = new RouteStop();
             stop.setStopOrder((int) r.getCell(0).getNumericCellValue());
-            stop.setStopName(r.getCell(1).getStringCellValue().trim());
+            stop.setStopName(stopName);
             stop.setLatitude(r.getCell(2).getNumericCellValue());
             stop.setLongitude(r.getCell(3).getNumericCellValue());
             stop.setDistanceFromStartKm(r.getCell(4).getNumericCellValue());
             stop.setSlackTimeMin((int) r.getCell(5).getNumericCellValue());
 
             stops.add(stop);
+            stopNames.add(stopName);
         }
 
         routeCache.put(routeKey, stops);
         wb.close();
 
+        //update json file with stop names
+        updateStopsJson(stopNames);
+
         System.out.println("Loaded route " + routeKey + " with " + stops.size() + " stops");
     }
+
+
+    private void updateStopsJson(List<String> stopNames){
+        try{
+            Map<String, Object> json = new HashMap<>();
+            json.put("stops", stopNames);
+
+            File file = new File(STOPS_JSON_PATH);
+
+            //create dir if missing
+            file.getParentFile().mkdirs();
+
+            objectMapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValue(file, json);
+
+            System.out.println("Updated stops.json file");
+        }catch (Exception e){
+            System.err.println("Error updating stops.json file");
+            e.printStackTrace();
+        }
+    }
+
 
     // Utility method
     private boolean isAnyCellMissing(Row row, int... idxs) {
