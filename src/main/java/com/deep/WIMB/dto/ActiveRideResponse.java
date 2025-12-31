@@ -11,4 +11,6 @@ public class ActiveRideResponse {
     private String routeKey;
     private Double latitude;
     private Double longitude;
+
+    private Double remainingDistanceKm;
 }

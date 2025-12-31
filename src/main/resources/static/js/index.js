@@ -85,8 +85,8 @@ async function searchBuses() {
             </h4>
           </div>
 
-          <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-            LIVE
+          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+            ETA: ${calculateETAFromDistance(bus.remainingDistanceKm)}
           </span>
         </div>
 
@@ -116,4 +116,14 @@ async function searchBuses() {
 function track(routeKey, rideId) {
   window.location.href =
     `track.html?routeKey=${routeKey}&rideId=${rideId}`;
+}
+
+function calculateETAFromDistance(distanceKm) {
+  if (distanceKm == null) return "Updating";
+
+  const avgSpeedKmph = 30; // realistic bus speed
+  const minutes = Math.ceil((distanceKm / avgSpeedKmph) * 60);
+
+  if (minutes <= 1) return "Arriving";
+  return `${minutes} min`;
 }

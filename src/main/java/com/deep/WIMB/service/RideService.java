@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -99,7 +100,7 @@ public class RideService {
         return rideRepository
                 .findByStatus(RideStatus.ACTIVE)
                 .stream()
-                .filter(ride -> {
+                .map(ride -> {
 
                     Location lastLoc =
                             locationRepository
@@ -108,30 +109,42 @@ public class RideService {
                                     )
                                     .orElse(null);
 
-                    if (lastLoc == null) return false;
+                    if (lastLoc == null) return null;
 
                     int busOrder = findStopOrder(fullRoute, lastLoc);
 
+                    boolean allowed;
                     if (isForward) {
-                    /*
-                      FORWARD RULE:
-                      bus must NOT have crossed source
-                      AND destination must be ahead
-                     */
-                        return busOrder <= sourceOrder
-                                && sourceOrder <= destOrder;
-
+                        allowed = busOrder <= sourceOrder && sourceOrder <= destOrder;
                     } else {
-                    /*
-                      BACKWARD RULE:
-                      bus must NOT have crossed source
-                      AND destination must be behind
-                     */
-                        return busOrder >= sourceOrder
-                                && sourceOrder >= destOrder;
+                        allowed = busOrder >= sourceOrder && sourceOrder >= destOrder;
                     }
+
+                    if (!allowed) return null;
+
+                    // 🔹 NEW: distance to source
+                    RouteStop busStop = fullRoute.stream()
+                            .filter(s -> s.getStopOrder() == busOrder)
+                            .findFirst()
+                            .orElse(null);
+
+                    RouteStop sourceStop = fullRoute.stream()
+                            .filter(s -> s.getStopOrder() == sourceOrder)
+                            .findFirst()
+                            .orElse(null);
+
+                    if (busStop == null || sourceStop == null) return null;
+
+                    double remainingDistance =
+                            Math.abs(sourceStop.getDistanceFromStartKm()
+                                    - busStop.getDistanceFromStartKm());
+
+                    ActiveRideResponse dto = toDto(ride);
+                    dto.setRemainingDistanceKm(remainingDistance);
+
+                    return dto;
                 })
-                .map(this::toDto)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
