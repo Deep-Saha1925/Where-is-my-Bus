@@ -31,16 +31,9 @@ public class RideController {
     @PostMapping("/start")
     public Ride startRide(@RequestBody StartRideRequest request) {
 
-        Ride ride = rideService.startRide(request);
+        StartRideRequest newRequest = rideService.updateRequest(request);
 
-        // Create FIRST location
-        locationService.addLocation(
-                ride.getId(),
-                request.getLatitude(),
-                request.getLongitude()
-        );
-
-        return ride;
+        return rideService.startRide(newRequest);
     }
 
     @GetMapping("/active/all")

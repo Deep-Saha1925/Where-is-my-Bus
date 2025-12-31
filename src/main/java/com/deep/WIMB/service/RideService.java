@@ -28,6 +28,25 @@ public class RideService {
     private final LocationRepository locationRepository;
     private final RouteExcelLoader routeExcelLoader;
 
+    // ============ UPDATE RIDE REQUEST ================
+    public StartRideRequest updateRequest(StartRideRequest request){
+        StartRideRequest updatedRequest = new StartRideRequest();
+        List<RouteStop> allRoute = routeExcelLoader.getFullRoute();
+        String src = request.getRouteKey().split("_")[0];
+
+        for(RouteStop stop : allRoute){
+            if (stop.getStopName().equalsIgnoreCase(src)){
+                updatedRequest.setRouteKey(request.getRouteKey());
+                updatedRequest.setBusNumber(request.getBusNumber());
+                updatedRequest.setLatitude(stop.getLatitude());
+                updatedRequest.setLongitude(stop.getLongitude());
+                break;
+            }
+        }
+
+        return updatedRequest;
+    }
+
     // ================= START RIDE =================
 
     @Transactional

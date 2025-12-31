@@ -46,9 +46,9 @@ window.onload = () => {
     async pos => {
       currentPosition = pos;
 
-      const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
 
         console.log("Latitude:", lat);
         console.log("Longitude:", lng);
@@ -62,11 +62,11 @@ window.onload = () => {
         const data = await res.json();
 
         const location = extractLocation(data.address);
-        document.getElementById("source").value = location;
+//        document.getElementById("source").value = location;
 
       } catch (err) {
         console.error(err);
-        document.getElementById("source").value = "Unknown Location";
+//        document.getElementById("source").value = "Unknown Location";
       }
     },
     err => {
@@ -132,6 +132,9 @@ async function startRide() {
 }
 
 function startLocationTracking() {
+
+    if(watchId) return;
+
   watchId = navigator.geolocation.watchPosition(
     pos => {
       fetch("http://localhost:8080/api/location/update", {
