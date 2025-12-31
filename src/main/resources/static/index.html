@@ -35,19 +35,21 @@
         </h2>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select
+            <input
                     id="source"
+                    list="stopsList"
+                    placeholder="Type source"
                     class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-                <option value="">Select Source</option>
-            </select>
+            />
 
-            <select
+            <input
                     id="destination"
+                    list="stopsList"
+                    placeholder="Type destination"
                     class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-                <option value="">Select Destination</option>
-            </select>
+            />
+
+            <datalist id="stopsList"></datalist>
 
             <button
                     onclick="searchBuses()"

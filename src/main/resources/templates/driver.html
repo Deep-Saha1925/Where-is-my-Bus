@@ -19,24 +19,29 @@
             id="busNumber"
             type="text"
             required
-            class="w-full border rounded p-2 mb-3 bg-gray-100"
+            class="w-full border rounded p-2 mt-2 mb-3 bg-gray-100"
             placeholder="Enter Bus Number (WB-23A-1245)"
     />
 
     <label class="block text-sm font-medium">Start Location</label>
     <input
             id="source"
+            list="stopsList"
+            placeholder="Type source"
+            class="w-full border rounded p-2 mt-2 mb-3 bg-gray-100"
             required
-            class="w-full border rounded p-2 mb-3 bg-gray-100"
     />
 
     <label class="block text-sm font-medium">Destination</label>
     <input
             id="destination"
+            list="stopsList"
+            placeholder="Type destination"
+            class="w-full border rounded p-2 mt-2 mb-3 bg-gray-100"
             required
-            placeholder="Enter destination (e.g. NJP)"
-            class="w-full border rounded p-2 mb-4"
     />
+
+    <datalist id="stopsList"></datalist>
 
     <button
             id="startBtn"

@@ -2,6 +2,26 @@ let rideId = null;
 let watchId = null;
 let currentPosition = null;
 
+document.addEventListener("DOMContentLoaded", loadStops);
+
+function loadStops() {
+  fetch("data/stops.json")
+    .then(response => response.json())
+    .then(data => {
+      const datalist = document.getElementById("stopsList");
+      datalist.innerHTML = "";
+
+      data.stops.forEach(stop => {
+        const option = document.createElement("option");
+        option.value = stop.toUpperCase(); // keep backend-friendly
+        datalist.appendChild(option);
+      });
+    })
+    .catch(error => {
+      console.error("Error loading stops:", error);
+    });
+}
+
 function extractLocation(address) {
   return (
     address.road ||
@@ -22,12 +42,17 @@ window.onload = () => {
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
+  watchId = navigator.geolocation.watchPosition(
     async pos => {
       currentPosition = pos;
 
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+      const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+
+        console.log("Latitude:", lat);
+        console.log("Longitude:", lng);
+        console.log("Accuracy (meters):", accuracy);
 
       try {
         const res = await fetch(
@@ -50,7 +75,7 @@ window.onload = () => {
     },
     {
      enableHighAccuracy: true,
-     timeout: 10000,
+     timeout: 15000,
      maximumAge: 0
      }
   );
@@ -59,6 +84,11 @@ window.onload = () => {
 async function startRide() {
   const source = document.getElementById("source").value.trim();
   const destination = document.getElementById("destination").value.trim();
+
+  if (source == destination){
+    alert("Source and destination must be different.");
+    return;
+  }
 
   if (!destination) {
     alert("Please enter destination");

@@ -1,26 +1,21 @@
 document.addEventListener("DOMContentLoaded", loadStops);
 
 function loadStops() {
-    fetch("data/stops.json")
-        .then(response => response.json())
-        .then(data => {
-            const sourceSelect = document.getElementById("source");
-            const destinationSelect = document.getElementById("destination");
+  fetch("data/stops.json")
+    .then(response => response.json())
+    .then(data => {
+      const datalist = document.getElementById("stopsList");
+      datalist.innerHTML = "";
 
-            data.stops.forEach(stop => {
-                const option1 = document.createElement("option");
-                option1.value = stop;
-                option1.textContent = stop;
-
-                const option2 = option1.cloneNode(true);
-
-                sourceSelect.appendChild(option1);
-                destinationSelect.appendChild(option2);
-            });
-        })
-        .catch(error => {
-            console.error("Error loading stops:", error);
-        });
+      data.stops.forEach(stop => {
+        const option = document.createElement("option");
+        option.value = stop.toUpperCase(); // keep backend-friendly
+        datalist.appendChild(option);
+      });
+    })
+    .catch(error => {
+      console.error("Error loading stops:", error);
+    });
 }
 
 
