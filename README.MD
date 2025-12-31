@@ -30,7 +30,7 @@ WIMB provides:
 - 🗺️ **Excel-driven route visualization**
 - 🔁 **Automatic forward & reverse direction handling**
 - 🔎 **Source → Destination based bus search**
-- 📍 **Dropdown-based stop selection (real-world UX)**
+- 📍 ** Auto Completion dropdown-based stop selection (real-world UX)**
 - ❌ **No false bus visibility after crossing source**
 
 ---
@@ -107,9 +107,9 @@ routes/ABC.xlsx
 
 | routeKey | stopName | latitude | longitude | distanceFromStartKm | slackTimeMin |
 |----------|----------|----------|-----------|---------------------|--------------|
-| SLG_NJP | Siliguri | 26.7271  | 88.3953   | 0                   | 0            |
-| SLG_NJP | Bagdogra | 26.6986  | 88.3110   | 12                  | 5            |
-| SLG_NJP | NJP      | 26.6812  | 88.3290   | 18                  | 0            |
+| SLG_NJP  | Siliguri | 26.7271  | 88.3953   | 0                   | 0            |
+| SLG_NJP  | Bagdogra | 26.6986  | 88.3110   | 12                  | 5            |
+| SLG_NJP  | NJP      | 26.6812  | 88.3290   | 18                  | 0            |
 
 ```
 ✔ Loaded once at application startup  
@@ -240,6 +240,7 @@ GET /admin/active/all-buses
 
 ## ✨ Key Highlights
 
+- ETA prediction
 - Excel = master data
 - JSON auto-synced
 - Direction-aware filtering
@@ -251,7 +252,6 @@ GET /admin/active/all-buses
 ## 🚀 Future Enhancements
 
 - WebSocket live tracking
-- ETA prediction
 - Admin Excel upload panel
 - Alerts & notifications
 - Multi-route support
