@@ -1,184 +1,422 @@
+//let rideId = null;
+//let previewWatchId = null;   // for initial GPS preview
+//let rideWatchId = null;      // for ride tracking
+//let currentPosition = null;
+//let lastGeoCodeTime = 0;
+//
+//document.addEventListener("DOMContentLoaded", () => {
+//  loadStops();
+//  initPreviewGPS();
+//});
+//
+///* ------------------ STOPS ------------------ */
+//
+//function loadStops() {
+//  fetch("data/stops.json")
+//    .then(res => res.json())
+//    .then(data => {
+//      const datalist = document.getElementById("stopsList");
+//      datalist.innerHTML = "";
+//
+//      data.stops.forEach(stop => {
+//        const option = document.createElement("option");
+//        option.value = stop.toUpperCase();
+//        datalist.appendChild(option);
+//      });
+//    })
+//    .catch(err => console.error("Error loading stops:", err));
+//}
+//
+///* ------------------ LOCATION HELPERS ------------------ */
+//
+//function extractLocation(address) {
+//  return (
+//    address.road ||
+//    address.neighbourhood ||
+//    address.suburb ||
+//    address.village ||
+//    address.town ||
+//    address.city ||
+//    "Unknown Location"
+//  );
+//}
+//
+///* ------------------ PREVIEW GPS (before ride) ------------------ */
+//
+//function initPreviewGPS() {
+//  if (!navigator.geolocation) {
+//    alert("Geolocation not supported");
+//    return;
+//  }
+//
+//  // Warm-up call
+//  navigator.geolocation.getCurrentPosition(() => {}, () => {}, {
+//    enableHighAccuracy: false
+//  });
+//
+//  previewWatchId = navigator.geolocation.watchPosition(
+//    pos => {
+//      currentPosition = pos;
+//      console.log("GPS OK:", pos.coords.latitude, pos.coords.longitude);
+//    },
+//    err => {
+//      if (err.code === err.TIMEOUT) {
+//        console.warn("GPS timeout, retrying...");
+//        return;
+//      }
+//      console.error("Preview GPS error:", err);
+//    },
+//    {
+//      enableHighAccuracy: false,
+//      timeout: 60000,
+//      maximumAge: 10000
+//    }
+//  );
+//}
+//
+///* ------------------ START RIDE ------------------ */
+//
+//async function startRide() {
+//  const source = document.getElementById("source").value.trim();
+//  const destination = document.getElementById("destination").value.trim();
+//
+//  if (!source || !destination) {
+//    alert("Please enter source and destination");
+//    return;
+//  }
+//
+//  if (source === destination) {
+//    alert("Source and destination must be different");
+//    return;
+//  }
+//
+//  if (!currentPosition) {
+//    alert("Waiting for GPS signal...");
+//    return;
+//  }
+//
+//  const payload = {
+//    busNumber: document.getElementById("busNumber").value.trim(),
+//    routeKey: `${source}_${destination}`,
+//    latitude: currentPosition.coords.latitude,
+//    longitude: currentPosition.coords.longitude
+//  };
+//
+//  try {
+//    const res = await fetch("http://localhost:8080/api/ride/start", {
+//      method: "POST",
+//      headers: { "Content-Type": "application/json" },
+//      body: JSON.stringify(payload)
+//    });
+//
+//    if (!res.ok) throw new Error("Ride start failed");
+//
+//    const data = await res.json();
+//    rideId = data.id;
+//
+//    // stop preview GPS
+//    if (previewWatchId) {
+//      navigator.geolocation.clearWatch(previewWatchId);
+//      previewWatchId = null;
+//    }
+//
+//    document.getElementById("startBtn").classList.add("hidden");
+//    document.getElementById("stopBtn").classList.remove("hidden");
+//    document.getElementById("status").innerText = `Ride Started (ID: ${rideId})`;
+//
+//    startRideTracking();
+//
+//  } catch (err) {
+//    console.error(err);
+//    alert("Ride start failed");
+//  }
+//}
+//
+///* ------------------ LIVE RIDE TRACKING ------------------ */
+//
+//function startRideTracking() {
+//  if (rideWatchId) return;
+//
+//  rideWatchId = navigator.geolocation.watchPosition(
+//    pos => {
+//      fetch("http://localhost:8080/api/location/update", {
+//        method: "POST",
+//        headers: { "Content-Type": "application/json" },
+//        body: JSON.stringify({
+//          rideId,
+//          latitude: pos.coords.latitude,
+//          longitude: pos.coords.longitude,
+//          accuracy: pos.coords.accuracy
+//        })
+//      });
+//    },
+//    err => console.error("Ride GPS error:", err),
+//    {
+//      enableHighAccuracy: true,
+//      timeout: 10000,
+//      maximumAge: 0
+//    }
+//  );
+//}
+//
+///* ------------------ STOP RIDE ------------------ */
+//
+//async function stopRide() {
+//  if (!rideId) return;
+//
+//  if (rideWatchId) {
+//    navigator.geolocation.clearWatch(rideWatchId);
+//    rideWatchId = null;
+//  }
+//
+//  try {
+//    await fetch(`http://localhost:8080/api/ride/cancel/${rideId}`, {
+//      method: "PUT"
+//    });
+//
+//    document.getElementById("status").innerText = "Ride Stopped";
+//    document.getElementById("stopBtn").classList.add("hidden");
+//    document.getElementById("startBtn").classList.remove("hidden");
+//
+//    rideId = null;
+//
+//    // restart preview GPS
+//    initPreviewGPS();
+//
+//  } catch (err) {
+//    console.error(err);
+//    alert("Failed to stop ride");
+//  }
+//}
+
+
+
+
+
+
+
+
+
+
+
+
+
 let rideId = null;
-let watchId = null;
+let previewWatchId = null;
+let rideWatchId = null;
 let currentPosition = null;
 
-document.addEventListener("DOMContentLoaded", loadStops);
+document.addEventListener("DOMContentLoaded", () => {
+  loadStops();
+  initPreviewGPS(); // still runs in background as fallback
+});
 
+/* ------------------ STOPS ------------------ */
 function loadStops() {
-  fetch("data/stops.json")
-    .then(response => response.json())
+  fetch("/data/stops.json")
+    .then(res => res.json())
     .then(data => {
       const datalist = document.getElementById("stopsList");
       datalist.innerHTML = "";
-
       data.stops.forEach(stop => {
         const option = document.createElement("option");
-        option.value = stop.toUpperCase(); // keep backend-friendly
+        option.value = stop.toUpperCase();
         datalist.appendChild(option);
       });
     })
-    .catch(error => {
-      console.error("Error loading stops:", error);
-    });
+    .catch(err => console.error("Error loading stops:", err));
 }
 
-function extractLocation(address) {
-  return (
-    address.road ||
-    address.neighbourhood ||
-    address.suburb ||
-    address.hamlet ||
-    address.village ||
-    address.town ||
-    address.city ||
-    address.county ||
-    "Unknown Location"
-  );
-}
+/* ------------------ PREVIEW GPS (background fallback) ------------------ */
+function initPreviewGPS() {
+  if (!navigator.geolocation) return;
 
-window.onload = () => {
-  if (!navigator.geolocation) {
-    alert("Geolocation not supported in this device");
-    return;
-  }
+  navigator.geolocation.getCurrentPosition(() => {}, () => {}, {
+    enableHighAccuracy: false
+  });
 
-  watchId = navigator.geolocation.watchPosition(
-    async pos => {
+  previewWatchId = navigator.geolocation.watchPosition(
+    pos => {
       currentPosition = pos;
-
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const accuracy = pos.coords.accuracy;
-
-        console.log("Latitude:", lat);
-        console.log("Longitude:", lng);
-        console.log("Accuracy (meters):", accuracy);
-
-      try {
-        const res = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-                { headers: { "User-Agent": "WhereIsMyBus" } }
-        );
-        const data = await res.json();
-
-        const location = extractLocation(data.address);
-//        document.getElementById("source").value = location;
-
-      } catch (err) {
-        console.error(err);
-//        document.getElementById("source").value = "Unknown Location";
-      }
+      console.log("GPS preview OK:", pos.coords.latitude, pos.coords.longitude);
     },
     err => {
-      alert("Unable to fetch location");
-      console.error(err);
+      if (err.code === err.TIMEOUT) return;
+      console.error("Preview GPS error:", err.message);
     },
-    {
-     enableHighAccuracy: true,
-     timeout: 20000,
-     maximumAge: 0
-     }
+    { enableHighAccuracy: false, timeout: 60000, maximumAge: 10000 }
   );
-};
+}
 
+/* ------------------ GET COORDS FROM EXCEL ROUTE DATA ------------------ */
+// Fetches the route stops and returns lat/lng of the source stop by name
+async function getCoordsFromRoute(source, destination) {
+  try {
+    const res = await fetch(`/api/routes?source=${source}&destination=${destination}`);
+    if (!res.ok) throw new Error("Route fetch failed");
+
+    const stops = await res.json();
+
+    // Find the stop whose name matches the source (case-insensitive)
+    const match = stops.find(
+      s => s.stopName.trim().toUpperCase() === source.trim().toUpperCase()
+    );
+
+    if (match) {
+      console.log(`Using Excel coords for "${match.stopName}":`, match.latitude, match.longitude);
+      return { latitude: match.latitude, longitude: match.longitude };
+    }
+
+    console.warn("Source stop not found in route Excel data:", source);
+    return null;
+
+  } catch (err) {
+    console.error("Failed to fetch route coords:", err);
+    return null;
+  }
+}
+
+/* ------------------ START RIDE ------------------ */
 async function startRide() {
-  const source = document.getElementById("source").value.trim();
-  const destination = document.getElementById("destination").value.trim();
+  const busNumber   = document.getElementById("busNumber").value.trim();
+  const source      = document.getElementById("source").value.trim().toUpperCase();
+  const destination = document.getElementById("destination").value.trim().toUpperCase();
+  const statusEl    = document.getElementById("status");
 
-  if (source == destination){
-    alert("Source and destination must be different.");
+  if (!busNumber || !source || !destination) {
+    alert("Please fill in Bus Number, Source, and Destination");
     return;
   }
 
-  if (!destination) {
-    alert("Please enter destination");
+  if (source === destination) {
+    alert("Source and destination must be different");
     return;
   }
 
-  if (!currentPosition) {
-    alert("Waiting for GPS signal...");
-    return;
+  statusEl.innerText = "Fetching start location...";
+
+  // STEP 1: Try to get coords from Excel route data first
+  let coords = await getCoordsFromRoute(source, destination);
+
+  // STEP 2: If Excel lookup failed, fall back to GPS
+  if (!coords) {
+    statusEl.innerText = "Stop not in route data, trying GPS...";
+    try {
+      const pos = await getPositionFromGPS();
+      coords = {
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude
+      };
+    } catch (err) {
+      statusEl.innerText = "";
+      alert("Could not get location: " + err.message);
+      return;
+    }
   }
 
   const payload = {
-    busNumber: document.getElementById("busNumber").value.trim(), // later make dynamic / logged-in driver
-    routeKey: source + "_" + destination,
-    latitude: currentPosition.coords.latitude,
-    longitude: currentPosition.coords.longitude
+    busNumber,
+    routeKey: `${source}_${destination}`,
+    latitude:  coords.latitude,
+    longitude: coords.longitude
   };
 
   try {
-    const res = await fetch("http://localhost:8080/api/ride/start", {
+    statusEl.innerText = "Starting ride...";
+
+    const res = await fetch("/api/ride/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error("Failed to start ride");
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Server error: ${errText}`);
+    }
 
     const data = await res.json();
-    rideId = data.id; // dynamic rideId
+    rideId = data.id;
+
+    // Stop preview GPS watcher
+    if (previewWatchId !== null) {
+      navigator.geolocation.clearWatch(previewWatchId);
+      previewWatchId = null;
+    }
 
     document.getElementById("startBtn").classList.add("hidden");
     document.getElementById("stopBtn").classList.remove("hidden");
-    document.getElementById("status").innerText = `Ride Started (ID: ${rideId})`;
+    statusEl.innerText = `Ride Started ✅ (ID: ${rideId})`;
 
-    startLocationTracking();
+    startRideTracking(); // live GPS tracking begins after ride starts
 
   } catch (err) {
     console.error(err);
-    alert("Ride start failed");
+    statusEl.innerText = "";
+    alert("Ride start failed: " + err.message);
   }
 }
 
-function startLocationTracking() {
+/* ------------------ GPS FALLBACK (Promise wrapper) ------------------ */
+function getPositionFromGPS() {
+  return new Promise((resolve, reject) => {
+    if (currentPosition) {
+      resolve(currentPosition);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve(pos),
+      err => reject(err),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+  });
+}
 
-    if(watchId) return;
+/* ------------------ LIVE RIDE TRACKING (GPS after ride starts) ------------------ */
+function startRideTracking() {
+  if (rideWatchId !== null) return;
 
-  watchId = navigator.geolocation.watchPosition(
+  rideWatchId = navigator.geolocation.watchPosition(
     pos => {
-      fetch("http://localhost:8080/api/location/update", {
+      fetch("/api/ride/location", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rideId,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
+          latitude:  pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy:  pos.coords.accuracy
         })
-      });
+      }).catch(err => console.error("Location update failed:", err));
     },
-    err => {
-      console.error("Location error:", err);
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    }
+    err => console.error("Ride GPS error:", err.message),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
+/* ------------------ STOP RIDE ------------------ */
 async function stopRide() {
   if (!rideId) return;
 
-  if (watchId) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+  if (rideWatchId !== null) {
+    navigator.geolocation.clearWatch(rideWatchId);
+    rideWatchId = null;
   }
 
   try {
-    await fetch(`http://localhost:8080/api/ride/cancel/${rideId}`, {
-      method: "PUT"
-    });
+    await fetch(`/api/ride/cancel/${rideId}`, { method: "PUT" });
 
-    document.getElementById("status").innerText = "Ride Stopped";
+    document.getElementById("status").innerText = "Ride Stopped ⛔";
     document.getElementById("stopBtn").classList.add("hidden");
     document.getElementById("startBtn").classList.remove("hidden");
 
     rideId = null;
+    currentPosition = null;
+
+    initPreviewGPS();
 
   } catch (err) {
     console.error(err);
-    alert("Failed to stop ride");
+    alert("Failed to stop ride: " + err.message);
   }
 }
