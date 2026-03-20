@@ -17,7 +17,9 @@ const busIcon = L.divIcon({
 let marker;
 let stopMarkers = [];
 let routeLine = null;
+let routeStops = []; // ← holds Excel stop data for stop-name lookup
 
+/* ---------------- AUTO SELECT BUS ---------------- */
 /* ---------------- AUTO SELECT BUS ---------------- */
 async function autoSelectRideId() {
   if (rideId || !routeKey) return;
@@ -26,29 +28,46 @@ async function autoSelectRideId() {
 
   try {
     const res = await fetch(
-      `http://localhost:8080/api/ride/active?routeKey=${routeKey}`
+      `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
     );
 
+    if (!res.ok) {
+      console.error("Failed to fetch active rides:", res.status);
+      return;
+    }
+
     const buses = await res.json();
+    console.log("Active buses:", buses);
 
     if (buses.length > 0) {
-      rideId = buses[0].rideId; // auto pick first bus
+      rideId = buses[0].rideId;
+      console.log("Auto-selected rideId:", rideId);
       updateLocation();
+    } else {
+      console.warn("No active buses on this route");
     }
   } catch (err) {
     console.error("Failed to auto-select bus", err);
   }
 }
 
-/* ---------------- LOAD ROUTE STOPS (PARTIAL) ---------------- */
+/* ---------------- LOAD ROUTE STOPS ---------------- */
 async function loadRouteStops(routeKey, src, dest) {
+  // FIX: encode spaces and special characters in stop names
   const res = await fetch(
-    `/api/routes?source=${src}&destination=${dest}`
+    `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
   );
 
-  const stops = await res.json();
+  if (!res.ok) {
+    console.error("Failed to load route stops:", res.status);
+    return;
+  }
 
-  // cleanup old markers
+  const stops = await res.json();
+  console.log("Loaded routeStops:", stops.length, stops); // debug line
+
+  routeStops = stops;
+
   stopMarkers.forEach(m => map.removeLayer(m));
   stopMarkers = [];
 
@@ -101,6 +120,37 @@ function renderETATable(stops) {
   });
 }
 
+/* ---------------- NEAREST STOP HELPER ---------------- */
+function getNearestStopLabel(lat, lng) {
+  if (!routeStops || routeStops.length === 0) return null;
+
+  const R = 6371000; // Earth radius in metres
+  let nearest = null;
+  let minDist = Infinity;
+
+  routeStops.forEach(stop => {
+    const dLat = (stop.latitude  - lat) * Math.PI / 180;
+    const dLng = (stop.longitude - lng) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat * Math.PI / 180) *
+      Math.cos(stop.latitude * Math.PI / 180) *
+      Math.sin(dLng / 2) ** 2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = { stop, dist };
+    }
+  });
+
+  if (!nearest) return null;
+
+  if (nearest.dist <= 100)  return `🚏 ${nearest.stop.stopName}`;           // at stop
+  if (nearest.dist <= 500)  return `Near ${nearest.stop.stopName}`;         // close
+  return null; // too far — fall back to reverse geocode
+}
+
 /* ---------------- REVERSE GEO ---------------- */
 const locationCache = {};
 
@@ -113,7 +163,6 @@ async function reverseGeocode(lat, lng) {
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
       { headers: { "User-Agent": "WhereIsMyBus" } }
     );
-
     const data = await res.json();
     const name = data.display_name || "Unknown location";
     locationCache[key] = name;
@@ -127,19 +176,26 @@ async function reverseGeocode(lat, lng) {
 async function updateLocation() {
   if (!rideId) return;
 
-  const res = await fetch(
-    `http://localhost:8080/api/location/last-loc/${rideId}`
-  );
-
+  const res = await fetch(`/api/location/last-loc/${rideId}`);
   if (!res.ok) return;
 
-const loc = await res.json();
+  const loc = await res.json();
   if (!loc) return;
 
   const pos = [loc.latitude, loc.longitude];
-  const locationName = await reverseGeocode(loc.latitude, loc.longitude);
 
-  const popup = `<b>Current Location:</b><br>${locationName}`;
+  // Always get the nearest stop info (no distance limit now)
+  const nearestLabel = getNearestStopLabel(loc.latitude, loc.longitude);
+
+  // Always get reverse geocode for road/area context
+  const geoName = await reverseGeocode(loc.latitude, loc.longitude);
+
+  // Combine: stop info + road name
+  const locationLabel = nearestLabel
+    ? `${nearestLabel}, ${geoName}`
+    : geoName;
+
+  const popup = `<b>Current Location:</b><br>${locationLabel}`;
 
   if (!marker) {
     marker = L.marker(pos, { icon: busIcon })
