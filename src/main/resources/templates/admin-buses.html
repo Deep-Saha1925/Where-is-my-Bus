@@ -322,6 +322,39 @@
   </div>
 </div>
 
+<!-- ── SEARCH BAR ── -->
+<div style="padding: 12px 20px 0;">
+  <div style="position:relative;">
+    <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%);
+                 font-size:16px; pointer-events:none;">🔍</span>
+    <input
+            id="searchInput"
+            type="text"
+            placeholder="Search by bus number, source or destination..."
+            oninput="filterBuses()"
+            style="width:100%; padding:11px 14px 11px 42px;
+             background:var(--bg-card); color:var(--text-primary);
+             border:1px solid var(--border); border-radius:12px;
+             font-size:14px; outline:none;
+             box-shadow: var(--shadow);
+             transition: border-color 0.2s, box-shadow 0.2s;"
+            onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)'"
+            onblur="this.style.borderColor=''; this.style.boxShadow='var(--shadow)'"
+    />
+    <button
+            onclick="clearSearch()"
+            id="clearBtn"
+            style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%);
+             background:var(--bg-page); border:none; cursor:pointer;
+             font-size:13px; color:var(--text-muted); padding:3px 8px;
+             border-radius:6px; font-weight:600;">
+      ✕ Clear
+    </button>
+  </div>
+  <div id="searchMeta" style="font-size:12px; color:var(--text-faint);
+       margin-top:6px; padding-left:4px; min-height:18px;"></div>
+</div>
+
 <!-- ── BUS CARDS GRID ── -->
 <div class="card-grid" id="busGrid">
   <div class="empty-state">
