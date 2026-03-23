@@ -461,6 +461,7 @@ async function checkBus() {
       document.getElementById("savedRouteKey").innerText =
         existing.routeKey.replace("_", " → ");
       document.getElementById("savedRideId").innerText = existing.rideId;
+      document.getElementById("activeBusNumber").innerText = busNumber;
 
       // Store for resumeRide() to use
       rideId = existing.rideId;
