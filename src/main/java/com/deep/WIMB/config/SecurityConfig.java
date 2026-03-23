@@ -47,9 +47,9 @@ public class SecurityConfig {
                         // ── Public pages (passengers & drivers) ──
                         .requestMatchers(
                                 "/",
-                                "/index.html",
-                                "/track.html",
-                                "/driver.html",
+                                "/index",
+                                "/track",
+                                "/driver",
                                 "/csrf-token",
                                 "/js/**",
                                 "/data/**",

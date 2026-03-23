@@ -1,165 +1,234 @@
-# 🚌 Where Is My Bus (WIMB)
+<div align="center">
 
-## 📌 Project Description
+# 🚌 Where Is My Bus
+### Real-time bus tracking for North Bengal
 
-**Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system designed to solve the problem of **uncertain bus timings and locations**, especially in semi-urban and rural regions like North Bengal.
+[![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=java)](https://www.java.com)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?style=flat-square&logo=mysql)](https://www.mysql.com)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
+[![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
 
-Unlike traditional systems that rely only on databases, WIMB uses a **hybrid approach**:
-- **Dynamic data** — live bus location, active rides
-- **Static route data** — stops, distance, halt times loaded from **Excel files**
-- **Frontend dropdown data** — synchronized automatically via **JSON**
+*Solving the problem of uncertain bus timings in semi-urban and rural regions*
 
-This design makes the system **realistic, scalable, and easy to maintain** for government or private transport systems.
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Setup](#-setup--run) · [API Docs](#-api-endpoints) · [Author](#-author)
 
----
-
-## ❓ Problem Statement
-
-- Passengers wait without knowing the exact bus position
-- No clarity on whether a bus has already crossed a stop
-- Static routes are hardcoded or poorly managed
-- No forward / reverse route intelligence
-- Drivers have no simple way to start or resume a journey
+</div>
 
 ---
 
-## ✅ Solution Overview
+## 📖 About
 
-WIMB provides:
+**Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system built for North Bengal. Unlike traditional systems, WIMB uses a **hybrid approach** combining live GPS data with Excel-driven static route files — making it practical, offline-friendly, and maintainable by non-technical staff.
 
-- 🔴 **Live bus tracking** — real-time position updated every 3 seconds
-- 🗺️ **Excel-driven route visualization** — full stop timeline, no map required
-- 🔁 **Automatic forward & reverse direction handling**
-- 🔎 **Source → Destination based bus search** with ETA
-- 📍 **Autocomplete dropdown** based stop selection (real-world UX)
-- ❌ **No false bus visibility** after crossing passenger's source stop
-- 🕐 **Recent searches** — passengers see quick results on return visits
-- 🌙 **Dark mode** across all pages, persisted across sessions
-- 🚗 **Driver panel** — resume active ride or start new ride by bus number
-- 🛡️ **Admin panel** — live map of all active buses with search
+> No app install needed. Works in any browser. Designed for low-connectivity areas.
 
 ---
 
-## 🛠️ Technology Stack
+## ✨ Features
 
-### 🔹 Backend
+<table>
+<tr>
+<td width="50%">
+
+### 🧑‍💼 For Passengers
+- 🔍 Search buses by source & destination
+- 🕐 Recent searches with quick results
+- 📍 Live route timeline (like "Where is my Train")
+- 🚌 Animated bus icon on current stop
+- ⏱️ ETA per stop from bus position
+- 🌙 Dark mode support
+
+</td>
+<td width="50%">
+
+### 🚗 For Drivers
+- 🔑 Login with bus number
+- ↩️ Resume active ride after refresh
+- 🗺️ GPS coordinates from Excel (no GPS needed at start)
+- 📡 Live location sent every GPS tick
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🛡️ For Admins
+- 🔐 Secure login (Spring Security)
+- 📊 Live card grid of all active buses
+- 🔎 Search by bus number, source or destination
+- 🕐 Recent searches saved
+- 🔄 Auto-refresh every 5 seconds
+
+</td>
+<td width="50%">
+
+### ⚙️ System Highlights
+- 📊 Excel = single source of truth for routes
+- 🔁 Auto forward & reverse direction detection
+- ❌ No false bus visibility after source stop
+- 🗂️ JSON auto-synced from Excel on startup
+- 🔐 Admin auth via config file, no DB needed
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+| Technology | Version | Purpose |
+|---|---|---|
+| Java | 17 | Core language |
+| Spring Boot | 3.x | REST API framework |
+| Spring Security | 6.x | Admin authentication |
+| Apache POI | 5.x | Excel route file processing |
+| MySQL | 8.0 | Live ride & location storage |
+| Jackson | 2.x | JSON sync for stop dropdowns |
+
+### Frontend
 | Technology | Purpose |
 |---|---|
-| Java 17 | Core language |
-| Spring Boot | REST API framework |
-| Apache POI | Excel route file processing |
-| MySQL | Live ride & location storage |
-| Jackson | JSON sync for stop dropdowns |
-
-### 🔹 Frontend
-| Technology | Purpose |
-|---|---|
-| HTML + Tailwind CSS | UI layout and styling |
+| HTML5 | Page structure |
+| Tailwind CSS | Styling & dark mode |
 | Vanilla JavaScript | All interactivity |
 | Font Awesome | Icons |
 
 ---
 
-## 📸 Application Screenshots
+## 📸 Screenshots
 
-### 🏠 Passenger Search
-<img src="images/dashboard.png" width="600"/>
-
-### 🗺 Live Bus Tracking (Timeline UI)
-<img src="images/live-tracking.png" width="600"/>
-
-### 🚗 Driver Panel
-<img src="images/driver-panel.png" width="600"/>
-
-### 🛡️ Admin Panel
-<img src="images/admin-panel.png" width="600"/>
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="images/dashboard.png" width="100%"/>
+<b>🏠 Passenger Search</b>
+</td>
+<td align="center" width="50%">
+<img src="images/live-tracking.png" width="100%"/>
+<b>🗺️ Live Route Timeline</b>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="images/driver-panel.png" width="100%"/>
+<b>🚗 Driver Panel</b>
+</td>
+<td align="center" width="50%">
+<img src="images/admin-panel.png" width="100%"/>
+<b>🛡️ Admin Panel</b>
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🧱 Architecture
 ```
-Driver App (GPS)
-      ↓
-POST /api/ride/start  →  POST /api/ride/location
-      ↓
-MySQL (Active Rides + Locations)
-      ↓
-GET /api/location/last-loc/{rideId}
-      ↓
-Passenger UI (Route Timeline)
+┌─────────────────────────────────────────────────────────┐
+│                      DRIVER APP                         │
+│              GPS coordinates every tick                 │
+└────────────────────────┬────────────────────────────────┘
+                         │ POST /api/ride/start
+                         │ POST /api/ride/location
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│              SPRING BOOT BACKEND                        │
+│                                                         │
+│   RideController  ──►  RideService  ──►  MySQL          │
+│   LocationController ─► LocationService ─► MySQL        │
+│   RouteController ──►  RouteExcelLoader ─► Cache        │
+└────────────┬───────────────────────┬────────────────────┘
+             │                       │
+             │ GET last-loc          │ GET routes
+             ▼                       ▼
+┌────────────────────┐   ┌───────────────────────────────┐
+│   PASSENGER UI     │   │        EXCEL FILE             │
+│                    │   │                               │
+│  Route Timeline    │   │  stop_name, lat, lng,         │
+│  ETA per stop      │   │  distance_km, slack_min       │
+│  Live bus icon     │   │                               │
+└────────────────────┘   └───────────────────────────────┘
 
-Excel Route File (.xlsx)
-      ↓
-RouteExcelLoader (@PostConstruct)
-      ↓
-In-Memory Route Cache (HashMap)
-      ↓
-GET /api/routes?source=X&destination=Y
-      ↓
-Timeline + ETA Calculation
+                    ADMIN ACCESS
+                         │
+                         ▼
+              Spring Security Filter
+                         │
+              InMemoryUserDetailsManager
+              (credentials from .properties)
+                         │
+                         ▼
+                 /admin-buses.html
 ```
 
 ---
 
 ## 📂 Route Data Management
 
-### 📘 Excel — Single Source of Truth
+Routes are managed entirely through **Excel files** — no code changes needed.
 ```
 src/main/resources/routes/route_APD_FLK.xlsx
 ```
 
-### 📑 Excel Format
+### Excel Format
 
 | stop_order | stop_name | latitude | longitude | distance_km | slack_min |
-|---|---|---|---|---|---|
+|:---:|---|:---:|:---:|:---:|:---:|
 | 1 | Alipurduar | 26.4799 | 89.5355 | 0 | 0 |
 | 2 | Alipurduar Chowpathy | 26.48083 | 89.526 | 1.5 | 2 |
 | 3 | Sonapur | 26.494 | 89.368 | 10.5 | 2 |
 | 4 | Falakata | 26.51721 | 89.20694 | 15 | 0 |
 
-✔ Loaded once at application startup via `@PostConstruct`  
-✔ No database required for route data  
-✔ Easy to update by non-technical staff  
-✔ Automatically syncs stop names to `data/stops.json` for frontend dropdowns
+> ✅ Loaded once at startup · ✅ No DB needed · ✅ Auto-syncs `stops.json`
 
 ---
 
-### 📗 JSON — Frontend Dropdown Sync
-```
-src/main/resources/static/data/stops.json
+## 🔐 Admin Security
+
+Admin panel is protected by **Spring Security** using `InMemoryUserDetailsManager`.  
+**No database required** — credentials live in `application.properties`.
+```properties
+wimb.admin.username=admin
+wimb.admin.password=wimb@2025
 ```
 
-- Auto-generated from Excel `stop_name` column on every startup
-- Powers the autocomplete dropdowns on all pages
-- Prevents spelling errors in source/destination input
+> 💡 To change credentials, update `application.properties` and restart. No code changes needed.
+
+### Access Control
+
+| URL | Who can access |
+|---|:---:|
+| `/index.html` `/track.html` `/driver.html` | 🌐 Everyone |
+| `/api/ride/active` `/api/ride/start` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
+| `/login.html` | 🌐 Everyone |
+| `/admin-buses.html` | 🔐 Admin only |
+| `/api/ride/active/all` | 🔐 Admin only |
 
 ---
 
 ## 🔄 Direction Logic
+```
+sourceOrder < destinationOrder  →  FORWARD  ▶
+sourceOrder > destinationOrder  →  BACKWARD ◀
+```
 
-Direction is determined automatically from stop order:
-
-| Condition | Direction |
-|---|---|
-| `sourceOrder < destinationOrder` | FORWARD |
-| `sourceOrder > destinationOrder` | BACKWARD |
-
-### Passenger Visibility Rule
-
-A bus is shown to a passenger **only if it has NOT yet crossed their source stop**.  
-This is computed by comparing the bus's current stop index against the passenger's source index on the **full route**, not just the searched segment.
-
-✔ Forward-safe ✔ Reverse-safe ✔ Real-world accurate
+A bus is shown to a passenger **only if it has NOT yet crossed their source stop** — computed by comparing the bus's position on the **full route**, not just the searched segment.
 
 ---
 
-## 🔗 Backend API Endpoints
+## 🔗 API Endpoints
 
-### ▶ Start Ride
-```
+<details>
+<summary><b>🚌 Ride APIs</b></summary>
+
+#### Start Ride
+```http
 POST /api/ride/start
-```
-```json
+Content-Type: application/json
+
 {
   "busNumber": "WB-23A-1245",
   "routeKey": "ALIPURDUAR_FALAKATA",
@@ -168,11 +237,11 @@ POST /api/ride/start
 }
 ```
 
-### ▶ Update Location (Driver GPS)
-```
+#### Update Location
+```http
 POST /api/ride/location
-```
-```json
+Content-Type: application/json
+
 {
   "rideId": 5,
   "latitude": 26.494,
@@ -181,88 +250,54 @@ POST /api/ride/location
 }
 ```
 
-### ▶ Get Last Known Location
-```
-GET /api/location/last-loc/{rideId}
-```
-
-### ▶ Get Active Buses on Route
-```
+#### Get Active Buses on Route
+```http
 GET /api/ride/active?source=ALIPURDUAR&destination=FALAKATA
 ```
 
-### ▶ Get All Active Buses
-```
+#### Get All Active Buses *(Admin)*
+```http
 GET /api/ride/active/all
 ```
 
-### ▶ Get Route Stops
+#### Cancel Ride
+```http
+PUT /api/ride/cancel/{rideId}
 ```
+
+</details>
+
+<details>
+<summary><b>📍 Location APIs</b></summary>
+
+#### Get Last Known Location
+```http
+GET /api/location/last-loc/{rideId}
+```
+
+</details>
+
+<details>
+<summary><b>🗺️ Route APIs</b></summary>
+
+#### Get Route Stops
+```http
 GET /api/routes?source=ALIPURDUAR&destination=FALAKATA
 ```
 
-### ▶ Cancel Ride
-```
-PUT /api/ride/cancel/{rideId}
-```
+</details>
 
 ---
 
 ## 🖥️ Frontend Pages
 
-### `index.html` — Passenger Search
-- Search by source & destination with autocomplete
-- Recent searches saved to localStorage — quick results on return
-- Live bus cards with ETA shown instantly
-- Click **Track Bus** to open the timeline
-
-### `track.html` — Live Route Timeline
-- Full route displayed as a vertical stop timeline (like "Where is my Train")
-- Passed stops grayed out, current stop highlighted with animated 🚌 icon
-- ETA shown per stop from bus's current position
-- Yellow banner when bus hasn't reached passenger's boarding stop yet
-- `📍 Your stop` and `🏁 Your dest` markers within the full route
-- Dark mode, live refresh every 3 seconds
-
-### `driver.html` — Driver Panel
-- Enter bus number → check for active ride
-- If active ride found: resume and end it
-- If no active ride: start new ride with source/destination
-- GPS coordinates fetched from Excel route data (no GPS dependency at start)
-- Live location updates sent every GPS tick
-
-### `admin-buses.html` — Admin Panel
-- Card grid of all active buses
-- Live stats: bus count, unique routes
-- Search by bus number, source or destination
-- Recent admin searches saved to localStorage
-- Auto-refreshes every 5 seconds
-- Click **View on Map** to track any bus
-
----
-
-## ✨ Key Highlights
-
-- **No map dependency** on passenger side — timeline UI is faster and clearer
-- **Excel = master data** — routes updated without touching code
-- **JSON auto-synced** from Excel on every startup
-- **Direction-aware filtering** — works for both forward and reverse journeys
-- **Full route always shown** — passengers see where the bus is even before it reaches them
-- **Resume ride** — drivers can refresh page without losing their active ride
-- **Consistent dark mode** — shared across all pages via localStorage
-- **Designed for real transport systems** in low-connectivity areas
-
----
-
-## 🚀 Future Enhancements
-
-- [ ] WebSocket live tracking (replace polling)
-- [ ] Admin Excel upload panel (no restart needed)
-- [ ] Push notifications when bus is nearby
-- [ ] Multi-route support per Excel file
-- [ ] Driver authentication
-- [ ] Passenger seat booking
-- [ ] Analytics dashboard for operators
+| Page | Who uses it | Description |
+|---|---|---|
+| `index.html` | Passenger | Search buses, recent searches, quick results |
+| `track.html` | Passenger | Live route timeline, ETA, bus position |
+| `driver.html` | Driver | Start/resume ride, live GPS updates |
+| `login.html` | Admin | Secure login form |
+| `admin-buses.html` | Admin | All active buses, search, live stats |
 
 ---
 
@@ -270,15 +305,18 @@ PUT /api/ride/cancel/{rideId}
 ```
 WIMB/
 ├── src/main/java/com/deep/WIMB/
+│   ├── config/
+│   │   └── SecurityConfig.java          # Spring Security rules
 │   ├── controller/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
 │   │   ├── RouteController.java
-│   │   └── DriverController.java
+│   │   ├── DriverController.java
+│   │   └── CsrfController.java
 │   ├── service/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
-│   │   └── RouteExcelLoader.java
+│   │   └── RouteExcelLoader.java        # Loads Excel on startup
 │   ├── model/
 │   │   ├── Ride.java
 │   │   └── Location.java
@@ -286,21 +324,23 @@ WIMB/
 │       ├── StartRideRequest.java
 │       ├── ActiveRideResponse.java
 │       └── RouteStop.java
+│
 ├── src/main/resources/
 │   ├── static/
-│   │   ├── index.html
-│   │   ├── track.html
-│   │   ├── driver.html
-│   │   ├── admin-buses.html
+│   │   ├── index.html                   # Passenger search
+│   │   ├── track.html                   # Route timeline
+│   │   ├── driver.html                  # Driver panel
+│   │   ├── login.html                   # Admin login
+│   │   ├── admin-buses.html             # Admin panel
 │   │   ├── js/
 │   │   │   ├── index.js
 │   │   │   ├── track.js
 │   │   │   ├── driver.js
 │   │   │   └── admin-buses.js
 │   │   └── data/
-│   │       └── stops.json
+│   │       └── stops.json               # Auto-generated from Excel
 │   ├── routes/
-│   │   └── route_APD_FLK.xlsx
+│   │   └── route_APD_FLK.xlsx           # Route master data
 │   └── application.properties
 └── pom.xml
 ```
@@ -310,39 +350,78 @@ WIMB/
 ## ⚙️ Setup & Run
 
 ### Prerequisites
+
 - Java 17+
 - MySQL 8+
-- Maven
+- Maven 3.8+
 
 ### Steps
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Deep-Saha1925/Where-is-my-Bus.git
 cd Where-is-my-Bus
-
+```
+```bash
 # 2. Create MySQL database
 mysql -u root -p
+```
+```sql
 CREATE DATABASE wimb;
-
+EXIT;
+```
+```bash
 # 3. Configure application.properties
+```
+```properties
+# Database
 spring.datasource.url=jdbc:mysql://localhost:3306/wimb
 spring.datasource.username=root
 spring.datasource.password=yourpassword
 spring.jpa.hibernate.ddl-auto=update
 
-# 4. Run the application
-./mvnw spring-boot:run
-
-# 5. Open in browser
-http://localhost:8080
+# Admin credentials
+wimb.admin.username=admin
+wimb.admin.password=wimb@2025
 ```
+```bash
+# 4. Build and run
+./mvnw spring-boot:run
+```
+```bash
+# 5. Open in browser
+open http://localhost:8080           # Passenger view
+open http://localhost:8080/login.html  # Admin login
+```
+
+---
+
+## 🚀 Future Enhancements
+
+- [ ] WebSocket live tracking (replace 3s polling)
+- [ ] Admin Excel upload panel (no restart needed)
+- [ ] Push notifications when bus is nearby
+- [ ] Multi-route support per Excel file
+- [ ] Driver authentication with OTP
+- [ ] Passenger seat booking
+- [ ] Analytics dashboard for operators
+- [ ] Mobile app (Android)
 
 ---
 
 ## 👨‍💻 Author
 
-**Deep Saha**  
-Backend & System Design Enthusiast  
-Java | Spring Boot | Real-Time Systems | North Bengal
+<div align="center">
 
-[![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=flat&logo=github)](https://github.com/Deep-Saha1925)
+**Deep Saha**
+
+*Backend & System Design Enthusiast*
+
+Java · Spring Boot · Real-Time Systems · North Bengal
+
+[![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=for-the-badge&logo=github)](https://github.com/Deep-Saha1925)
+
+---
+
+*Built with ❤️ for North Bengal*
+
+</div>
