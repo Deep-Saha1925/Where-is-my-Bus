@@ -3,16 +3,55 @@
 <head>
     <meta charset="UTF-8" />
     <title>Where Is My Bus</title>
-
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <style>
+        .recent-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid #e0e7ff;
+            background: #eef2ff;
+            color: #4f46e5;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .recent-chip:hover {
+            background: #e0e7ff;
+            border-color: #6366f1;
+        }
+        .recent-chip .remove-chip {
+            font-size: 11px;
+            color: #a5b4fc;
+            margin-left: 2px;
+            line-height: 1;
+        }
+        .recent-chip .remove-chip:hover {
+            color: #6366f1;
+        }
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(10px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.3s ease both; }
 
-    <!-- Font Awesome -->
-    <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    />
-
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 400px 100%;
+            animation: shimmer 1.2s ease infinite;
+            border-radius: 8px;
+        }
+    </style>
 </head>
 
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -20,9 +59,7 @@
 <!-- HEADER -->
 <header class="bg-white shadow-md p-4 flex items-center gap-3">
     <i class="fa-solid fa-bus text-indigo-600 text-2xl"></i>
-    <h1 class="text-xl font-bold text-gray-800">
-        Where Is My Bus
-    </h1>
+    <h1 class="text-xl font-bold text-gray-800">Where Is My Bus</h1>
 </header>
 
 <!-- MAIN -->
@@ -38,59 +75,85 @@
             <input
                     id="source"
                     list="stopsList"
-                    placeholder="Type source"
-                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="From — source stop"
+                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
             />
-
             <input
                     id="destination"
                     list="stopsList"
-                    placeholder="Type destination"
-                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="To — destination stop"
+                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
             />
-
             <datalist id="stopsList"></datalist>
-
             <button
                     onclick="searchBuses()"
-                    class="bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+                    class="bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm font-semibold"
             >
                 <i class="fa-solid fa-magnifying-glass"></i>
                 Search
             </button>
         </div>
+
+        <!-- RECENT SEARCHES -->
+        <div id="recentSection" class="hidden mt-5">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                    Recent searches
+                </span>
+                <button onclick="clearAllRecent()"
+                        class="text-xs text-gray-400 hover:text-red-400 transition">
+                    Clear all
+                </button>
+            </div>
+            <div id="recentChips" class="flex flex-wrap gap-2"></div>
+        </div>
     </div>
 
-    <!-- RESULT LIST -->
-    <div class="mt-10">
+    <!-- QUICK RESULTS (shown before full search) -->
+    <div id="quickResults" class="hidden mt-6">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="text-sm font-semibold text-gray-600">Quick results</span>
+            <span id="quickCount"
+                  class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium"></span>
+        </div>
+        <div id="quickList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
 
-        <h3 class="text-md font-semibold text-gray-700 mb-3">
-            Available buses
-        </h3>
+    <!-- FULL RESULTS -->
+    <div class="mt-8">
+        <div id="resultsHeader" class="hidden flex items-center justify-between mb-3">
+            <h3 class="text-md font-semibold text-gray-700">Available buses</h3>
+            <span id="resultsCount"
+                  class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium"></span>
+        </div>
 
-        <!-- Loading -->
-        <div id="loading" class="hidden text-center py-6">
-            <i class="fa-solid fa-spinner fa-spin text-indigo-600 text-xl"></i>
-            <p class="text-gray-500 mt-2">Searching buses...</p>
+        <!-- Loading skeletons -->
+        <div id="loading" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-md p-5 space-y-3">
+                    <div class="skeleton h-5 w-32"></div>
+                    <div class="skeleton h-4 w-48"></div>
+                    <div class="skeleton h-9 w-full mt-2"></div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-5 space-y-3">
+                    <div class="skeleton h-5 w-32"></div>
+                    <div class="skeleton h-4 w-48"></div>
+                    <div class="skeleton h-9 w-full mt-2"></div>
+                </div>
+            </div>
         </div>
 
         <!-- No Results -->
-        <div
-                id="noResults"
-                class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg p-4 text-center"
-        >
-            No active buses found on this route.
+        <div id="noResults"
+             class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl p-6 text-center">
+            <i class="fa-solid fa-circle-exclamation text-2xl mb-2"></i>
+            <p class="font-semibold">No active buses on this route</p>
+            <p class="text-sm mt-1 text-yellow-600">Try a different source or destination</p>
         </div>
 
         <!-- Bus Cards -->
-        <div
-                id="busList"
-                class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4"
-        ></div>
-
+        <div id="busList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
     </div>
-
-
 </main>
 
 <!-- FOOTER -->
@@ -98,7 +161,6 @@
     © 2025 Where Is My Bus · Built by Deep Saha
 </footer>
 
-<!-- JS -->
 <script src="js/index.js"></script>
 </body>
 </html>
