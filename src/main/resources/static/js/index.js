@@ -5,7 +5,6 @@ document.addEventListener("DOMContentLoaded", () => {
   renderRecentChips();
   loadQuickResults();
 
-  // Search on Enter key in either input
   document.getElementById("source").addEventListener("keydown", e => {
     if (e.key === "Enter") searchBuses();
   });
@@ -59,7 +58,7 @@ function removeRecent(index) {
 function clearAllRecent() {
   localStorage.removeItem("wimb_passenger_recent");
   renderRecentChips();
-  document.getElementById("quickResults").classList.add("hidden");
+  document.getElementById("quickResults").style.display = "none";
 }
 
 function applyRecent(source, destination) {
@@ -74,26 +73,27 @@ function renderRecentChips() {
   const chips   = document.getElementById("recentChips");
 
   if (!recent.length) {
-    section.classList.add("hidden");
+    section.style.display = "none";
     return;
   }
 
-  section.classList.remove("hidden");
+  section.style.display = "block";
   chips.innerHTML = recent.map((r, i) => `
-    <div class="recent-chip" onclick="applyRecent('${r.source}', '${r.destination}')">
+    <div class="recent-chip"
+         onclick="applyRecent('${r.source}', '${r.destination}')">
       <i class="fa-solid fa-clock-rotate-left" style="font-size:11px; opacity:0.7"></i>
       ${r.source} → ${r.destination}
-      <span class="remove-chip" onclick="event.stopPropagation(); removeRecent(${i})">✕</span>
+      <span class="remove-chip"
+            onclick="event.stopPropagation(); removeRecent(${i})">✕</span>
     </div>
   `).join("");
 }
 
-/* ─── QUICK RESULTS (from recent searches, shown on load) ────────── */
+/* ─── QUICK RESULTS ─────────────────────────────────────────────── */
 async function loadQuickResults() {
   const recent = getRecent();
   if (!recent.length) return;
 
-  // Use the most recent search to show quick results
   const { source, destination } = recent[0];
 
   try {
@@ -105,46 +105,110 @@ async function loadQuickResults() {
     const quickResults = document.getElementById("quickResults");
     const quickList    = document.getElementById("quickList");
     const quickCount   = document.getElementById("quickCount");
+    const quickRoute   = document.getElementById("quickRoute");
 
     if (!buses.length) {
-      quickResults.classList.add("hidden");
+      quickResults.style.display = "none";
       return;
     }
 
-    quickResults.classList.remove("hidden");
-    quickCount.textContent = `${buses.length} bus${buses.length > 1 ? "es" : ""} active`;
+    quickResults.style.display = "block";
+    quickCount.textContent     = `${buses.length} active`;
+    quickRoute.textContent     = `${source} → ${destination}`;
 
     const routeKey = `${source}_${destination}`;
     quickList.innerHTML = buses.map((bus, i) => `
-      <div class="bg-white rounded-xl border border-indigo-100 shadow-sm p-4 fade-up"
-           style="animation-delay:${i * 80}ms">
-        <div class="flex justify-between items-center mb-2">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
-              <i class="fa-solid fa-bus text-indigo-600 text-sm"></i>
-            </div>
-            <span class="font-bold text-gray-800 text-sm">${bus.busNumber}</span>
+      <div class="quick-card fade-up"
+           style="animation-delay:${i * 80}ms"
+           onclick="track('${routeKey}', ${bus.rideId})">
+        <div class="bus-icon-wrap">🚌</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:14px; font-weight:700; color:var(--text-primary);">
+            ${bus.busNumber}
           </div>
-          <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium">
-            ${calculateETAFromDistance(bus.remainingDistanceKm)}
-          </span>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+            <span class="route-src">${source}</span>
+            <i class="fa-solid fa-arrow-right"
+               style="margin:0 4px; font-size:10px; color:var(--text-faint);"></i>
+            <span class="route-dest">${destination}</span>
+          </div>
         </div>
-        <p class="text-xs text-gray-500 mb-3">
-          <span class="font-medium text-indigo-600">${source}</span>
-          <i class="fa-solid fa-arrow-right mx-1 text-gray-300"></i>
-          <span class="font-medium text-green-600">${destination}</span>
-        </p>
-        <button onclick="track('${routeKey}', ${bus.rideId})"
-                class="w-full bg-indigo-600 text-white py-1.5 rounded-lg hover:bg-indigo-700
-                       transition text-xs font-semibold flex items-center justify-center gap-1">
-          <i class="fa-solid fa-location-dot"></i> Track
-        </button>
+        <div style="text-align:right; flex-shrink:0;">
+          <div class="eta-badge">
+            ${calculateETAFromDistance(bus.remainingDistanceKm)}
+          </div>
+          <div style="font-size:11px; color:#10b981; margin-top:4px;
+                      display:flex; align-items:center;
+                      justify-content:flex-end; gap:4px;">
+            <span class="live-dot-sm"></span> Live
+          </div>
+        </div>
       </div>
     `).join("");
 
   } catch (err) {
     console.error("Quick results failed:", err);
   }
+}
+
+/* ─── RENDER FULL BUS CARDS ─────────────────────────────────────── */
+function renderBusCards(buses, routeKey) {
+  const busList       = document.getElementById("busList");
+  const resultsHeader = document.getElementById("resultsHeader");
+  const resultsCount  = document.getElementById("resultsCount");
+
+  resultsHeader.style.display = "flex";
+  resultsCount.textContent    = `${buses.length} bus${buses.length > 1 ? "es" : ""} found`;
+  busList.innerHTML           = "";
+
+  buses.forEach((bus, i) => {
+    let src = "N/A", dest = "N/A";
+    if (bus.routeKey?.includes("_")) [src, dest] = bus.routeKey.split("_");
+
+    const card = document.createElement("div");
+    card.className        = "bus-card";
+    card.style.animationDelay = `${i * 80}ms`;
+
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="bus-icon-wrap">🚌</div>
+          <div>
+            <div style="font-size:16px; font-weight:700; color:var(--text-primary);">
+              ${bus.busNumber}
+            </div>
+            <div style="font-size:11px; color:var(--text-faint); margin-top:1px;">
+              Ride #${bus.rideId}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="eta-badge">
+            ${calculateETAFromDistance(bus.remainingDistanceKm)}
+          </div>
+          <div style="font-size:11px; color:#10b981; margin-top:5px;
+                      display:flex; align-items:center;
+                      justify-content:flex-end; gap:4px;">
+            <span class="live-dot-sm"></span> Live
+          </div>
+        </div>
+      </div>
+
+      <div class="route-pill">
+        <span class="route-src">${src}</span>
+        <i class="fa-solid fa-arrow-right"
+           style="font-size:10px; color:var(--text-faint); margin:0 2px;"></i>
+        <span class="route-dest">${dest}</span>
+      </div>
+
+      <button class="track-btn" onclick="track('${routeKey}', ${bus.rideId})">
+        <i class="fa-solid fa-location-dot"></i>
+        Track Bus
+      </button>
+    `;
+
+    busList.appendChild(card);
+  });
 }
 
 /* ─── MAIN SEARCH ────────────────────────────────────────────────── */
@@ -161,19 +225,18 @@ async function searchBuses() {
     return;
   }
 
-  const routeKey     = `${source}_${destination}`;
-  const busList      = document.getElementById("busList");
-  const loading      = document.getElementById("loading");
-  const noResults    = document.getElementById("noResults");
-  const resultsHeader= document.getElementById("resultsHeader");
-  const resultsCount = document.getElementById("resultsCount");
-  const quickResults = document.getElementById("quickResults");
+  const routeKey      = `${source}_${destination}`;
+  const busList       = document.getElementById("busList");
+  const loading       = document.getElementById("loading");
+  const noResults     = document.getElementById("noResults");
+  const resultsHeader = document.getElementById("resultsHeader");
+  const quickResults  = document.getElementById("quickResults");
 
-  busList.innerHTML = "";
-  noResults.classList.add("hidden");
-  resultsHeader.classList.add("hidden");
-  quickResults.classList.add("hidden"); // hide quick results during full search
-  loading.classList.remove("hidden");
+  busList.innerHTML           = "";
+  noResults.style.display     = "none";
+  resultsHeader.style.display = "none";
+  quickResults.style.display  = "none";
+  loading.style.display       = "block";
 
   try {
     const res   = await fetch(
@@ -181,70 +244,18 @@ async function searchBuses() {
     );
     const buses = await res.json();
 
-    loading.classList.add("hidden");
-
-    // Save to recent only on successful search
+    loading.style.display = "none";
     saveRecent(source, destination);
 
     if (!buses.length) {
-      noResults.classList.remove("hidden");
+      noResults.style.display = "block";
       return;
     }
 
-    resultsHeader.classList.remove("hidden");
-    resultsCount.textContent = `${buses.length} bus${buses.length > 1 ? "es" : ""} found`;
-
-    buses.forEach((bus, i) => {
-      const card = document.createElement("div");
-      card.className = "bg-white rounded-xl shadow-md p-5 hover:shadow-xl transition transform hover:-translate-y-1 fade-up";
-      card.style.animationDelay = `${i * 80}ms`;
-
-      let src = "N/A", dest = "N/A";
-      if (bus.routeKey?.includes("_")) [src, dest] = bus.routeKey.split("_");
-
-      card.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
-              <i class="fa-solid fa-bus text-indigo-600 text-lg"></i>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-gray-800">${bus.busNumber}</h4>
-              <p class="text-xs text-gray-400">Ride #${bus.rideId}</p>
-            </div>
-          </div>
-          <div class="text-right">
-            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium block">
-              ${calculateETAFromDistance(bus.remainingDistanceKm)}
-            </span>
-            <span class="text-xs text-green-600 font-medium mt-1 flex items-center justify-end gap-1">
-              <span class="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
-              Live
-            </span>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 mb-4 text-sm">
-          <span class="font-semibold text-indigo-600">${src}</span>
-          <i class="fa-solid fa-arrow-right text-gray-300 text-xs"></i>
-          <span class="font-semibold text-green-600">${dest}</span>
-        </div>
-
-        <button
-          onclick="track('${routeKey}', ${bus.rideId})"
-          class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700
-                 transition flex items-center justify-center gap-2 text-sm font-semibold"
-        >
-          <i class="fa-solid fa-location-dot"></i>
-          Track Bus
-        </button>
-      `;
-
-      busList.appendChild(card);
-    });
+    renderBusCards(buses, routeKey);
 
   } catch (err) {
-    loading.classList.add("hidden");
+    loading.style.display = "none";
     alert("Failed to fetch buses");
     console.error(err);
   }

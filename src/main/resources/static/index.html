@@ -2,165 +2,472 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Where Is My Bus</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <style>
+        :root {
+            --bg-page:      #f1f5f9;
+            --bg-card:      #ffffff;
+            --bg-header:    #ffffff;
+            --bg-input:     #f8fafc;
+            --border:       #e2e8f0;
+            --text-primary: #0f172a;
+            --text-muted:   #64748b;
+            --text-faint:   #94a3b8;
+            --shadow:       0 1px 4px rgba(0,0,0,0.07);
+            --shadow-lg:    0 8px 24px rgba(0,0,0,0.10);
+        }
+        .dark-mode {
+            --bg-page:      #0f172a;
+            --bg-card:      #1e293b;
+            --bg-header:    #1e293b;
+            --bg-input:     #0f172a;
+            --border:       #334155;
+            --text-primary: #f1f5f9;
+            --text-muted:   #94a3b8;
+            --text-faint:   #475569;
+            --shadow:       0 1px 4px rgba(0,0,0,0.4);
+            --shadow-lg:    0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        * { box-sizing: border-box; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+        body {
+            background: var(--bg-page);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .app-header {
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            box-shadow: var(--shadow);
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .header-sub {
+            font-size: 11px;
+            color: var(--text-faint);
+        }
+
+        /* ── Theme button ── */
+        .theme-btn {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 17px;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.2s;
+        }
+        .theme-btn:hover  { transform: scale(1.1); }
+        .theme-btn:active { transform: scale(0.95); }
+
+        /* ── Search card ── */
+        .search-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+        .search-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── Inputs ── */
+        .search-input {
+            width: 100%;
+            padding: 11px 16px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-input::placeholder { color: var(--text-faint); }
+        .search-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+        }
+
+        /* ── Search button ── */
+        .search-btn {
+            width: 100%;
+            padding: 11px 16px;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: opacity 0.2s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+        }
+        .search-btn:hover  { opacity: 0.92; }
+        .search-btn:active { transform: scale(0.98); }
+
+        /* ── Recent chips ── */
         .recent-chip {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            font-size: 13px;
+            gap: 6px;
+            font-size: 12px;
             font-weight: 500;
             padding: 5px 12px;
             border-radius: 20px;
-            border: 1px solid #e0e7ff;
-            background: #eef2ff;
-            color: #4f46e5;
+            border: 1px solid var(--border);
+            background: var(--bg-page);
+            color: var(--text-muted);
             cursor: pointer;
             transition: all 0.15s;
             white-space: nowrap;
         }
         .recent-chip:hover {
-            background: #e0e7ff;
             border-color: #6366f1;
+            color: #6366f1;
+            background: rgba(99,102,241,0.06);
         }
-        .recent-chip .remove-chip {
-            font-size: 11px;
-            color: #a5b4fc;
-            margin-left: 2px;
+        .dark-mode .recent-chip:hover { background: rgba(99,102,241,0.1); }
+        .remove-chip {
+            font-size: 10px;
+            color: var(--text-faint);
             line-height: 1;
+            padding: 1px 3px;
+            border-radius: 3px;
         }
-        .recent-chip .remove-chip:hover {
+        .remove-chip:hover { color: #ef4444; }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        /* ── Cards ── */
+        .bus-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: fadeUp 0.35s ease both;
+        }
+        .bus-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .bus-icon-wrap {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: rgba(99,102,241,0.1);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .dark-mode .bus-icon-wrap { background: rgba(129,140,248,0.12); }
+
+        .route-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-page);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 12px 0;
+        }
+        .route-src  { color: #6366f1; }
+        .route-dest { color: #10b981; }
+        .dark-mode .route-src  { color: #818cf8; }
+        .dark-mode .route-dest { color: #34d399; }
+        .route-arrow { color: var(--text-faint); font-size: 11px; }
+
+        .eta-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(99,102,241,0.1);
             color: #6366f1;
         }
-        @keyframes fadeUp {
-            from { opacity:0; transform:translateY(10px); }
-            to   { opacity:1; transform:translateY(0); }
-        }
-        .fade-up { animation: fadeUp 0.3s ease both; }
+        .dark-mode .eta-badge { color: #818cf8; background: rgba(129,140,248,0.12); }
 
-        @keyframes shimmer {
-            0%   { background-position: -400px 0; }
-            100% { background-position: 400px 0; }
+        .live-dot-sm {
+            width: 7px; height: 7px;
+            background: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            animation: livePulse 1.4s ease-in-out infinite;
         }
+
+        .track-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: opacity 0.2s, transform 0.1s;
+            box-shadow: 0 3px 10px rgba(99,102,241,0.3);
+        }
+        .track-btn:hover  { opacity: 0.9; }
+        .track-btn:active { transform: scale(0.98); }
+
+        /* ── Quick result card (compact) ── */
+        .quick-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid #6366f1;
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            animation: fadeUp 0.3s ease both;
+        }
+        .quick-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ── Skeleton ── */
         .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background: linear-gradient(90deg, var(--bg-page) 25%, var(--border) 50%, var(--bg-page) 75%);
             background-size: 400px 100%;
             animation: shimmer 1.2s ease infinite;
             border-radius: 8px;
         }
+
+        /* ── No results ── */
+        .no-results {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        /* ── Keyframes ── */
+        @keyframes fadeUp {
+            from { opacity:0; transform:translateY(10px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position:  400px 0; }
+        }
+        @keyframes livePulse {
+            0%,100% { opacity:1; transform:scale(1); }
+            50%     { opacity:0.4; transform:scale(0.85); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+        }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+<body id="appBody">
 
-<!-- HEADER -->
-<header class="bg-white shadow-md p-4 flex items-center gap-3">
-    <i class="fa-solid fa-bus text-indigo-600 text-2xl"></i>
-    <h1 class="text-xl font-bold text-gray-800">Where Is My Bus</h1>
+<!-- ── HEADER ── -->
+<header class="app-header">
+    <div class="header-brand">
+        <div class="header-icon">🚌</div>
+        <div>
+            <div class="header-title">Where Is My Bus</div>
+            <div class="header-sub">Real-time bus tracking</div>
+        </div>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
+            aria-label="Toggle dark mode">🌙</button>
 </header>
 
-<!-- MAIN -->
-<main class="max-w-4xl mx-auto mt-10 px-4">
+<!-- ── MAIN ── -->
+<main style="max-width:860px; margin:0 auto; padding:20px 16px 60px;">
 
     <!-- SEARCH CARD -->
-    <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">
-            Search buses by route
-        </h2>
+    <div class="search-card">
+        <div class="search-title">
+            <i class="fa-solid fa-magnifying-glass" style="color:#6366f1; font-size:15px;"></i>
+            Find your bus
+        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-                    id="source"
-                    list="stopsList"
-                    placeholder="From — source stop"
-                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
-            <input
-                    id="destination"
-                    list="stopsList"
-                    placeholder="To — destination stop"
-                    class="border rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
+        <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:12px;">
+            <div style="position:relative;">
+                <i class="fa-solid fa-location-dot"
+                   style="position:absolute; left:13px; top:50%; transform:translateY(-50%);
+                          color:#6366f1; font-size:13px; pointer-events:none;"></i>
+                <input id="source" list="stopsList"
+                       placeholder="From — source stop"
+                       class="search-input" style="padding-left:36px;"/>
+            </div>
+            <div style="position:relative;">
+                <i class="fa-solid fa-flag-checkered"
+                   style="position:absolute; left:13px; top:50%; transform:translateY(-50%);
+                          color:#10b981; font-size:13px; pointer-events:none;"></i>
+                <input id="destination" list="stopsList"
+                       placeholder="To — destination stop"
+                       class="search-input" style="padding-left:36px;"/>
+            </div>
             <datalist id="stopsList"></datalist>
-            <button
-                    onclick="searchBuses()"
-                    class="bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm font-semibold"
-            >
+            <button class="search-btn" onclick="searchBuses()" style="width:auto; padding:11px 24px;">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 Search
             </button>
         </div>
 
         <!-- RECENT SEARCHES -->
-        <div id="recentSection" class="hidden mt-5">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                    Recent searches
-                </span>
+        <div id="recentSection" style="display:none; margin-top:18px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <span class="section-label">Recent searches</span>
                 <button onclick="clearAllRecent()"
-                        class="text-xs text-gray-400 hover:text-red-400 transition">
+                        style="font-size:12px; color:var(--text-faint); background:none;
+                               border:none; cursor:pointer; transition:color 0.15s;"
+                        onmouseover="this.style.color='#ef4444'"
+                        onmouseout="this.style.color=''">
                     Clear all
                 </button>
             </div>
-            <div id="recentChips" class="flex flex-wrap gap-2"></div>
+            <div id="recentChips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
         </div>
     </div>
 
-    <!-- QUICK RESULTS (shown before full search) -->
-    <div id="quickResults" class="hidden mt-6">
-        <div class="flex items-center gap-2 mb-3">
-            <span class="text-sm font-semibold text-gray-600">Quick results</span>
+    <!-- QUICK RESULTS -->
+    <div id="quickResults" style="display:none; margin-top:24px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <span style="font-size:14px; font-weight:700; color:var(--text-primary);">
+                Quick results
+            </span>
             <span id="quickCount"
-                  class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium"></span>
+                  style="font-size:11px; font-weight:600; padding:3px 10px;
+                         border-radius:20px; background:rgba(99,102,241,0.1); color:#6366f1;">
+            </span>
+            <span style="font-size:12px; color:var(--text-faint);" id="quickRoute"></span>
         </div>
-        <div id="quickList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div id="quickList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:12px;"></div>
     </div>
 
     <!-- FULL RESULTS -->
-    <div class="mt-8">
-        <div id="resultsHeader" class="hidden flex items-center justify-between mb-3">
-            <h3 class="text-md font-semibold text-gray-700">Available buses</h3>
+    <div style="margin-top:24px;">
+        <div id="resultsHeader"
+             style="display:none; align-items:center; justify-content:space-between; margin-bottom:14px;">
+            <span style="font-size:15px; font-weight:700; color:var(--text-primary);">
+                Available buses
+            </span>
             <span id="resultsCount"
-                  class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium"></span>
+                  style="font-size:12px; font-weight:600; padding:4px 12px;
+                         border-radius:20px; background:rgba(16,185,129,0.1); color:#059669;">
+            </span>
         </div>
 
-        <!-- Loading skeletons -->
-        <div id="loading" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white rounded-xl shadow-md p-5 space-y-3">
-                    <div class="skeleton h-5 w-32"></div>
-                    <div class="skeleton h-4 w-48"></div>
-                    <div class="skeleton h-9 w-full mt-2"></div>
+        <!-- Skeletons -->
+        <div id="loading" style="display:none;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;">
+                <div class="bus-card" style="space-y:12px;">
+                    <div class="skeleton" style="height:20px; width:130px; margin-bottom:12px;"></div>
+                    <div class="skeleton" style="height:16px; width:180px; margin-bottom:12px;"></div>
+                    <div class="skeleton" style="height:38px; width:100%;"></div>
                 </div>
-                <div class="bg-white rounded-xl shadow-md p-5 space-y-3">
-                    <div class="skeleton h-5 w-32"></div>
-                    <div class="skeleton h-4 w-48"></div>
-                    <div class="skeleton h-9 w-full mt-2"></div>
+                <div class="bus-card">
+                    <div class="skeleton" style="height:20px; width:130px; margin-bottom:12px;"></div>
+                    <div class="skeleton" style="height:16px; width:180px; margin-bottom:12px;"></div>
+                    <div class="skeleton" style="height:38px; width:100%;"></div>
                 </div>
             </div>
         </div>
 
         <!-- No Results -->
-        <div id="noResults"
-             class="hidden bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl p-6 text-center">
-            <i class="fa-solid fa-circle-exclamation text-2xl mb-2"></i>
-            <p class="font-semibold">No active buses on this route</p>
-            <p class="text-sm mt-1 text-yellow-600">Try a different source or destination</p>
+        <div id="noResults" class="no-results" style="display:none;">
+            <div style="font-size:40px; margin-bottom:10px; opacity:0.4;">🚌</div>
+            <div style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">
+                No active buses
+            </div>
+            <div style="font-size:13px; color:var(--text-muted);">
+                No buses are currently running on this route
+            </div>
         </div>
 
         <!-- Bus Cards -->
-        <div id="busList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        <div id="busList"
+             style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;">
+        </div>
     </div>
 </main>
 
 <!-- FOOTER -->
-<footer class="text-center text-sm text-gray-500 mt-12 mb-4">
+<footer style="text-align:center; font-size:12px; color:var(--text-faint);
+               padding:16px; border-top:1px solid var(--border);">
     © 2025 Where Is My Bus · Built by Deep Saha
 </footer>
 
 <script src="js/index.js"></script>
+<script>
+    const appBody  = document.getElementById("appBody");
+    const themeBtn = document.getElementById("themeBtn");
+    let isDark     = localStorage.getItem("wimb_theme") === "dark";
+
+    function applyTheme() {
+        appBody.classList.toggle("dark-mode", isDark);
+        themeBtn.textContent = isDark ? "☀️" : "🌙";
+    }
+    function toggleTheme() {
+        isDark = !isDark;
+        localStorage.setItem("wimb_theme", isDark ? "dark" : "light");
+        applyTheme();
+    }
+    applyTheme();
+</script>
 </body>
 </html>
