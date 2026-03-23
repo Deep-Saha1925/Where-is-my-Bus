@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Login | WIMB</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+        --bg-page:    #f1f5f9;
+        --bg-card:    #ffffff;
+        --border:     #e2e8f0;
+        --text-primary:#0f172a;
+        --text-muted: #64748b;
+        --text-faint: #94a3b8;
+    }
+    .dark-mode {
+        --bg-page:    #0f172a;
+        --bg-card:    #1e293b;
+        --border:     #334155;
+        --text-primary:#f1f5f9;
+        --text-muted: #94a3b8;
+        --text-faint: #475569;
+    }
+    * { box-sizing: border-box; transition: background-color 0.3s, color 0.3s; }
+    body {
+        background: var(--bg-page);
+        color: var(--text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 40px 36px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .dark-mode .card { box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .input-field {
+        width: 100%;
+        padding: 12px 16px;
+        background: var(--bg-page);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        margin-top: 6px;
+    }
+    .input-field:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .input-field::placeholder { color: var(--text-faint); }
+    .login-btn {
+        width: 100%;
+        padding: 13px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+        transition: opacity 0.2s, transform 0.1s;
+    }
+    .login-btn:hover  { opacity: 0.92; }
+    .login-btn:active { transform: scale(0.98); }
+    .theme-btn {
+        position: fixed;
+        top: 16px; right: 16px;
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        cursor: pointer;
+        font-size: 17px;
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s;
+    }
+    .theme-btn:hover { transform: scale(1.1); }
+    label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+  </style>
+</head>
+<body id="appBody">
+
+<button class="theme-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+
+<div class="card">
+
+  <!-- Logo -->
+  <div style="text-align:center; margin-bottom:28px;">
+    <div style="width:56px; height:56px; border-radius:16px;
+                    background:linear-gradient(135deg,#6366f1,#4f46e5);
+                    display:flex; align-items:center; justify-content:center;
+                    font-size:26px; margin:0 auto 14px;">🚌</div>
+    <div style="font-size:20px; font-weight:700; color:var(--text-primary);">
+      Admin Login
+    </div>
+    <div style="font-size:13px; color:var(--text-faint); margin-top:4px;">
+      Where Is My Bus — Admin Panel
+    </div>
+  </div>
+
+  <!-- Error banner -->
+  <div id="errorBanner" style="display:none; background:rgba(239,68,68,0.1);
+         border:1px solid rgba(239,68,68,0.3); border-radius:10px;
+         padding:10px 14px; margin-bottom:18px;
+         font-size:13px; color:#ef4444; text-align:center;">
+    ❌ Invalid username or password
+  </div>
+
+  <!-- Logout success banner -->
+  <div id="logoutBanner" style="display:none; background:rgba(16,185,129,0.1);
+         border:1px solid rgba(16,185,129,0.3); border-radius:10px;
+         padding:10px 14px; margin-bottom:18px;
+         font-size:13px; color:#10b981; text-align:center;">
+    ✅ Logged out successfully
+  </div>
+
+  <!-- Login form — action must match loginProcessingUrl in SecurityConfig -->
+  <form action="/do-login" method="post">
+
+    <div style="margin-bottom:16px;">
+      <label for="username">Username</label>
+      <input class="input-field" type="text"
+             id="username" name="username"
+             placeholder="Enter admin username"
+             autocomplete="username" required/>
+    </div>
+
+    <div style="margin-bottom:24px;">
+      <label for="password">Password</label>
+      <div style="position:relative;">
+        <input class="input-field" type="password"
+               id="password" name="password"
+               placeholder="Enter password"
+               autocomplete="current-password" required/>
+        <button type="button"
+                onclick="togglePassword()"
+                style="position:absolute; right:14px; top:50%;
+                               transform:translateY(-50%); background:none;
+                               border:none; cursor:pointer; font-size:16px;
+                               color:var(--text-faint);" id="eyeBtn">👁️</button>
+      </div>
+    </div>
+
+    <button type="submit" class="login-btn">
+      Sign In →
+    </button>
+  </form>
+
+  <p style="text-align:center; font-size:12px; color:var(--text-faint); margin-top:20px;">
+    Passenger? <a href="/index.html"
+                  style="color:#6366f1; font-weight:600;">Go to search →</a>
+  </p>
+</div>
+
+<script>
+  // Theme
+  const appBody  = document.getElementById("appBody");
+  const themeBtn = document.getElementById("themeBtn");
+  let isDark     = localStorage.getItem("wimb_theme") === "dark";
+  function applyTheme() {
+      appBody.classList.toggle("dark-mode", isDark);
+      themeBtn.textContent = isDark ? "☀️" : "🌙";
+  }
+  function toggleTheme() {
+      isDark = !isDark;
+      localStorage.setItem("wimb_theme", isDark ? "dark" : "light");
+      applyTheme();
+  }
+  applyTheme();
+
+  // Show error/logout banners from URL params
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("error"))  document.getElementById("errorBanner").style.display  = "block";
+  if (params.get("logout")) document.getElementById("logoutBanner").style.display = "block";
+
+  // Password toggle
+  function togglePassword() {
+
+    const form = document.querySelector("form");
+    console.log("action:", form.action);
+    console.log("method:", form.method);
+
+
+      const input  = document.getElementById("password");
+      const btn    = document.getElementById("eyeBtn");
+      const isHidden = input.type === "password";
+      input.type   = isHidden ? "text" : "password";
+      btn.textContent = isHidden ? "🙈" : "👁️";
+  }
+</script>
+</body>
+</html>

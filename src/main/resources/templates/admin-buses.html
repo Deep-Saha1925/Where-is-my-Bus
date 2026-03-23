@@ -300,6 +300,20 @@
     </div>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
             aria-label="Toggle dark mode">🌙</button>
+
+
+    <form action="/logout" method="post" style="display:inline;">
+      <input type="hidden" name="_csrf" id="csrfToken"/>
+      <button type="submit"
+              style="font-size:12px; font-weight:600; padding:6px 14px;
+                     border-radius:20px; border:1px solid var(--border);
+                     background:var(--bg-card); color:var(--text-muted);
+                     cursor:pointer; transition:all 0.2s;"
+              onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'"
+              onmouseout="this.style.borderColor='';this.style.color=''">
+        Sign out
+      </button>
+    </form>
   </div>
 </div>
 
@@ -366,6 +380,18 @@
 
 <script src="/js/admin-buses.js"></script>
 <script>
+
+    // Fetch CSRF token from Spring Security endpoint
+    fetch("/csrf-token")
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("csrfToken").value = data.token;
+        })
+        .catch(() => {
+            // If CSRF fetch fails, just ignore — Spring will reject if needed
+        });
+
+
   /* ── THEME ── */
   const appBody  = document.getElementById("appBody");
   const themeBtn = document.getElementById("themeBtn");
