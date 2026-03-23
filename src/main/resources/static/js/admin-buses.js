@@ -1,59 +1,78 @@
 async function loadActiveBuses() {
   try {
-    const res = await fetch("http://localhost:8080/api/ride/active/all");
+    const res   = await fetch("/api/ride/active/all");
     const rides = await res.json();
 
-    const body = document.getElementById("busTableBody");
-    body.innerHTML = "";
+    const grid = document.getElementById("busGrid");
+
+    // Update stats
+    const uniqueRoutes = new Set(rides.map(r => r.routeKey)).size;
+    document.getElementById("statCount").textContent  = rides.length;
+    document.getElementById("statRoutes").textContent = uniqueRoutes;
+    document.getElementById("lastRefreshed").textContent =
+      "Last updated " + new Date().toLocaleTimeString();
 
     if (!rides.length) {
-      body.innerHTML = `
-        <tr>
-          <td colspan="5" class="p-4 text-center text-gray-500">
-            No active buses
-          </td>
-        </tr>
-      `;
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🚌</div>
+          <div class="empty-title">No active buses</div>
+          <div class="empty-sub">No rides are currently in progress</div>
+        </div>`;
       return;
     }
 
-    rides.forEach(ride => {
-      const routeKey = ride.routeKey;
-      const [source, destination] = routeKey.split("_");
+    grid.innerHTML = rides.map((ride, i) => {
+      const [source, destination] = ride.routeKey
+        ? ride.routeKey.split("_") : ["—", "—"];
 
-      const row = document.createElement("tr");
-      row.className = "border-t hover:bg-gray-50";
+      return `
+      <div class="bus-card" style="animation-delay:${i * 60}ms">
+        <div class="bus-card-header">
+          <div class="bus-number">
+            <div class="bus-icon-circle">🚌</div>
+            ${ride.busNumber}
+          </div>
+          <div class="status-badge">
+            <span class="status-dot"></span> Active
+          </div>
+        </div>
 
-      row.innerHTML = `
-        <td class="p-3 font-semibold">${ride.busNumber}</td>
-        <td class="p-3">${source}</td>
-        <td class="p-3">${destination}</td>
-        <td class="p-3">
-          <span class="text-green-600 font-bold">LIVE</span>
-        </td>
-        <td class="p-3 text-center">
-          <button
-            onclick="trackBus('${routeKey}', ${ride.rideId})"
-            class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-          >
-            View Map
-          </button>
-        </td>
-      `;
+        <div class="route-row">
+          <span class="route-src">${source}</span>
+          <span class="route-arr">→</span>
+          <span class="route-dest">${destination}</span>
+        </div>
 
-      body.appendChild(row);
-    });
+        <div class="meta-row">
+          <span class="meta-chip">Ride #${ride.rideId}</span>
+          ${ride.latitude && ride.longitude
+            ? `<span class="meta-chip">📍 ${Number(ride.latitude).toFixed(4)}, ${Number(ride.longitude).toFixed(4)}</span>`
+            : `<span class="meta-chip">📍 Location updating...</span>`
+          }
+        </div>
+
+        <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId})">
+          <span>📍</span> View on Map
+        </button>
+      </div>`;
+    }).join("");
 
   } catch (err) {
-    console.error("Failed to load active rides", err);
+    console.error("Failed to load active rides:", err);
+    document.getElementById("busGrid").innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠️</div>
+        <div class="empty-title">Failed to load</div>
+        <div class="empty-sub">Could not fetch active rides. Retrying...</div>
+      </div>`;
   }
 }
 
 function trackBus(routeKey, rideId) {
   window.location.href =
-    `http://localhost:8080/track.html?routeKey=${routeKey}&rideId=${rideId}`;
+    `/track.html?routeKey=${routeKey}&rideId=${rideId}`;
 }
 
-// initial load + auto refresh
 loadActiveBuses();
 setInterval(loadActiveBuses, 5000);

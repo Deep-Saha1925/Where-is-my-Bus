@@ -1,31 +1,361 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Active Buses | WIMB</title>
-
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-page:    #f1f5f9;
+      --bg-card:    #ffffff;
+      --bg-header:  #ffffff;
+      --border:     #e2e8f0;
+      --text-primary:#0f172a;
+      --text-muted: #64748b;
+      --text-faint: #94a3b8;
+      --shadow:     0 1px 4px rgba(0,0,0,0.07);
+    }
+    .dark-mode {
+      --bg-page:    #0f172a;
+      --bg-card:    #1e293b;
+      --bg-header:  #1e293b;
+      --border:     #334155;
+      --text-primary:#f1f5f9;
+      --text-muted: #94a3b8;
+      --text-faint: #475569;
+      --shadow:     0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-top: 1px;
+    }
+
+    .live-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16,185,129,0.12);
+      color: #059669;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+    .dark-mode .live-pill { color: #34d399; background: rgba(52,211,153,0.1); }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: livePulse 1.4s ease-in-out infinite;
+    }
+    .dark-mode .live-dot { background: #34d399; }
+
+    .theme-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      cursor: pointer;
+      font-size: 17px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.2s;
+    }
+    .theme-btn:hover  { transform: scale(1.1); }
+    .theme-btn:active { transform: scale(0.95); }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px 0;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      flex: 1;
+      box-shadow: var(--shadow);
+    }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* ── Bus cards ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      padding: 16px 20px 24px;
+    }
+
+    .bus-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: fadeUp 0.35s ease both;
+    }
+    .bus-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    }
+    .dark-mode .bus-card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .bus-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .bus-number {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bus-icon-circle {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(59,130,246,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .dark-mode .bus-icon-circle { background: rgba(96,165,250,0.12); }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(16,185,129,0.12);
+      color: #059669;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .dark-mode .status-badge { color: #34d399; background: rgba(52,211,153,0.1); }
+    .status-dot {
+      width: 6px; height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      animation: livePulse 1.4s ease-in-out infinite;
+    }
+    .dark-mode .status-dot { background: #34d399; }
+
+    .route-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      background: var(--bg-page);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .route-src  { color: #3b82f6; font-weight: 600; }
+    .route-arr  { color: var(--text-faint); font-size: 16px; }
+    .route-dest { color: #10b981; font-weight: 600; }
+    .dark-mode .route-src  { color: #60a5fa; }
+    .dark-mode .route-dest { color: #34d399; }
+
+    .meta-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .meta-chip {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-page);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+    }
+
+    .view-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #3b82f6;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .view-btn:hover  { background: #2563eb; }
+    .view-btn:active { transform: scale(0.98); }
+    .dark-mode .view-btn { background: #2563eb; }
+    .dark-mode .view-btn:hover { background: #1d4ed8; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-faint);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+    .empty-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); }
+    .empty-sub { font-size: 13px; }
+
+    /* ── Keyframes ── */
+    @keyframes livePulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%     { opacity:0.4; transform:scale(0.85); }
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(12px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+    }
+
+    @media (max-width: 480px) {
+      .stats-row { flex-direction: column; }
+      .card-grid { grid-template-columns: 1fr; padding: 12px; }
+    }
+  </style>
 </head>
-<body class="bg-gray-100 p-6">
 
-<h1 class="text-2xl font-bold mb-4">🚌 Active Buses</h1>
+<body id="appBody">
 
-<div class="bg-white shadow rounded-lg overflow-hidden">
-  <table class="w-full text-sm">
-    <thead class="bg-gray-200">
-    <tr>
-      <th class="p-3 text-left">Bus No</th>
-      <th class="p-3 text-left">Source</th>
-      <th class="p-3 text-left">Destination</th>
-      <th class="p-3 text-left">Status</th>
-      <th class="p-3 text-center">Action</th>
-    </tr>
-    </thead>
+<!-- ── PAGE HEADER ── -->
+<div class="page-header">
+  <div class="header-left">
+    <div>
+      <div class="header-title">🚌 Active Buses</div>
+      <div class="header-sub" id="lastRefreshed">Refreshing...</div>
+    </div>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div class="live-pill">
+      <span class="live-dot"></span> Live
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
+            aria-label="Toggle dark mode">🌙</button>
+  </div>
+</div>
 
-    <tbody id="busTableBody"></tbody>
-  </table>
+<!-- ── STATS ROW ── -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Active buses</div>
+    <div class="stat-value" id="statCount">—</div>
+    <div class="stat-sub">On route right now</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Routes covered</div>
+    <div class="stat-value" id="statRoutes">—</div>
+    <div class="stat-sub">Unique routes active</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Refresh</div>
+    <div class="stat-value" style="font-size:18px;" id="statNext">5s</div>
+    <div class="stat-sub">Auto-refreshing</div>
+  </div>
+</div>
+
+<!-- ── BUS CARDS GRID ── -->
+<div class="card-grid" id="busGrid">
+  <div class="empty-state">
+    <div class="empty-icon">🚌</div>
+    <div class="empty-title">Loading buses...</div>
+    <div class="empty-sub">Fetching active rides</div>
+  </div>
 </div>
 
 <script src="/js/admin-buses.js"></script>
+<script>
+  /* ── THEME ── */
+  const appBody  = document.getElementById("appBody");
+  const themeBtn = document.getElementById("themeBtn");
+  let isDark     = localStorage.getItem("wimb_theme") === "dark";
+
+  function applyTheme() {
+    appBody.classList.toggle("dark-mode", isDark);
+    themeBtn.textContent = isDark ? "☀️" : "🌙";
+  }
+  function toggleTheme() {
+    isDark = !isDark;
+    localStorage.setItem("wimb_theme", isDark ? "dark" : "light");
+    applyTheme();
+  }
+  applyTheme();
+
+  /* ── COUNTDOWN ── */
+  let countdown = 5;
+  setInterval(() => {
+    countdown = countdown <= 1 ? 5 : countdown - 1;
+    const el = document.getElementById("statNext");
+    if (el) el.textContent = countdown + "s";
+  }, 1000);
+</script>
 </body>
 </html>
