@@ -1,127 +1,375 @@
-<!--<!DOCTYPE html>-->
-<!--<html>-->
-<!--<head>-->
-<!--    <title>Track Bus</title>-->
-<!--    <link-->
-<!--            rel="stylesheet"-->
-<!--            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"-->
-<!--    />-->
-<!--    <style>#map{height:100vh}-->
-<!--        .bus-marker i {-->
-<!--          font-size: 26px;-->
-<!--          color: #1976d2;-->
-<!--        }-->
-<!--        #backBtn {-->
-<!--          position: absolute;-->
-<!--          top: 23px;-->
-<!--          left: 64px;-->
-<!--          z-index: 1000;-->
-<!--          padding: 8px 12px;-->
-<!--          background: white;-->
-<!--          border: 1px solid #ccc;-->
-<!--          border-radius: 6px;-->
-<!--          cursor: pointer;-->
-<!--          font-weight: bold;-->
-<!--        }-->
-
-<!--        #backBtn:hover {-->
-<!--          background: #f0f0f0;-->
-<!--        }-->
-
-<!--    </style>-->
-<!--    <link-->
-<!--            rel="stylesheet"-->
-<!--            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"-->
-<!--    />-->
-<!--</head>-->
-
-<!--<body>-->
-<!--<button id="backBtn" onclick="goBack()">⬅ Back</button>-->
-<!--<div id="map"></div>-->
-<!--<div id="etaTable" style="padding:10px;">-->
-<!--    <h3>Route Stops</h3>-->
-<!--    <table border="1" cellpadding="6">-->
-<!--        <thead>-->
-<!--        <tr>-->
-<!--            <th>Stop</th>-->
-<!--            <th>Distance (km)</th>-->
-<!--            <th>Slack Time (min)</th>-->
-<!--        </tr>-->
-<!--        </thead>-->
-<!--        <tbody id="etaBody"></tbody>-->
-<!--    </table>-->
-<!--</div>-->
-
-<!--<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>-->
-<!--<script src="js/track.js"></script>-->
-
-<!--</body>-->
-<!--</html>-->
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Track Bus | WIMB</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-        @keyframes float { 0%{transform:translateY(0)} 100%{transform:translateY(-4px)} }
-        .live-dot { animation: pulse 1.4s ease-in-out infinite; }
-        .bus-float { animation: float 0.9s ease-in-out infinite alternate; }
+        :root {
+            --bg-page:     #f3f4f6;
+            --bg-card:     #ffffff;
+            --bg-header:   #ffffff;
+            --border:      #e5e7eb;
+            --border-stop: #f3f4f6;
+            --text-primary:#111827;
+            --text-muted:  #6b7280;
+            --text-faint:  #9ca3af;
+            --line-done:   #3b82f6;
+            --line-empty:  #e5e7eb;
+            --dot-future:  #e5e7eb;
+            --dot-border:  #d1d5db;
+            --shadow:      0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .dark-mode {
+            --bg-page:     #0f172a;
+            --bg-card:     #1e293b;
+            --bg-header:   #1e293b;
+            --border:      #334155;
+            --border-stop: #1e293b;
+            --text-primary:#f1f5f9;
+            --text-muted:  #94a3b8;
+            --text-faint:  #64748b;
+            --line-done:   #60a5fa;
+            --line-empty:  #334155;
+            --dot-future:  #334155;
+            --dot-border:  #475569;
+            --shadow:      0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        * { box-sizing: border-box; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+        body {
+            background: var(--bg-page);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .header-bar {
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Progress bar ── */
+        .progress-track {
+            height: 7px;
+            background: var(--line-empty);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dark-mode .progress-fill {
+            background: linear-gradient(90deg, #60a5fa, #93c5fd);
+        }
+
+        /* ── Timeline line segments ── */
+        .line-seg {
+            width: 2px;
+            flex: 1;
+            border-radius: 1px;
+            transition: background-color 0.5s ease;
+        }
+        .line-done  { background: var(--line-done); }
+        .line-empty { background: var(--line-empty); }
+
+        /* ── Dots ── */
+        .dot {
+            width: 13px; height: 13px;
+            border-radius: 50%;
+            border: 2px solid var(--dot-border);
+            background: var(--dot-future);
+            flex-shrink: 0;
+            transition: all 0.4s ease;
+        }
+        .dot-done {
+            background: var(--line-done);
+            border-color: var(--line-done);
+        }
+        .dot-current {
+            width: 16px; height: 16px;
+            background: var(--bg-card);
+            border: 2.5px solid #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59,130,246,0.2);
+            animation: ringPulse 2s ease-in-out infinite;
+        }
+        .dark-mode .dot-current {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(96,165,250,0.25);
+        }
+        .dot-endpoint {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        .dark-mode .dot-endpoint {
+            background: #60a5fa;
+            border-color: #60a5fa;
+        }
+
+        /* ── Bus icon ── */
+        .bus-icon {
+            position: absolute;
+            left: -22px;
+            font-size: 22px;
+            animation: busFloat 1s ease-in-out infinite alternate,
+                       busPulse 2s ease-in-out infinite;
+            filter: drop-shadow(0 2px 4px rgba(59,130,246,0.4));
+        }
+        .dark-mode .bus-icon {
+            filter: drop-shadow(0 2px 8px rgba(96,165,250,0.6));
+        }
+
+        /* ── Stop rows ── */
+        .stop-row {
+            display: flex;
+            align-items: stretch;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-stop);
+            transition: background-color 0.3s;
+            animation: fadeSlideIn 0.4s ease both;
+        }
+        .stop-row:last-child { border-bottom: none; }
+        .stop-row.row-current { background: rgba(59,130,246,0.06); }
+        .dark-mode .stop-row.row-current { background: rgba(96,165,250,0.08); }
+        .stop-row.row-passed { opacity: 0.6; }
+
+        /* ── Badges ── */
+        .badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-left: auto;
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+        .badge-passed  { background: rgba(100,116,139,0.12); color: var(--text-faint); }
+        .badge-here    { background: rgba(59,130,246,0.15);  color: #3b82f6; animation: badgePulse 2s ease-in-out infinite; }
+        .badge-arriving{ background: rgba(245,158,11,0.15);  color: #d97706; }
+        .badge-eta     { background: rgba(100,116,139,0.1);  color: var(--text-muted); }
+        .badge-src     { background: rgba(99,102,241,0.12);  color: #6366f1; font-size: 11px; }
+        .badge-dest    { background: rgba(16,185,129,0.12);  color: #10b981; font-size: 11px; }
+        .dark-mode .badge-here    { color: #60a5fa; background: rgba(96,165,250,0.15); }
+        .dark-mode .badge-arriving{ color: #fbbf24; }
+        .dark-mode .badge-src     { color: #818cf8; }
+        .dark-mode .badge-dest    { color: #34d399; }
+
+        /* ── Live badge ── */
+        .live-badge {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            background: rgba(16,185,129,0.12);
+            color: #059669;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+        .dark-mode .live-badge { color: #34d399; background: rgba(52,211,153,0.12); }
+        .live-dot {
+            width: 8px; height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: livePulse 1.4s ease-in-out infinite;
+        }
+        .dark-mode .live-dot { background: #34d399; }
+
+        /* ── Theme toggle ── */
+        .theme-btn {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 17px;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover  { transform: scale(1.1); }
+        .theme-btn:active { transform: scale(0.95); }
+
+        /* ── Stat cards ── */
+        .stat-card {
+            background: var(--bg-page);
+            border-radius: 10px;
+            padding: 12px 14px;
+            flex: 1;
+        }
+        .stat-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-faint);
+            margin-bottom: 4px;
+            letter-spacing: 0.02em;
+        }
+        .stat-value {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        /* ── Banner ── */
+        .banner {
+            padding: 12px 16px;
+            border-bottom: 1px solid;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .banner-yellow {
+            background: rgba(245,158,11,0.08);
+            border-color: rgba(245,158,11,0.2);
+            color: #b45309;
+        }
+        .dark-mode .banner-yellow {
+            background: rgba(251,191,36,0.08);
+            border-color: rgba(251,191,36,0.15);
+            color: #fbbf24;
+        }
+
+        /* ── Keyframes ── */
+        @keyframes ringPulse {
+            0%,100% { box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
+            50%      { box-shadow: 0 0 0 8px rgba(59,130,246,0.08); }
+        }
+        @keyframes busFloat {
+            0%   { transform: translateY(0px); }
+            100% { transform: translateY(-4px); }
+        }
+        @keyframes busPulse {
+            0%,100% { filter: drop-shadow(0 2px 4px rgba(59,130,246,0.4)); }
+            50%     { filter: drop-shadow(0 4px 10px rgba(59,130,246,0.7)); }
+        }
+        @keyframes livePulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50%     { opacity: 0.4; transform: scale(0.85); }
+        }
+        @keyframes badgePulse {
+            0%,100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation: none !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body id="appBody">
 
-<!-- HEADER BAR -->
-<div class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-    <button onclick="goBack()" class="text-gray-500 hover:text-gray-800 text-lg">←</button>
-    <div class="flex-1">
-        <div class="font-semibold text-gray-800 text-sm" id="routeTitle">Loading route...</div>
-        <div class="text-xs text-gray-400" id="lastUpdated">Fetching location...</div>
+<!-- ── STICKY HEADER ── -->
+<div class="header-bar px-4 py-3 flex items-center gap-3 sticky top-0 z-20">
+    <button onclick="goBack()"
+            style="color:var(--text-muted); font-size:22px; background:none; border:none; cursor:pointer; padding:0 4px; line-height:1;"
+            aria-label="Go back">←</button>
+
+    <div class="flex-1 min-w-0">
+        <div style="font-size:17px; font-weight:700; color:var(--text-primary);
+                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+             id="routeTitle">Loading route...</div>
+        <div style="font-size:12px; color:var(--text-faint); margin-top:2px;"
+             id="lastUpdated">Fetching location...</div>
     </div>
-    <div id="liveBadge" class="hidden items-center gap-1 bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
-        <span class="live-dot w-2 h-2 bg-green-500 rounded-full inline-block"></span>
-        Live
+
+    <div class="live-badge" id="liveBadge">
+        <span class="live-dot"></span> Live
+    </div>
+
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
+            aria-label="Toggle dark mode">🌙</button>
+</div>
+
+<!-- ── INFO CARD ── -->
+<div style="padding:12px 12px 0;">
+    <div class="card" style="padding:16px;">
+
+        <div style="display:flex; justify-content:space-between; gap:8px;">
+            <div class="stat-card">
+                <div class="stat-label">Bus</div>
+                <div class="stat-value" id="busNumberDisplay">—</div>
+            </div>
+            <div class="stat-card" style="text-align:center;">
+                <div class="stat-label">Current stop</div>
+                <div class="stat-value" style="color:#3b82f6; font-size:14px;" id="currentStopDisplay">—</div>
+            </div>
+            <div class="stat-card" style="text-align:right;">
+                <div class="stat-label">Remaining</div>
+                <div class="stat-value" id="remainingDisplay">—</div>
+            </div>
+        </div>
+
+        <div class="progress-track">
+            <div class="progress-fill" id="progressBar" style="width:0%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:5px;">
+            <span style="font-size:11px; font-weight:500; color:var(--text-muted);" id="progressStart">—</span>
+            <span style="font-size:12px; font-weight:700; color:var(--text-primary);" id="progressPct">0%</span>
+            <span style="font-size:11px; font-weight:500; color:var(--text-muted);" id="progressEnd">—</span>
+        </div>
     </div>
 </div>
 
-<!-- INFO CARD -->
-<div class="mx-3 mt-3 bg-white rounded-xl border border-gray-200 p-4">
-    <div class="flex justify-between items-center mb-2">
-        <div>
-            <div class="text-xs text-gray-400 mb-0.5">Bus Number</div>
-            <div class="font-semibold text-gray-800 text-sm" id="busNumberDisplay">—</div>
+<!-- ── ROUTE TIMELINE ── -->
+<div style="padding:12px 12px 24px;">
+    <div class="card" style="overflow:hidden;">
+        <div style="padding:12px 16px 10px; border-bottom:1px solid var(--border);
+                    font-size:12px; font-weight:700; letter-spacing:0.07em;
+                    color:var(--text-muted); text-transform:uppercase;">
+            Route stops
         </div>
-        <div class="text-center">
-            <div class="text-xs text-gray-400 mb-0.5">Current Stop</div>
-            <div class="font-semibold text-blue-600 text-sm" id="currentStopDisplay">—</div>
-        </div>
-        <div class="text-right">
-            <div class="text-xs text-gray-400 mb-0.5">Remaining</div>
-            <div class="font-semibold text-gray-800 text-sm" id="remainingDisplay">—</div>
+        <div id="stopList">
+            <div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">
+                Loading stops...
+            </div>
         </div>
     </div>
-    <!-- Progress bar -->
-    <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-        <div id="progressBar" class="h-full bg-blue-500 rounded-full transition-all duration-700" style="width:0%"></div>
-    </div>
-</div>
-
-<!-- ROUTE TIMELINE -->
-<div class="mx-3 mt-3 bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-    <div class="px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400 uppercase tracking-wide">
-        Route Stops
-    </div>
-    <div id="stopList"></div>
 </div>
 
 <script src="/js/track.js"></script>
+<script>
+    const body     = document.getElementById("appBody");
+    const themeBtn = document.getElementById("themeBtn");
+    let isDark     = localStorage.getItem("wimb_theme") === "dark";
+
+    function applyTheme() {
+        if (isDark) {
+            body.classList.add("dark-mode");
+            themeBtn.textContent = "☀️";
+        } else {
+            body.classList.remove("dark-mode");
+            themeBtn.textContent = "🌙";
+        }
+    }
+
+    function toggleTheme() {
+        isDark = !isDark;
+        localStorage.setItem("wimb_theme", isDark ? "dark" : "light");
+        applyTheme();
+    }
+
+    applyTheme();
+</script>
 </body>
 </html>

@@ -158,127 +158,111 @@ function renderTimeline() {
 
   if (!displayStops.length) {
     container.innerHTML =
-      `<div class="px-4 py-8 text-center text-sm text-gray-400">Loading stops...</div>`;
+      `<div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">Loading stops...</div>`;
     return;
   }
 
   const busPos = getBusPosition();
 
-  // Passenger's source stop name (to mark it and show banner)
-  const srcName  = routeStops[0]?.stopName?.trim().toUpperCase();
-  const destName = routeStops[routeStops.length - 1]?.stopName?.trim().toUpperCase();
-
-  // Index of passenger's source on the full route
+  const srcName   = routeStops[0]?.stopName?.trim().toUpperCase();
+  const destName  = routeStops[routeStops.length-1]?.stopName?.trim().toUpperCase();
   const srcOnFull = displayStops.findIndex(
     s => s.stopName.trim().toUpperCase() === srcName
   );
-
-  // Is bus still before the passenger's boarding stop?
   const notYetArrived = busPos && srcOnFull >= 0 && busPos.nearestIdx < srcOnFull;
 
-  // Bus distance and overall progress
   const busDistKm = busPos
     ? displayStops[busPos.nearestIdx]?.distanceFromStartKm || 0
     : 0;
-  const totalDist = displayStops[displayStops.length - 1].distanceFromStartKm;
-  const progress  = !busPos
-    ? 0
-    : Math.min(100, Math.round((busDistKm / totalDist) * 100));
+  const totalDist = displayStops[displayStops.length-1].distanceFromStartKm;
+  const progress  = !busPos ? 0 : Math.min(100, Math.round((busDistKm / totalDist) * 100));
 
-  // Update header info
-  document.getElementById("progressBar").style.width = progress + "%";
+  document.getElementById("progressBar").style.width  = progress + "%";
+  document.getElementById("progressPct").innerText    = progress + "%";
+  document.getElementById("progressStart").innerText  = displayStops[0].stopName;
+  document.getElementById("progressEnd").innerText    = displayStops[displayStops.length-1].stopName;
   document.getElementById("remainingDisplay").innerText = !busPos
-    ? "—"
-    : `${(totalDist - busDistKm).toFixed(1)} km`;
+    ? "—" : `${(totalDist - busDistKm).toFixed(1)} km`;
   document.getElementById("currentStopDisplay").innerText = busPos
-    ? displayStops[busPos.nearestIdx].stopName
-    : "—";
+    ? displayStops[busPos.nearestIdx].stopName : "—";
 
-  // Yellow banner if bus hasn't reached passenger's boarding stop yet
   let bannerHtml = "";
   if (notYetArrived) {
     bannerHtml = `
-      <div class="px-4 py-2.5 bg-yellow-50 border-b border-yellow-100 flex items-center gap-2 text-xs text-yellow-700 font-medium">
-        <span style="font-size:15px">🚌</span>
-        Bus is on its way — not yet reached your boarding stop
-      </div>`;
+    <div class="banner banner-yellow">
+      <span style="font-size:18px">🚌</span>
+      Bus is on its way — not yet reached your boarding stop
+    </div>`;
   }
 
-  // Build stop rows
   let stopsHtml = "";
-
   displayStops.forEach((stop, i) => {
     const isFirst   = i === 0;
     const isLast    = i === displayStops.length - 1;
     const isPassed  = busPos ? busPos.nearestIdx > i  : false;
     const isCurrent = busPos ? busPos.nearestIdx === i : false;
 
-    // Line segment colors
-    const topLine = (isPassed || isCurrent) ? "bg-blue-500" : "bg-gray-200";
-    const botLine =  isPassed               ? "bg-blue-500" : "bg-gray-200";
+    const topLineCl = (isPassed || isCurrent) ? "line-done" : "line-empty";
+    const botLineCl =  isPassed               ? "line-done" : "line-empty";
 
-    // Dot style
-    let dotClass = "w-3 h-3 rounded-full border-2 flex-shrink-0 ";
-    if      (isPassed)          dotClass += "bg-blue-500 border-blue-500";
-    else if (isCurrent)         dotClass += "bg-white border-blue-500 ring-2 ring-blue-100 w-3.5 h-3.5";
-    else if (isFirst || isLast) dotClass += "bg-blue-700 border-blue-700";
-    else                        dotClass += "bg-gray-200 border-gray-300";
+    let dotCl = "dot ";
+    if      (isPassed)          dotCl += "dot-done";
+    else if (isCurrent)         dotCl += "dot-current";
+    else if (isFirst || isLast) dotCl += "dot-endpoint";
 
-    // ETA badge
-    const eta = calcETA(stop.distanceFromStartKm, busDistKm);
-    let etaBadge = "";
-    if (isPassed) {
-      etaBadge = `<span class="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Passed</span>`;
-    } else if (isCurrent) {
-      etaBadge = `<span class="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Here</span>`;
-    } else if (eta === "Arriving") {
-      etaBadge = `<span class="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Arriving</span>`;
-    } else if (eta) {
-      etaBadge = `<span class="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">${eta}</span>`;
-    }
-
-    // Mark the passenger's own boarding and destination stops
     const isPassengerSrc  = stop.stopName.trim().toUpperCase() === srcName;
     const isPassengerDest = stop.stopName.trim().toUpperCase() === destName;
-    const passengerMarker = isPassengerSrc
-      ? `<span class="text-xs text-indigo-500 font-medium ml-1">📍 Your stop</span>`
-      : isPassengerDest
-        ? `<span class="text-xs text-indigo-500 font-medium ml-1">🏁 Your dest</span>`
-        : "";
 
-    const rowBg  = isCurrent ? "bg-blue-50"   : "";
-    const nameCl = isPassed  ? "text-gray-400" : isCurrent ? "text-blue-700" : "text-gray-800";
-    const metaCl = isPassed  ? "text-gray-300" : "text-gray-400";
+    const eta = calcETA(stop.distanceFromStartKm, busDistKm);
+
+    let badgeHtml = "";
+    if (isPassed) {
+      badgeHtml = `<span class="badge badge-passed">Passed</span>`;
+    } else if (isCurrent) {
+      badgeHtml = `<span class="badge badge-here">● Here</span>`;
+    } else if (eta === "Arriving") {
+      badgeHtml = `<span class="badge badge-arriving">Arriving</span>`;
+    } else if (eta) {
+      badgeHtml = `<span class="badge badge-eta">${eta}</span>`;
+    }
+
+    let markerHtml = "";
+    if (isPassengerSrc)  markerHtml = `<span class="badge badge-src">📍 Your stop</span>`;
+    if (isPassengerDest) markerHtml = `<span class="badge badge-dest">🏁 Your dest</span>`;
+
+    const rowCl  = `stop-row${isCurrent ? ' row-current' : ''}${isPassed ? ' row-passed' : ''}`;
+    const nameCl = isPassed ? "color:var(--text-faint)" : isCurrent ? "color:#3b82f6" : "color:var(--text-primary)";
+    const metaCl = isPassed ? "color:var(--text-faint)" : "color:var(--text-muted)";
+    const animDel = `animation-delay:${i * 40}ms`;
 
     stopsHtml += `
-      <div class="flex items-stretch px-4 ${rowBg} ${!isLast ? 'border-b border-gray-50' : ''}">
+    <div class="${rowCl}" style="${animDel}">
+      <div style="width:32px; display:flex; flex-direction:column; align-items:center;
+                  flex-shrink:0; padding:8px 0; position:relative;">
+        <div class="line-seg ${topLineCl}" style="${isFirst ? 'visibility:hidden' : ''}"></div>
 
-        <div class="flex flex-col items-center w-7 flex-shrink-0 py-1 relative">
-          <div class="flex-1 w-0.5 ${isFirst ? 'invisible' : topLine}"></div>
-
-          ${isCurrent ? `
-            <div class="relative flex items-center justify-center">
-              <div class="${dotClass}"></div>
-              <span class="bus-float absolute -left-4" style="font-size:18px">🚌</span>
-            </div>
-          ` : `<div class="${dotClass}"></div>`}
-
-          <div class="flex-1 w-0.5 ${isLast ? 'invisible' : botLine}"></div>
-        </div>
-
-        <div class="flex-1 py-3 pl-3">
-          <div class="flex items-center gap-1 flex-wrap">
-            <span class="text-sm font-medium ${nameCl}">${stop.stopName}</span>
-            ${passengerMarker}
-            ${etaBadge}
+        ${isCurrent ? `
+          <div style="position:relative; display:flex; align-items:center; justify-content:center;">
+            <div class="${dotCl}"></div>
+            <span class="bus-icon">🚌</span>
           </div>
-          <div class="flex gap-3 mt-0.5 text-xs ${metaCl}">
-            <span>${stop.distanceFromStartKm} km</span>
-            ${stop.slackTimeMin > 0 ? `<span>Halt ${stop.slackTimeMin} min</span>` : ""}
-          </div>
-        </div>
+        ` : `<div class="${dotCl}"></div>`}
 
-      </div>`;
+        <div class="line-seg ${botLineCl}" style="${isLast ? 'visibility:hidden' : ''}"></div>
+      </div>
+
+      <div style="flex:1; padding:14px 0 14px 14px;">
+        <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+          <span style="font-size:15px; font-weight:600; ${nameCl}">${stop.stopName}</span>
+          ${markerHtml}
+          ${badgeHtml}
+        </div>
+        <div style="display:flex; gap:12px; margin-top:4px; font-size:13px; ${metaCl}">
+          <span>${stop.distanceFromStartKm} km</span>
+          ${stop.slackTimeMin > 0 ? `<span>Halt ${stop.slackTimeMin} min</span>` : ""}
+        </div>
+      </div>
+    </div>`;
   });
 
   container.innerHTML = bannerHtml + stopsHtml;
