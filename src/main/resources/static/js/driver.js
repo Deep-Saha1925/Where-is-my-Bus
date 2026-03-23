@@ -283,12 +283,6 @@ async function startRide() {
   const destination = document.getElementById("destination").value.trim().toUpperCase();
   const statusEl    = document.getElementById("status");
 
-  document.getElementById("newRideSection").classList.add("hidden");
-  document.getElementById("activeRideSection").classList.remove("hidden");
-  document.getElementById("activeRouteKey").innerText =
-    `${source} → ${destination}`;
-  document.getElementById("activeRideId").innerText = rideId;
-
   if (!busNumber || !source || !destination) {
     alert("Please fill in Bus Number, Source, and Destination");
     return;
@@ -350,11 +344,15 @@ async function startRide() {
       previewWatchId = null;
     }
 
-    document.getElementById("startBtn").classList.add("hidden");
-    document.getElementById("stopBtn").classList.remove("hidden");
+
+    document.getElementById("newRideSection").classList.add("hidden");
+    document.getElementById("activeRideSection").classList.remove("hidden");
+    document.getElementById("activeRouteKey").innerText = `${source} → ${destination}`;
+    document.getElementById("activeRideId").innerText = rideId;
+    document.getElementById("activeBusNumber").innerText = busNumber;
     statusEl.innerText = `Ride Started ✅ (ID: ${rideId})`;
 
-    startRideTracking(); // live GPS tracking begins after ride starts
+    startRideTracking();
 
   } catch (err) {
     console.error(err);
