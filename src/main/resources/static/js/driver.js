@@ -283,6 +283,12 @@ async function startRide() {
   const destination = document.getElementById("destination").value.trim().toUpperCase();
   const statusEl    = document.getElementById("status");
 
+  document.getElementById("newRideSection").classList.add("hidden");
+  document.getElementById("activeRideSection").classList.remove("hidden");
+  document.getElementById("activeRouteKey").innerText =
+    `${source} → ${destination}`;
+  document.getElementById("activeRideId").innerText = rideId;
+
   if (!busNumber || !source || !destination) {
     alert("Please fill in Bus Number, Source, and Destination");
     return;
@@ -410,6 +416,12 @@ async function stopRide() {
     document.getElementById("stopBtn").classList.add("hidden");
     document.getElementById("startBtn").classList.remove("hidden");
 
+    // Go back to bus number entry
+    document.getElementById("activeRideSection").classList.add("hidden");
+    document.getElementById("busNumberSection").classList.remove("hidden");
+    document.getElementById("busNumber").value = "";
+    document.getElementById("busNumber").disabled = false;
+
     rideId = null;
     currentPosition = null;
 
@@ -419,4 +431,72 @@ async function stopRide() {
     console.error(err);
     alert("Failed to stop ride: " + err.message);
   }
+}
+
+
+/* ------------------ CHECK BUS (after entering bus number) ------------------ */
+async function checkBus() {
+  const busNumber = document.getElementById("busNumber").value.trim();
+  if (!busNumber) {
+    alert("Please enter a bus number");
+    return;
+  }
+
+  document.getElementById("status").innerText = "Checking...";
+
+  try {
+    // Fetch all active rides and find one matching this bus number
+    const res = await fetch("/api/ride/active/all");
+    if (!res.ok) throw new Error("Failed to fetch rides");
+
+    const rides = await res.json();
+    const existing = rides.find(
+      r => r.busNumber.trim().toUpperCase() === busNumber.toUpperCase()
+    );
+
+    document.getElementById("status").innerText = "";
+
+    if (existing) {
+      // Active ride found — show resume prompt
+      document.getElementById("savedRouteKey").innerText =
+        existing.routeKey.replace("_", " → ");
+      document.getElementById("savedRideId").innerText = existing.rideId;
+
+      // Store for resumeRide() to use
+      rideId = existing.rideId;
+
+      document.getElementById("busNumberSection").classList.add("hidden");
+      document.getElementById("resumeSection").classList.remove("hidden");
+    } else {
+      // No active ride — go straight to new ride form
+      showNewRideForm();
+    }
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("status").innerText = "";
+    alert("Could not check bus status: " + err.message);
+  }
+}
+
+/* ------------------ RESUME RIDE ------------------ */
+function resumeRide() {
+  // rideId already set in checkBus()
+  const routeKey = document.getElementById("savedRouteKey").innerText;
+
+  document.getElementById("resumeSection").classList.add("hidden");
+  document.getElementById("activeRideSection").classList.remove("hidden");
+  document.getElementById("activeRouteKey").innerText = routeKey;
+  document.getElementById("activeRideId").innerText = rideId;
+  document.getElementById("status").innerText = `Ride Resumed ✅`;
+
+  startRideTracking();
+}
+
+/* ------------------ SHOW NEW RIDE FORM ------------------ */
+function showNewRideForm() {
+  rideId = null;
+  document.getElementById("busNumberSection").classList.add("hidden");
+  document.getElementById("resumeSection").classList.add("hidden");
+  document.getElementById("newRideSection").classList.remove("hidden");
 }
