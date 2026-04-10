@@ -73,7 +73,6 @@ public class SecurityConfig {
                                 "/admin/**",
                                 "/api/ride/active/all"
                         ).hasRole("ADMIN")
-
                         // ── Everything else requires login ──
                         .anyRequest().authenticated()
                 )
