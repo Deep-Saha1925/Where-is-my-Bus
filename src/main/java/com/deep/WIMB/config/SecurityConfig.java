@@ -49,7 +49,6 @@ public class SecurityConfig {
                                 "/index",
                                 "/track",
                                 "/driver",
-                                "/login.html",
                                 "/csrf-token",
                                 "/js/**",
                                 "/data/**",
