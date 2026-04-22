@@ -47,6 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/index",
+                                "/index.html",
+                                "/login.html",
                                 "/track",
                                 "/driver",
                                 "/csrf-token",
