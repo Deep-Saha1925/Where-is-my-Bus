@@ -49,7 +49,7 @@ public class SecurityConfig {
                                 "/index",
                                 "/index.html",
                                 "/login.html",
-                                "/track",
+                                "/track.html",
                                 "/driver",
                                 "/csrf-token",
                                 "/js/**",
