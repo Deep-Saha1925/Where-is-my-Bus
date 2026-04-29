@@ -11,6 +11,7 @@ import com.deep.WIMB.repository.BusRepository;
 import com.deep.WIMB.repository.LocationRepository;
 import com.deep.WIMB.repository.RideRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,21 +21,23 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RideService {
 
     private final BusRepository busRepository;
     private final RideRepository rideRepository;
     private final LocationRepository locationRepository;
     private final RouteExcelLoader routeExcelLoader;
+    private final RedisLocationService redisLocationService; // ← NEW
 
     // ============ UPDATE RIDE REQUEST ================
-    public StartRideRequest updateRequest(StartRideRequest request){
+    public StartRideRequest updateRequest(StartRideRequest request) {
         StartRideRequest updatedRequest = new StartRideRequest();
         List<RouteStop> allRoute = routeExcelLoader.getFullRoute();
         String src = request.getRouteKey().split("_")[0];
 
-        for(RouteStop stop : allRoute){
-            if (stop.getStopName().equalsIgnoreCase(src)){
+        for (RouteStop stop : allRoute) {
+            if (stop.getStopName().equalsIgnoreCase(src)) {
                 updatedRequest.setRouteKey(request.getRouteKey());
                 updatedRequest.setBusNumber(request.getBusNumber());
                 updatedRequest.setLatitude(stop.getLatitude());
@@ -58,8 +61,11 @@ public class RideService {
                     return busRepository.save(b);
                 });
 
+        // End any existing active ride for this bus
         rideRepository.findByBusAndStatus(bus, RideStatus.ACTIVE)
                 .ifPresent(r -> {
+                    // ── flush Redis before ending old ride ──
+                    flushRideFromRedisToMySQL(r.getId());
                     r.setStatus(RideStatus.ENDED);
                     r.setEndTime(LocalDateTime.now());
                 });
@@ -78,7 +84,8 @@ public class RideService {
         loc.setLongitude(request.getLongitude());
         loc.setTimestamp(LocalDateTime.now());
 
-        locationRepository.save(loc);
+        // Save to Redis instead of MySQL directly
+        redisLocationService.saveLocationToRedis(loc);
 
         return ride;
     }
@@ -94,6 +101,9 @@ public class RideService {
         if (ride.getStatus() == RideStatus.ENDED) {
             throw new RuntimeException("Ride already ended");
         }
+
+        // Flush Redis → MySQL before ending ride so no data is lost
+        flushRideFromRedisToMySQL(rideId);
 
         ride.setStatus(RideStatus.ENDED);
         ride.setEndTime(LocalDateTime.now());
@@ -120,12 +130,8 @@ public class RideService {
                 .stream()
                 .map(ride -> {
 
-                    Location lastLoc =
-                            locationRepository
-                                    .findTopByRideIdOrderByTimestampDesc(
-                                            ride.getId()
-                                    )
-                                    .orElse(null);
+                    //Redis-first, fallback to MySQL
+                    Location lastLoc = getLatestLocation(ride.getId());
 
                     if (lastLoc == null) return null;
 
@@ -140,7 +146,6 @@ public class RideService {
 
                     if (!allowed) return null;
 
-                    // 🔹 NEW: distance to source
                     RouteStop busStop = fullRoute.stream()
                             .filter(s -> s.getStopOrder() == busOrder)
                             .findFirst()
@@ -166,16 +171,44 @@ public class RideService {
                 .collect(Collectors.toList());
     }
 
-
     // ================= ALL ACTIVE RIDES =================
 
     public List<ActiveRideResponse> getAllActiveRides() {
-
         return rideRepository.findByStatus(RideStatus.ACTIVE)
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
+
+    // ================= HELPER: Redis-first latest location =================
+
+    private Location getLatestLocation(Long rideId) {
+
+        // 1. Try Redis first
+        List<Location> redisLocations = redisLocationService.getLocationsFromRedis(rideId);
+        if (!redisLocations.isEmpty()) {
+            // Last element is the most recent (we use rightPush)
+            return redisLocations.get(redisLocations.size() - 1);
+        }
+
+        // 2. Fallback to MySQL
+        return locationRepository
+                .findTopByRideIdOrderByTimestampDesc(rideId)
+                .orElse(null);
+    }
+
+    // ================= HELPER: Flush Redis → MySQL =================
+
+    private void flushRideFromRedisToMySQL(Long rideId) {
+        List<Location> locations = redisLocationService.getLocationsFromRedis(rideId);
+        if (!locations.isEmpty()) {
+            locationRepository.saveAll(locations);
+            redisLocationService.clearLocationsFromRedis(rideId);
+            log.info("Flushed {} locations for rideId={} to MySQL", locations.size(), rideId);
+        }
+    }
+
+    // ================= HELPER: Find stop order =================
 
     private int findStopOrder(List<RouteStop> fullRoute, Location lastLoc) {
 
@@ -187,17 +220,14 @@ public class RideService {
         double lon = lastLoc.getLongitude();
 
         for (RouteStop stop : fullRoute) {
-
             if (Double.compare(stop.getLatitude(), lat) == 0 &&
                     Double.compare(stop.getLongitude(), lon) == 0) {
-
                 return stop.getStopOrder();
             }
         }
 
-        return -1; // stop not found
+        return -1;
     }
-
 
     // ================= DTO MAPPER =================
 
@@ -208,12 +238,12 @@ public class RideService {
         dto.setBusNumber(ride.getBus().getBusNumber());
         dto.setRouteKey(ride.getRouteKey());
 
-        locationRepository
-                .findTopByRideIdOrderByTimestampDesc(ride.getId())
-                .ifPresent(loc -> {
-                    dto.setLatitude(loc.getLatitude());
-                    dto.setLongitude(loc.getLongitude());
-                });
+        //Redis-first, fallback to MySQL
+        Location latest = getLatestLocation(ride.getId());
+        if (latest != null) {
+            dto.setLatitude(latest.getLatitude());
+            dto.setLongitude(latest.getLongitude());
+        }
 
         return dto;
     }

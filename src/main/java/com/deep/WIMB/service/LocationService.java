@@ -17,6 +17,7 @@ public class LocationService {
 
     private final LocationRepository locationRepository;
     private final RideRepository rideRepository;
+    private final RedisLocationService redisLocationService;
 
     public Location addLocation(Long rideId, double lat, double lng) {
 
@@ -33,7 +34,8 @@ public class LocationService {
         location.setLongitude(lng);
         location.setTimestamp(LocalDateTime.now());
 
-        return locationRepository.save(location);
+        redisLocationService.saveLocationToRedis(location);
+        return location;
     }
 
     public Location getLastKnownLocation(Long rideId) {

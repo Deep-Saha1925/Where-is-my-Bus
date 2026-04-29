@@ -24,7 +24,7 @@ public class RedisLocationService {
 
     private static final String REDIS_KEY = "location:ride:";
 
-    public void saveLocation(Location location){
+    public void saveLocationToRedis(Location location){
         try{
             String key = REDIS_KEY + location.getRide().getId();
             String json = objectMapper.writeValueAsString(location);
@@ -36,7 +36,7 @@ public class RedisLocationService {
         }
     }
 
-    public List<Location> getLocationFromRedis(Long rideId){
+    public List<Location> getLocationsFromRedis(Long rideId){
         String key = REDIS_KEY + rideId;
         List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
         List<Location> locations = new ArrayList<>();
