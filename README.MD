@@ -9,6 +9,7 @@
 [![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=java)](https://www.java.com)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?style=flat-square&logo=mysql)](https://www.mysql.com)
+[![Redis](https://img.shields.io/badge/Redis-7.x-red?style=flat-square&logo=redis)](https://redis.io)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
 
@@ -72,6 +73,8 @@
 - ❌ No false bus visibility after source stop
 - 🗂️ JSON auto-synced from Excel on startup
 - 🔐 Admin auth via config file, no DB needed
+- ⚡ Redis buffer for high-frequency GPS writes
+- 🔄 Auto batch flush Redis → MySQL every 60s
 
 </td>
 </tr>
@@ -88,7 +91,8 @@
 | Spring Boot | 3.x | REST API framework |
 | Spring Security | 6.x | Admin authentication |
 | Apache POI | 5.x | Excel route file processing |
-| MySQL | 8.0 | Live ride & location storage |
+| MySQL | 8.0 | Persistent ride & location storage |
+| Redis | 7.x | High-frequency GPS location buffer |
 | Jackson | 2.x | JSON sync for stop dropdowns |
 
 ### Frontend
@@ -140,13 +144,29 @@
 ┌─────────────────────────────────────────────────────────┐
 │              SPRING BOOT BACKEND                        │
 │                                                         │
-│   RideController  ──►  RideService  ──►  MySQL          │
-│   LocationController ─► LocationService ─► MySQL        │
+│   RideController  ──►  RideService                      │
+│   LocationController ─► LocationService                 │
 │   RouteController ──►  RouteExcelLoader ─► Cache        │
-└────────────┬───────────────────────┬────────────────────┘
-             │                       │
-             │ GET last-loc          │ GET routes
-             ▼                       ▼
+│                              │                          │
+│                              ▼                          │
+│                     RedisLocationService                 │
+│                        │         │                      │
+│               Write fast│         │Read latest          │
+│                        ▼         ▼                      │
+│                    ┌────────────────┐                   │
+│                    │     REDIS      │  ← GPS buffer     │
+│                    │ location:ride: │                   │
+│                    └───────┬────────┘                   │
+│                            │ Flush every 60s            │
+│                            │ or on ride end             │
+│                            ▼                            │
+│                    ┌────────────────┐                   │
+│                    │     MYSQL      │  ← Persistent     │
+│                    └────────────────┘                   │
+└────────────┬────────────────────────────────────────────┘
+             │
+             │ GET last-loc / active rides
+             ▼
 ┌────────────────────┐   ┌───────────────────────────────┐
 │   PASSENGER UI     │   │        EXCEL FILE             │
 │                    │   │                               │
@@ -166,6 +186,47 @@
                          ▼
                  /admin-buses.html
 ```
+
+---
+
+## ⚡ Redis Integration
+
+WIMB uses Redis as a **high-speed write buffer** for GPS location updates.
+
+### Why Redis?
+GPS updates arrive every few seconds per active ride. Writing each update directly to MySQL causes high I/O and slow response times. Redis solves this by acting as an in-memory buffer.
+
+### How it works
+
+```
+GPS Update (every ~3s)
+        ↓
+   Redis List (instant ~0.1ms write)
+   key: location:ride:{rideId}
+        ↓
+   Scheduler (every 60s)  ──OR──  Ride ends (immediate flush)
+        ↓
+      MySQL (batch saveAll)
+```
+
+### Performance Comparison
+
+| Aspect | Without Redis | With Redis |
+|---|---|---|
+| Write speed | ~5–10ms (MySQL) | ~0.1ms (Redis) |
+| DB load | Every 3s hit | Batched every 60s |
+| Live tracking | Query DB each time | Read from Redis cache |
+| Data safety | Always persisted | Flushed on ride end |
+
+### Redis Key Structure
+```
+location:ride:1   →  List of JSON location objects
+location:ride:2   →  List of JSON location objects
+```
+
+### Flush Strategy
+- **Scheduled flush** — `LocationFlushScheduler` runs every 60 seconds, drains all Redis keys to MySQL
+- **Ride end flush** — When a ride is cancelled or a new ride starts for the same bus, remaining Redis data is immediately flushed so no location data is ever lost
 
 ---
 
@@ -277,6 +338,7 @@ PUT /api/ride/cancel/{rideId}
 ```http
 GET /api/location/last-loc/{rideId}
 ```
+> ⚡ Returns from Redis if ride is active, falls back to MySQL if not buffered.
 
 </details>
 
@@ -309,7 +371,8 @@ GET /api/routes?source=ALIPURDUAR&destination=FALAKATA
 WIMB/
 ├── src/main/java/com/deep/WIMB/
 │   ├── config/
-│   │   └── SecurityConfig.java          # Spring Security rules
+│   │   ├── SecurityConfig.java          # Spring Security rules
+│   │   └── RedisConfig.java             # Redis template config
 │   ├── controller/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
@@ -319,12 +382,16 @@ WIMB/
 │   ├── service/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
+│   │   ├── RedisLocationService.java    # Redis read/write/clear
 │   │   └── RouteExcelLoader.java        # Loads Excel on startup
+│   ├── scheduler/
+│   │   └── LocationFlushScheduler.java  # Batch flush Redis → MySQL
 │   ├── model/
 │   │   ├── Ride.java
-│   │   └── Location.java
+│   │   └── Location.java               # implements Serializable
 │   └── dto/
 │       ├── StartRideRequest.java
+│       ├── LocationUpdateRequest.java
 │       ├── ActiveRideResponse.java
 │       └── RouteStop.java
 │
@@ -357,6 +424,7 @@ WIMB/
 - Java 17+
 - MySQL 8+
 - Maven 3.8+
+- Redis 7+
 
 ### Steps
 ```bash
@@ -365,7 +433,16 @@ git clone https://github.com/Deep-Saha1925/Where-is-my-Bus.git
 cd Where-is-my-Bus
 ```
 ```bash
-# 2. Create MySQL database
+# 2. Install and start Redis (Ubuntu)
+sudo apt install redis-server -y
+sudo systemctl start redis
+sudo systemctl enable redis
+
+# Verify Redis is running
+redis-cli ping   # should return PONG
+```
+```bash
+# 3. Create MySQL database
 mysql -u root -p
 ```
 ```sql
@@ -373,7 +450,7 @@ CREATE DATABASE wimb;
 EXIT;
 ```
 ```bash
-# 3. Configure application.properties
+# 4. Configure application.properties
 ```
 ```properties
 # Database
@@ -382,18 +459,32 @@ spring.datasource.username=root
 spring.datasource.password=yourpassword
 spring.jpa.hibernate.ddl-auto=update
 
+# Redis
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+spring.data.redis.timeout=2000ms
+
 # Admin credentials
 wimb.admin.username=admin
 wimb.admin.password=wimb@2025
 ```
 ```bash
-# 4. Build and run
+# 5. Build and run
 ./mvnw spring-boot:run
 ```
 ```bash
-# 5. Open in browser
-open http://localhost:8080           # Passenger view
+# 6. Open in browser
+open http://localhost:8080             # Passenger view
 open http://localhost:8080/login.html  # Admin login
+```
+
+### Verify Redis is working
+```bash
+# After starting a ride, check Redis
+redis-cli
+KEYS *                          # should show location:ride:1 etc.
+LLEN location:ride:1            # number of buffered locations
+LRANGE location:ride:1 0 -1     # all buffered location JSON
 ```
 
 ---
