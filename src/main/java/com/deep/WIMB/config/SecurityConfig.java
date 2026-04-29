@@ -65,14 +65,15 @@ public class SecurityConfig {
                                 "/api/ride/location",
                                 "/api/ride/cancel/**",
                                 "/api/location/**",
-                                "/api/routes/**"
+                                "/api/routes/**",
+                                "/api/ride/active/all",
+                                "/swagger-ui.html"
                         ).permitAll()
 
                         // ── Admin pages & APIs — login required ──
                         .requestMatchers(
                                 "/admin-buses.html",
-                                "/admin/**",
-                                "/api/ride/active/all"
+                                "/admin/**"
                         ).hasRole("ADMIN")
                         // ── Everything else requires login ──
                         .anyRequest().authenticated()
