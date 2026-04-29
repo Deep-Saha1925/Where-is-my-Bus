@@ -1,7 +1,10 @@
 <div align="center">
 
-# 🚌 Where Is My Bus
-### Real-time bus tracking for North Bengal
+<img src="images/logo.png" width="120" alt="WIMB Logo"/>
+
+<h1>🚌 Where Is My Bus</h1>
+<h3>Real-time bus tracking for North Bengal</h3>
+
 
 [![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=java)](https://www.java.com)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
