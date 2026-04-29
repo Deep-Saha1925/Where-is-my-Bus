@@ -2,7 +2,7 @@
 
 <img src="images/logo.png" width="120" alt="WIMB Logo"/>
 
-<h1>🚌 Where Is My Bus</h1>
+<h1>Where Is My Bus</h1>
 <h3>Real-time bus tracking for North Bengal</h3>
 
 
@@ -116,7 +116,7 @@
 </tr>
 <tr>
 <td align="center" width="50%">
-<img src="images/driver-panel.png" width="100%"/>
+<img src="images/start-ride.png" width="100%"/>
 <b>🚗 Driver Panel</b>
 </td>
 <td align="center" width="50%">
