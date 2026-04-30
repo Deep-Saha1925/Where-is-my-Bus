@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +61,7 @@ public class RedisLocationService {
         log.info("Cleared Redis key={}", key);
     }
 
-    public java.util.Set<String> getAllLocationKeys() {
+    public Set<String> getAllLocationKeys() {
         return redisTemplate.keys(REDIS_KEY + "*");
     }
 
