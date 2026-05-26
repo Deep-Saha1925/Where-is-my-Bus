@@ -272,3 +272,12 @@ function calculateETAFromDistance(distanceKm) {
   if (mins <= 1) return "Arriving";
   return `${mins} min`;
 }
+
+/* ─── SWAP STOPS ─────────────────────────────────────────────────── */
+function swapStops() {
+  const src  = document.getElementById("source");
+  const dest = document.getElementById("destination");
+  const temp = src.value;
+  src.value  = dest.value;
+  dest.value = temp;
+}
