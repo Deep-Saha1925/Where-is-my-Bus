@@ -85,4 +85,17 @@ public class RedisLocationService {
 
     }
 
+    public Location getLastLocationFromRedis(Long rideId) {
+        String key = REDIS_KEY + rideId;
+        // rightPop index -1 = last element (most recent)
+        String json = redisTemplate.opsForList().index(key, -1);
+        if (json == null) return null;
+        try {
+            return objectMapper.readValue(json, Location.class);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to deserialize last location from Redis: {}", e.getMessage());
+            return null;
+        }
+    }
+
 }

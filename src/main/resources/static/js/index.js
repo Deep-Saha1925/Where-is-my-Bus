@@ -213,8 +213,8 @@ function renderBusCards(buses, routeKey) {
 
 /* ─── MAIN SEARCH ────────────────────────────────────────────────── */
 async function searchBuses() {
-  const source      = document.getElementById("source").value.trim().toUpperCase();
-  const destination = document.getElementById("destination").value.trim().toUpperCase();
+  const source      = document.getElementById("source").value.trim();
+  const destination = document.getElementById("destination").value.trim();
 
   if (!source || !destination) {
     alert("Please select both source and destination");

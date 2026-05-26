@@ -39,6 +39,12 @@ public class LocationService {
     }
 
     public Location getLastKnownLocation(Long rideId) {
+
+        Location redisLocation = redisLocationService.getLastLocationFromRedis(rideId);
+        if (redisLocation != null) {
+            return redisLocation;
+        }
+
         return locationRepository
                 .findTopByRideIdOrderByTimestampDesc(rideId)
                 .orElseThrow(() -> new RuntimeException("Location not found"));
