@@ -26,7 +26,7 @@ public class LocationController {
 
         Ride ride = rideService.getRideById(request.getRideId());
         String tokenBus = driverTokenService.resolveBusNumber(driverToken);
-        if (ride == null || tokenBus == null || !tokenBus.equalsIgnoreCase(ride.getBusNumber())) {
+        if (ride == null || tokenBus == null || !tokenBus.equalsIgnoreCase(ride.getBus().getBusNumber())) {
             throw new DriverNotVerifiedException("Driver not verified for this ride");
         }
 
