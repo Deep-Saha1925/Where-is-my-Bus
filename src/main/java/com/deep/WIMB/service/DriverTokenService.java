@@ -22,4 +22,10 @@ public class DriverTokenService {
         return token;
     }
 
+    /** Returns the bus number this token was issued for, or null if invalid/expired. */
+    public String resolveBusNumber(String token) {
+        if (token == null) return null;
+        return redisTemplate.opsForValue().get(PREFIX + token);
+    }
+
 }
