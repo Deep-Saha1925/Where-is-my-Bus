@@ -291,4 +291,8 @@ public class RideService {
         }
         return dto;
     }
+
+    public Ride getRideById(Long rideId) {
+        return rideRepository.findById(rideId).orElse(null);
+    }
 }
