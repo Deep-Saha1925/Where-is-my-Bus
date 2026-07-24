@@ -1,8 +1,12 @@
 package com.deep.WIMB.controller;
 
 import com.deep.WIMB.dto.LocationUpdateRequest;
+import com.deep.WIMB.exception.DriverNotVerifiedException;
 import com.deep.WIMB.model.Location;
+import com.deep.WIMB.model.Ride;
+import com.deep.WIMB.service.DriverTokenService;
 import com.deep.WIMB.service.LocationService;
+import com.deep.WIMB.service.RideService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +16,20 @@ import org.springframework.web.bind.annotation.*;
 public class LocationController {
 
     private final LocationService locationService;
+    private final RideService rideService;
+    private final DriverTokenService driverTokenService;
 
-    // Driver sends GPS
+    // Driver sends GPS (legacy path — kept for compatibility)
     @PostMapping("/update")
-    public Location updateLocation(@RequestBody LocationUpdateRequest request){
+    public Location updateLocation(@RequestBody LocationUpdateRequest request,
+                                   @RequestHeader(value = "X-Driver-Token", required = false) String driverToken) {
+
+        Ride ride = rideService.getRideById(request.getRideId());
+        String tokenBus = driverTokenService.resolveBusNumber(driverToken);
+        if (ride == null || tokenBus == null || !tokenBus.equalsIgnoreCase(ride.getBusNumber())) {
+            throw new DriverNotVerifiedException("Driver not verified for this ride");
+        }
+
         return locationService.addLocation(
                 request.getRideId(),
                 request.getLatitude(),
@@ -23,10 +37,9 @@ public class LocationController {
         );
     }
 
-    // user fetches last user location
+    // passenger fetches last known location — stays open, no token needed
     @GetMapping("/last-loc/{rideId}")
     public Location getLastLocation(@PathVariable Long rideId){
         return locationService.getLastKnownLocation(rideId);
     }
-
 }
