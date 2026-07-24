@@ -26,7 +26,7 @@ setInterval(tick, 3000);
 async function loadRoute(src, dest) {
   try {
     const segRes = await fetch(
-      `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
+        `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
     );
     routeStops = await segRes.json();
     if (rideId) await loadFullRoute();
@@ -49,7 +49,7 @@ async function loadFullRoute() {
 
     const [rideSrc, rideDest] = ride.routeKey.split("_");
     const fullRes = await fetch(
-      `/api/routes?source=${encodeURIComponent(rideSrc)}&destination=${encodeURIComponent(rideDest)}`
+        `/api/routes?source=${encodeURIComponent(rideSrc)}&destination=${encodeURIComponent(rideDest)}`
     );
     fullRouteStops = await fullRes.json();
   } catch (err) {
@@ -64,7 +64,7 @@ async function autoSelectRide() {
   const [src, dest] = routeKey.split("_");
   try {
     const res   = await fetch(
-      `/api/ride/active?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
+        `/api/ride/active?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
     );
     const buses = await res.json();
     if (buses.length > 0) {
@@ -85,7 +85,7 @@ async function fetchRideInfo() {
     rideInfo    = rides.find(r => String(r.rideId) === String(rideId));
     if (rideInfo) {
       document.getElementById("busNumberDisplay").innerText =
-        rideInfo.busNumber || "—";
+          rideInfo.busNumber || "—";
       if (!fullRouteStops.length) await loadFullRoute();
     }
   } catch (err) {
@@ -104,7 +104,7 @@ async function tick() {
     document.getElementById("liveBadge").classList.remove("hidden");
     document.getElementById("liveBadge").classList.add("flex");
     document.getElementById("lastUpdated").innerText =
-      "Updated " + timeAgo(busLocation.timestamp);
+        "Updated " + timeAgo(busLocation.timestamp);
 
     renderTimeline();
   } catch (err) {
@@ -127,10 +127,10 @@ function getBusPosition() {
     const dLat = (stop.latitude  - lat) * Math.PI / 180;
     const dLng = (stop.longitude - lng) * Math.PI / 180;
     const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(lat * Math.PI/180) *
-      Math.cos(stop.latitude * Math.PI/180) *
-      Math.sin(dLng/2)**2;
+        Math.sin(dLat/2)**2 +
+        Math.cos(lat * Math.PI/180) *
+        Math.cos(stop.latitude * Math.PI/180) *
+        Math.sin(dLng/2)**2;
     const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     if (dist < minDist) { minDist = dist; nearestIdx = i; }
   });
@@ -158,7 +158,7 @@ function renderTimeline() {
 
   if (!displayStops.length) {
     container.innerHTML =
-      `<div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">Loading stops...</div>`;
+        `<div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">Loading stops...</div>`;
     return;
   }
 
@@ -167,13 +167,13 @@ function renderTimeline() {
   const srcName   = routeStops[0]?.stopName?.trim().toUpperCase();
   const destName  = routeStops[routeStops.length-1]?.stopName?.trim().toUpperCase();
   const srcOnFull = displayStops.findIndex(
-    s => s.stopName.trim().toUpperCase() === srcName
+      s => s.stopName.trim().toUpperCase() === srcName
   );
   const notYetArrived = busPos && srcOnFull >= 0 && busPos.nearestIdx < srcOnFull;
 
   const busDistKm = busPos
-    ? displayStops[busPos.nearestIdx]?.distanceFromStartKm || 0
-    : 0;
+      ? displayStops[busPos.nearestIdx]?.distanceFromStartKm || 0
+      : 0;
   const totalDist = displayStops[displayStops.length-1].distanceFromStartKm;
   const progress  = !busPos ? 0 : Math.min(100, Math.round((busDistKm / totalDist) * 100));
 
@@ -182,9 +182,9 @@ function renderTimeline() {
   document.getElementById("progressStart").innerText  = displayStops[0].stopName;
   document.getElementById("progressEnd").innerText    = displayStops[displayStops.length-1].stopName;
   document.getElementById("remainingDisplay").innerText = !busPos
-    ? "—" : `${(totalDist - busDistKm).toFixed(1)} km`;
+      ? "—" : `${(totalDist - busDistKm).toFixed(1)} km`;
   document.getElementById("currentStopDisplay").innerText = busPos
-    ? displayStops[busPos.nearestIdx].stopName : "—";
+      ? displayStops[busPos.nearestIdx].stopName : "—";
 
   let bannerHtml = "";
   if (notYetArrived) {
@@ -231,7 +231,7 @@ function renderTimeline() {
     if (isPassengerDest) markerHtml = `<span class="badge badge-dest">🏁 Your dest</span>`;
 
     const rowCl  = `stop-row${isCurrent ? ' row-current' : ''}${isPassed ? ' row-passed' : ''}`;
-    const nameCl = isPassed ? "color:var(--text-faint)" : isCurrent ? "color:#3b82f6" : "color:var(--text-primary)";
+    const nameCl = isPassed ? "color:var(--text-faint)" : isCurrent ? "color:var(--accent)" : "color:var(--text-primary)";
     const metaCl = isPassed ? "color:var(--text-faint)" : "color:var(--text-muted)";
     const animDel = `animation-delay:${i * 40}ms`;
 
