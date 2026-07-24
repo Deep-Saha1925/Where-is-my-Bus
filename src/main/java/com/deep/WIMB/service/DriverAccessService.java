@@ -19,4 +19,10 @@ public class DriverAccessService {
             }
         }
     }
+
+    public boolean isValid(String busNumber, String code) {
+        if (busNumber == null || code == null) return false;
+        String expected = busCodes.get(busNumber.trim().toUpperCase());
+        return expected != null && expected.equals(code.trim());
+    }
 }
