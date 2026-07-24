@@ -2,7 +2,7 @@ package com.deep.WIMB.controller;
 
 import com.deep.WIMB.service.DriverAccessService;
 import com.deep.WIMB.service.DriverTokenService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,10 +10,11 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/driver")
+@RequiredArgsConstructor
 public class DriverAuthController {
 
-    @Autowired private DriverAccessService driverAccessService;
-    @Autowired private DriverTokenService driverTokenService;
+    private final DriverAccessService driverAccessService;
+    private final DriverTokenService driverTokenService;
 
     @PostMapping("/verify")
     public ResponseEntity<?> verify(@RequestBody Map<String, String> body) {
