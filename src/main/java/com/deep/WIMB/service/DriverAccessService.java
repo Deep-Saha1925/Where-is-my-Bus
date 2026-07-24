@@ -1,6 +1,6 @@
 package com.deep.WIMB.service;
 
-import lombok.Value;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -11,7 +11,7 @@ public class DriverAccessService {
 
     private final Map<String, String> busCodes = new HashMap<>();
 
-    public DriverAccessService(@Value("${wimb.driver.codes}") String rawCodes){
+    public DriverAccessService(@Value("${wimb.driver.codes}") String rawCodes) {
         for (String entry : rawCodes.split(",")) {
             String[] parts = entry.trim().split(":");
             if (parts.length == 2) {
