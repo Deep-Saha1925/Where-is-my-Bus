@@ -6,6 +6,7 @@ let routeStops     = [];
 let fullRouteStops = [];
 let busLocation    = null;
 let rideInfo       = null;
+let hasEnteredOnce = false; // only slide the rows in on the first render, not every 3s refresh
 
 /* ─── INIT ─────────────────────────────────────────────────────── */
 if (routeKey) {
@@ -230,10 +231,11 @@ function renderTimeline() {
     if (isPassengerSrc)  markerHtml = `<span class="badge badge-src">📍 Your stop</span>`;
     if (isPassengerDest) markerHtml = `<span class="badge badge-dest">🏁 Your dest</span>`;
 
-    const rowCl  = `stop-row${isCurrent ? ' row-current' : ''}${isPassed ? ' row-passed' : ''}`;
+    const enterCl = hasEnteredOnce ? '' : ' row-enter';
+    const rowCl  = `stop-row${enterCl}${isCurrent ? ' row-current' : ''}${isPassed ? ' row-passed' : ''}`;
     const nameCl = isPassed ? "color:var(--text-faint)" : isCurrent ? "color:var(--accent)" : "color:var(--text-primary)";
     const metaCl = isPassed ? "color:var(--text-faint)" : "color:var(--text-muted)";
-    const animDel = `animation-delay:${i * 40}ms`;
+    const animDel = hasEnteredOnce ? "" : `animation-delay:${i * 40}ms`;
 
     stopsHtml += `
     <div class="${rowCl}" style="${animDel}">
@@ -266,6 +268,7 @@ function renderTimeline() {
   });
 
   container.innerHTML = bannerHtml + stopsHtml;
+  hasEnteredOnce = true;
 }
 
 /* ─── HELPERS ───────────────────────────────────────────────────── */
