@@ -205,26 +205,50 @@ let rideId = null;
 let previewWatchId = null;
 let rideWatchId = null;
 let currentPosition = null;
+let driverToken = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   loadStops();
   initPreviewGPS(); // still runs in background as fallback
 });
 
+/* ------------------ SAFE JSON HELPER ------------------ */
+// Wraps fetch responses so a non-JSON reply (HTML error page, wrong port,
+// server not started, etc.) throws a clear message instead of the cryptic
+// "Unexpected token '<', "<!DOCTYPE "... is not valid JSON" parser error.
+async function safeJson(res) {
+  const contentType = res.headers.get("content-type") || "";
+
+  if (!contentType.includes("application/json")) {
+    const bodyPreview = (await res.text()).slice(0, 120).trim();
+    const looksLikeHtml = bodyPreview.startsWith("<");
+
+    throw new Error(
+        looksLikeHtml
+            ? `Server returned a web page instead of data (status ${res.status}). ` +
+            `Make sure you're opening this page as http://localhost:8080/driver.html ` +
+            `served by the Spring Boot app — not a separate dev server or a local file.`
+            : `Unexpected response (status ${res.status}): ${bodyPreview}`
+    );
+  }
+
+  return res.json();
+}
+
 /* ------------------ STOPS ------------------ */
 function loadStops() {
   fetch("/data/stops.json")
-    .then(res => res.json())
-    .then(data => {
-      const datalist = document.getElementById("stopsList");
-      datalist.innerHTML = "";
-      data.stops.forEach(stop => {
-        const option = document.createElement("option");
-        option.value = stop.toUpperCase();
-        datalist.appendChild(option);
-      });
-    })
-    .catch(err => console.error("Error loading stops:", err));
+      .then(res => res.json())
+      .then(data => {
+        const datalist = document.getElementById("stopsList");
+        datalist.innerHTML = "";
+        data.stops.forEach(stop => {
+          const option = document.createElement("option");
+          option.value = stop.toUpperCase();
+          datalist.appendChild(option);
+        });
+      })
+      .catch(err => console.error("Error loading stops:", err));
 }
 
 /* ------------------ PREVIEW GPS (background fallback) ------------------ */
@@ -236,15 +260,15 @@ function initPreviewGPS() {
   });
 
   previewWatchId = navigator.geolocation.watchPosition(
-    pos => {
-      currentPosition = pos;
-      console.log("GPS preview OK:", pos.coords.latitude, pos.coords.longitude);
-    },
-    err => {
-      if (err.code === err.TIMEOUT) return;
-      console.error("Preview GPS error:", err.message);
-    },
-    { enableHighAccuracy: false, timeout: 60000, maximumAge: 10000 }
+      pos => {
+        currentPosition = pos;
+        console.log("GPS preview OK:", pos.coords.latitude, pos.coords.longitude);
+      },
+      err => {
+        if (err.code === err.TIMEOUT) return;
+        console.error("Preview GPS error:", err.message);
+      },
+      { enableHighAccuracy: false, timeout: 60000, maximumAge: 10000 }
   );
 }
 
@@ -255,11 +279,11 @@ async function getCoordsFromRoute(source, destination) {
     const res = await fetch(`/api/routes?source=${source}&destination=${destination}`);
     if (!res.ok) throw new Error("Route fetch failed");
 
-    const stops = await res.json();
+    const stops = await safeJson(res);
 
     // Find the stop whose name matches the source (case-insensitive)
     const match = stops.find(
-      s => s.stopName.trim().toUpperCase() === source.trim().toUpperCase()
+        s => s.stopName.trim().toUpperCase() === source.trim().toUpperCase()
     );
 
     if (match) {
@@ -326,16 +350,24 @@ async function startRide() {
 
     const res = await fetch("/api/ride/start", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Driver-Token": driverToken
+      },
       body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
+      if (res.status === 403) {
+        localStorage.removeItem("wimb_driver_token");
+        localStorage.removeItem("wimb_driver_bus");
+        driverToken = null;
+      }
       const errText = await res.text();
       throw new Error(`Server error: ${errText}`);
     }
 
-    const data = await res.json();
+    const data = await safeJson(res);
     rideId = data.id;
 
     // Stop preview GPS watcher
@@ -369,9 +401,9 @@ function getPositionFromGPS() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      pos => resolve(pos),
-      err => reject(err),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+        pos => resolve(pos),
+        err => reject(err),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     );
   });
 }
@@ -381,20 +413,23 @@ function startRideTracking() {
   if (rideWatchId !== null) return;
 
   rideWatchId = navigator.geolocation.watchPosition(
-    pos => {
-      fetch("/api/ride/location", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rideId,
-          latitude:  pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy:  pos.coords.accuracy
-        })
-      }).catch(err => console.error("Location update failed:", err));
-    },
-    err => console.error("Ride GPS error:", err.message),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      pos => {
+        fetch("/api/ride/location", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Driver-Token": driverToken
+          },
+          body: JSON.stringify({
+            rideId,
+            latitude:  pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy:  pos.coords.accuracy
+          })
+        }).catch(err => console.error("Location update failed:", err));
+      },
+      err => console.error("Ride GPS error:", err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
@@ -408,7 +443,10 @@ async function stopRide() {
   }
 
   try {
-    await fetch(`/api/ride/cancel/${rideId}`, { method: "PUT" });
+    await fetch(`/api/ride/cancel/${rideId}`, {
+      method: "PUT",
+      headers: { "X-Driver-Token": driverToken }
+    });
 
     document.getElementById("status").innerText = "Ride Stopped ⛔";
     document.getElementById("stopBtn").classList.add("hidden");
@@ -435,6 +473,8 @@ async function stopRide() {
 /* ------------------ CHECK BUS (after entering bus number) ------------------ */
 async function checkBus() {
   const busNumber = document.getElementById("busNumber").value.trim();
+  const code = document.getElementById("driverCode").value.trim();
+
   if (!busNumber) {
     alert("Please enter a bus number");
     return;
@@ -443,31 +483,65 @@ async function checkBus() {
   document.getElementById("status").innerText = "Checking...";
 
   try {
-    // Fetch all active rides and find one matching this bus number
+    const storedToken = localStorage.getItem("wimb_driver_token");
+    const storedBus   = localStorage.getItem("wimb_driver_bus");
+
+    if (storedToken && storedBus && storedBus === busNumber.toUpperCase()) {
+      // Already verified earlier this shift — skip the code check
+      driverToken = storedToken;
+    } else {
+      if (!code) {
+        document.getElementById("status").innerText = "";
+        alert("Please enter your driver code for this bus");
+        return;
+      }
+
+      const verifyRes = await fetch("/api/driver/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ busNumber, code })
+      });
+
+      if (!verifyRes.ok) {
+        document.getElementById("status").innerText = "";
+        // Try to read a real error message; fall back if the body isn't JSON
+        let msg = "Invalid bus number or code";
+        try {
+          const errData = await safeJson(verifyRes);
+          msg = errData.error || msg;
+        } catch (_) { /* keep default msg */ }
+        alert(msg);
+        return;
+      }
+
+      const verifyData = await safeJson(verifyRes);
+      driverToken = verifyData.token;
+      localStorage.setItem("wimb_driver_token", driverToken);
+      localStorage.setItem("wimb_driver_bus", busNumber.toUpperCase());
+    }
+
+    // ── everything below is your original checkBus() logic, unchanged ──
     const res = await fetch("/api/ride/active/all");
     if (!res.ok) throw new Error("Failed to fetch rides");
 
-    const rides = await res.json();
+    const rides = await safeJson(res);
     const existing = rides.find(
-      r => r.busNumber.trim().toUpperCase() === busNumber.toUpperCase()
+        r => r.busNumber.trim().toUpperCase() === busNumber.toUpperCase()
     );
 
     document.getElementById("status").innerText = "";
 
     if (existing) {
-      // Active ride found — show resume prompt
       document.getElementById("savedRouteKey").innerText =
-        existing.routeKey.replace("_", " → ");
+          existing.routeKey.replace("_", " → ");
       document.getElementById("savedRideId").innerText = existing.rideId;
       document.getElementById("activeBusNumber").innerText = busNumber;
 
-      // Store for resumeRide() to use
       rideId = existing.rideId;
 
       document.getElementById("busNumberSection").classList.add("hidden");
       document.getElementById("resumeSection").classList.remove("hidden");
     } else {
-      // No active ride — go straight to new ride form
       showNewRideForm();
     }
 
