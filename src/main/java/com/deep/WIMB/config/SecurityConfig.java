@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/login.html",
                                 "/track.html",
                                 "/driver",
+                                "/driver.html",
                                 "/csrf-token",
                                 "/js/**",
                                 "/data/**",
@@ -67,6 +68,7 @@ public class SecurityConfig {
                                 "/api/location/**",
                                 "/api/routes/**",
                                 "/api/ride/active/all",
+                                "/api/driver/**",
                                 "/swagger-ui.html"
                         ).permitAll()
 
@@ -96,12 +98,13 @@ public class SecurityConfig {
                         .permitAll()
                 )
 
-                // Disable CSRF only for driver API (GPS posts from mobile)
+                // Disable CSRF only for driver-facing APIs (GPS posts from mobile, driver code verify)
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers(
                                 "/do-login",
                                 "/api/ride/**",
-                                "/api/location/**"
+                                "/api/location/**",
+                                "/api/driver/**"
                         )
                 );
 
