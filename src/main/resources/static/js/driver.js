@@ -199,8 +199,6 @@
 
 
 
-
-
 let rideId = null;
 let previewWatchId = null;
 let rideWatchId = null;
@@ -209,8 +207,42 @@ let driverToken = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   loadStops();
+  loadDepots();
   initPreviewGPS(); // still runs in background as fallback
 });
+
+/* ------------------ DEPOTS ------------------ */
+async function loadDepots() {
+  const select = document.getElementById("depotName");
+  try {
+    const res = await fetch("/api/driver/depots");
+    const depots = await safeJson(res);
+
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.disabled = true;
+    placeholder.textContent = "Select your depot";
+    select.appendChild(placeholder);
+
+    depots.forEach(depot => {
+      const option = document.createElement("option");
+      option.value = depot;
+      option.textContent = depot.charAt(0) + depot.slice(1).toLowerCase();
+      select.appendChild(option);
+    });
+
+    const savedDepot = localStorage.getItem("wimb_driver_depot");
+    if (savedDepot && depots.includes(savedDepot)) {
+      select.value = savedDepot;
+    } else {
+      placeholder.selected = true;
+    }
+  } catch (err) {
+    console.error("Failed to load depots:", err);
+    select.innerHTML = `<option value="" disabled selected>Could not load depots</option>`;
+  }
+}
 
 /* ------------------ SAFE JSON HELPER ------------------ */
 // Wraps fetch responses so a non-JSON reply (HTML error page, wrong port,
@@ -470,9 +502,27 @@ async function stopRide() {
 }
 
 
+/* ------------------ TOGGLE DRIVER CODE VISIBILITY ------------------ */
+function toggleDriverCodeVisibility() {
+  const input   = document.getElementById("driverCode");
+  const eye     = document.getElementById("eyeIcon");
+  const eyeOff  = document.getElementById("eyeOffIcon");
+  const btn     = document.getElementById("toggleCodeBtn");
+
+  const isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+
+  eye.classList.toggle("hidden", isHidden);
+  eyeOff.classList.toggle("hidden", !isHidden);
+
+  btn.setAttribute("aria-label", isHidden ? "Hide driver code" : "Show driver code");
+  btn.setAttribute("aria-pressed", isHidden ? "true" : "false");
+}
+
 /* ------------------ CHECK BUS (after entering bus number) ------------------ */
 async function checkBus() {
   const busNumber = document.getElementById("busNumber").value.trim();
+  const depotName = document.getElementById("depotName").value;
   const code = document.getElementById("driverCode").value.trim();
 
   if (!busNumber) {
@@ -487,25 +537,30 @@ async function checkBus() {
     const storedBus   = localStorage.getItem("wimb_driver_bus");
 
     if (storedToken && storedBus && storedBus === busNumber.toUpperCase()) {
-      // Already verified earlier this shift — skip the code check
+      // Already verified earlier this shift — skip the depot code check
       driverToken = storedToken;
     } else {
+      if (!depotName) {
+        document.getElementById("status").innerText = "";
+        alert("Please select your depot");
+        return;
+      }
       if (!code) {
         document.getElementById("status").innerText = "";
-        alert("Please enter your driver code for this bus");
+        alert("Please enter your depot code");
         return;
       }
 
       const verifyRes = await fetch("/api/driver/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ busNumber, code })
+        body: JSON.stringify({ depotName, code, busNumber })
       });
 
       if (!verifyRes.ok) {
         document.getElementById("status").innerText = "";
         // Try to read a real error message; fall back if the body isn't JSON
-        let msg = "Invalid bus number or code";
+        let msg = "Invalid depot or code";
         try {
           const errData = await safeJson(verifyRes);
           msg = errData.error || msg;
@@ -518,6 +573,7 @@ async function checkBus() {
       driverToken = verifyData.token;
       localStorage.setItem("wimb_driver_token", driverToken);
       localStorage.setItem("wimb_driver_bus", busNumber.toUpperCase());
+      localStorage.setItem("wimb_driver_depot", depotName);
     }
 
     // ── everything below is your original checkBus() logic, unchanged ──
