@@ -27,6 +27,17 @@
                 class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4"
                 placeholder="Enter Bus Number (WB-23A-1245)"
         />
+
+        <label class="block text-sm font-semibold text-gray-600 mb-1">Driver Code</label>
+        <input
+                id="driverCode"
+                type="password"
+                inputmode="numeric"
+                class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-1"
+                placeholder="Your code for this bus"
+        />
+        <p class="text-xs text-gray-400 mb-4">Only needed once per shift on this device.</p>
+
         <button
                 onclick="checkBus()"
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
