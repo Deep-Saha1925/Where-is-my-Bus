@@ -1,7 +1,6 @@
 package com.deep.WIMB.service;
 
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +14,6 @@ public class DriverAccessService {
     @Value("${wimb.depot.file.path}")
     private String depotFilePath;
 
-    // volatile so a reload() from another thread (the upload request)
-    // is immediately visible to requests reading it
     private volatile Map<String, String> depotCodes = new LinkedHashMap<>();
 
     /** Called once at startup, and again every time admin uploads a new file. */
@@ -33,8 +30,11 @@ public class DriverAccessService {
         Map<String, String> parsed = new LinkedHashMap<>();
         DataFormatter formatter = new DataFormatter();
 
+        // WorkbookFactory reads the file's actual signature/bytes, so it
+        // transparently handles .xlsx, .xls (old binary format), and .xlsm
+        // regardless of what extension the admin's file happened to have.
         try (FileInputStream fis = new FileInputStream(file);
-             Workbook workbook = new XSSFWorkbook(fis)) {
+             Workbook workbook = WorkbookFactory.create(fis)) {
 
             Sheet sheet = workbook.getSheetAt(0);
 
@@ -50,7 +50,7 @@ public class DriverAccessService {
                 }
             }
 
-            depotCodes = parsed; // atomic swap — replaces the whole list
+            depotCodes = parsed;
             System.out.println("Loaded " + parsed.size() + " depot codes from " + depotFilePath);
 
         } catch (Exception e) {
@@ -58,7 +58,6 @@ public class DriverAccessService {
         }
     }
 
-    // Load whatever's on disk (if anything) as soon as the app starts
     @jakarta.annotation.PostConstruct
     public void init() {
         reload();
@@ -70,12 +69,10 @@ public class DriverAccessService {
         return expected != null && expected.equals(code.trim());
     }
 
-    /** Public — names only, no codes. */
     public List<String> getDepotNames() {
         return new ArrayList<>(depotCodes.keySet());
     }
 
-    /** Admin-only — full map, so admin can visually confirm what's loaded. */
     public Map<String, String> getAllDepotCodes() {
         return new LinkedHashMap<>(depotCodes);
     }
