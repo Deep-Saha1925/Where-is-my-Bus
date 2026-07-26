@@ -2,6 +2,7 @@ package com.deep.WIMB.controller;
 
 import com.deep.WIMB.service.DriverAccessService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,8 +18,10 @@ public class AdminDepotController {
 
     private final DriverAccessService driverAccessService;
 
-    private static final String DEPOT_FILE_PATH = "data/depot-codes.xlsx";
+    @Value("${wimb.depot.file.path}")
+    private String depotFilePath;
 
+    // admin can visually confirm what's currently loaded
     @GetMapping
     public Map<String, String> viewCurrentDepots() {
         return driverAccessService.getAllDepotCodes();
@@ -34,8 +37,8 @@ public class AdminDepotController {
         }
 
         try {
-            File dest = new File(DEPOT_FILE_PATH);
-            dest.getParentFile().mkdirs(); // create the /data folder if it doesn't exist yet
+            File dest = new File(depotFilePath);
+            dest.getParentFile().mkdirs(); // create the folder if it doesn't exist yet
             Files.write(dest.toPath(), file.getBytes());
 
             driverAccessService.reload();
