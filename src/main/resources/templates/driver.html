@@ -2,48 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Driver Panel | WIMB</title>
     <link rel="icon" type="image/jpeg" href="data:image/jpeg;base64,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">
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-page:     #eef1ec;
+            --bg-card:     #ffffff;
+            --border:      #dbe2da;
+            --text-primary:#16261f;
+            --text-muted:  #5c6b62;
+            --text-faint:  #8a978d;
+            --line-done:   #1f6f5c;   /* teal — secondary brand accent */
+            --accent:      #e2892f;   /* amber — primary brand accent */
+            --accent-soft: rgba(226,137,47,0.14);
+            --teal-soft:   rgba(31,111,92,0.13);
+            --shadow:      0 1px 3px rgba(22,38,31,0.07), 0 14px 32px -18px rgba(22,38,31,0.35);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: var(--bg-page);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        .eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+        .brand-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .brand-label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .brand-input, .brand-select {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 15px;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            background: var(--bg-page);
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .brand-input::placeholder { color: var(--text-faint); }
+        .brand-input:focus, .brand-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+            background: var(--bg-card);
+        }
+
+        .brand-btn {
+            width: 100%;
+            padding: 13px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: filter 0.2s, transform 0.1s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .brand-btn:active { transform: scale(0.98); }
+        .brand-btn:hover { filter: brightness(0.94); }
+
+        .btn-amber { background: var(--accent); color: #fff; }
+        .btn-teal  { background: var(--line-done); color: #fff; }
+        .btn-ghost { background: var(--bg-page); color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-danger { background: #dc2626; color: #fff; }
+
+        .info-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 10px 14px; font-size: 13.5px;
+        }
+        .info-row .label { color: var(--text-faint); }
+        .info-row .value { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-primary); }
+
+        .panel-amber { background: var(--accent-soft); border: 1px solid rgba(226,137,47,0.3); border-radius: 16px; padding: 18px; }
+        .panel-teal  { background: var(--teal-soft); border: 1px solid rgba(31,111,92,0.3); border-radius: 16px; padding: 18px; }
+
+        .status-text { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 18px; min-height: 18px; }
+
+        .toggle-eye-btn {
+            position: absolute; inset: 0 0 0 auto;
+            display: flex; align-items: center; padding: 0 12px;
+            color: var(--text-faint); background: none; border: none; cursor: pointer;
+        }
+        .toggle-eye-btn:hover { color: var(--text-muted); }
+
+        @media (max-width: 400px) {
+            .outer-wrap { padding: 14px !important; }
+            .brand-card { padding: 22px 18px !important; border-radius: 16px; }
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+<body class="outer-wrap min-h-screen flex items-center justify-center p-6">
 
-<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-8">
+<div class="brand-card w-full max-w-lg p-8">
 
     <!-- Header -->
     <div class="flex items-center justify-center gap-3 mb-7">
-        <div class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">🚌</div>
-        <h2 class="text-2xl font-bold text-gray-800">Driver Panel</h2>
+        <div style="width:42px; height:42px; border-radius:50%; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:20px;">🚌</div>
+        <div>
+            <h2 class="eyebrow" style="font-size:19px; color:var(--text-primary); margin:0;">Driver Panel</h2>
+            <div style="font-size:12px; color:var(--text-faint);">Where Is My Bus</div>
+        </div>
     </div>
 
     <!-- STEP 1: Bus Number -->
     <div id="busNumberSection">
-        <label class="block text-sm font-semibold text-gray-600 mb-1">Bus Number</label>
+        <label class="brand-label">Bus Number</label>
         <input
                 id="busNumber"
                 type="text"
                 required
-                class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4"
+                class="brand-input mb-4"
                 placeholder="Enter Bus Number (WB-23A-1245)"
         />
 
-        <label class="block text-sm font-semibold text-gray-600 mb-1">Your Depot</label>
+        <label class="brand-label">Your Depot</label>
         <select
                 id="depotName"
                 required
-                class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4"
+                class="brand-select mb-4"
         >
             <option value="" disabled selected>Loading depots...</option>
         </select>
 
-        <label class="block text-sm font-semibold text-gray-600 mb-1">Depot Code</label>
+        <label class="brand-label">Depot Code</label>
         <div class="relative mb-1">
             <input
                     id="driverCode"
                     type="password"
                     inputmode="numeric"
-                    class="w-full border border-gray-300 rounded-lg p-3 pr-11 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    class="brand-input"
+                    style="padding-right:44px;"
                     placeholder="Code for your depot"
             />
             <button
@@ -52,7 +172,7 @@
                     onclick="toggleDriverCodeVisibility()"
                     aria-label="Show driver code"
                     aria-pressed="false"
-                    class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600 transition"
+                    class="toggle-eye-btn"
             >
                 <!-- eye (closed / show) icon -->
                 <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -70,40 +190,31 @@
                 </svg>
             </button>
         </div>
-        <p class="text-xs text-gray-400 mb-4">Ask your depot office for this code. Only needed once per shift on this device.</p>
+        <p style="font-size:12px; color:var(--text-faint); margin:6px 0 18px;">Ask your depot office for this code. Only needed once per shift on this device.</p>
 
-        <button
-                onclick="checkBus()"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
-        >
+        <button onclick="checkBus()" class="brand-btn btn-amber">
             Continue →
         </button>
     </div>
 
     <!-- STEP 2a: Active ride found -->
     <div id="resumeSection" class="hidden">
-        <div class="bg-yellow-50 border border-yellow-300 rounded-xl p-5 mb-4">
-            <p class="text-sm font-bold text-yellow-800 mb-3">🚌 Active ride found for this bus</p>
-            <div class="text-sm text-gray-700 space-y-2 mb-5">
-                <div class="flex justify-between bg-white rounded-lg px-4 py-2 border border-yellow-200">
-                    <span class="text-gray-500">Route</span>
-                    <b id="savedRouteKey" class="text-gray-800"></b>
+        <div class="panel-amber mb-4">
+            <p class="eyebrow" style="font-size:13.5px; color:var(--text-primary); margin:0 0 12px;">🚌 Active ride found for this bus</p>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+                <div class="info-row">
+                    <span class="label">Route</span>
+                    <span class="value" id="savedRouteKey"></span>
                 </div>
-                <div class="flex justify-between bg-white rounded-lg px-4 py-2 border border-yellow-200">
-                    <span class="text-gray-500">Ride ID</span>
-                    <b id="savedRideId" class="text-gray-800"></b>
+                <div class="info-row">
+                    <span class="label">Ride ID</span>
+                    <span class="value" id="savedRideId"></span>
                 </div>
             </div>
-            <button
-                    onclick="resumeRide()"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg mb-2 transition"
-            >
-                ↩ Resume & End This Ride
+            <button onclick="resumeRide()" class="brand-btn btn-amber mb-2">
+                ↩ Resume &amp; End This Ride
             </button>
-            <button
-                    onclick="showNewRideForm()"
-                    class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-lg transition"
-            >
+            <button onclick="showNewRideForm()" class="brand-btn btn-ghost">
                 ＋ Start New Ride Instead
             </button>
         </div>
@@ -111,67 +222,59 @@
 
     <!-- STEP 2b: New ride form -->
     <div id="newRideSection" class="hidden">
-        <label class="block text-sm font-semibold text-gray-600 mb-1">Start Location</label>
+        <label class="brand-label">Start Location</label>
         <input
                 id="source"
                 list="stopsList"
                 placeholder="Type source stop"
-                class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-400 mb-4"
+                class="brand-input mb-4"
                 required
         />
 
-        <label class="block text-sm font-semibold text-gray-600 mb-1">Destination</label>
+        <label class="brand-label">Destination</label>
         <input
                 id="destination"
                 list="stopsList"
                 placeholder="Type destination stop"
-                class="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-400 mb-5"
+                class="brand-input mb-5"
                 required
         />
 
         <datalist id="stopsList"></datalist>
 
-        <button
-                id="startBtn"
-                onclick="startRide()"
-                class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition"
-        >
+        <button id="startBtn" onclick="startRide()" class="brand-btn btn-teal">
             🚦 Start Ride
         </button>
     </div>
 
     <!-- STEP 3: Ride active -->
     <div id="activeRideSection" class="hidden">
-        <div class="bg-green-50 border border-green-300 rounded-xl p-5 mb-4">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse inline-block"></span>
-                <p class="text-sm font-bold text-green-800">Ride is Active</p>
+        <div class="panel-teal mb-4">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                <span style="width:10px; height:10px; background:#10b981; border-radius:50%;" class="animate-pulse"></span>
+                <p class="eyebrow" style="font-size:13.5px; color:var(--text-primary); margin:0;">Ride is Active</p>
             </div>
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between bg-white rounded-lg px-4 py-2 border border-green-200">
-                    <span class="text-gray-500">Bus Number</span>
-                    <b id="activeBusNumber" class="text-gray-800"></b>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <div class="info-row">
+                    <span class="label">Bus Number</span>
+                    <span class="value" id="activeBusNumber"></span>
                 </div>
-                <div class="flex justify-between bg-white rounded-lg px-4 py-2 border border-green-200">
-                    <span class="text-gray-500">Route</span>
-                    <b id="activeRouteKey" class="text-gray-800"></b>
+                <div class="info-row">
+                    <span class="label">Route</span>
+                    <span class="value" id="activeRouteKey"></span>
                 </div>
-                <div class="flex justify-between bg-white rounded-lg px-4 py-2 border border-green-200">
-                    <span class="text-gray-500">Ride ID</span>
-                    <b id="activeRideId" class="text-gray-800"></b>
+                <div class="info-row">
+                    <span class="label">Ride ID</span>
+                    <span class="value" id="activeRideId"></span>
                 </div>
             </div>
         </div>
-        <button
-                id="stopBtn"
-                onclick="stopRide()"
-                class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition"
-        >
+        <button id="stopBtn" onclick="stopRide()" class="brand-btn btn-danger">
             🛑 Stop Ride
         </button>
     </div>
 
-    <p id="status" class="text-center text-sm text-gray-500 mt-5"></p>
+    <p id="status" class="status-text"></p>
 </div>
 
 <script src="/js/driver.js"></script>
