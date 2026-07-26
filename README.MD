@@ -47,10 +47,11 @@
 <td width="50%">
 
 ### 🚗 For Drivers
-- 🔑 Login with bus number
+- 🏢 Pick your depot + enter your depot's code (no personal login needed)
+- 🔐 Code verified once per shift, then remembered on that device
 - ↩️ Resume active ride after refresh
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
-- 📡 Live location sent every GPS tick
+- 📡 Live location sent every GPS tick, protected by a per-bus driver token
 
 </td>
 </tr>
@@ -63,16 +64,19 @@
 - 🔎 Search by bus number, source or destination
 - 🕐 Recent searches saved
 - 🔄 Auto-refresh every 5 seconds
+- 🏢 **Depot Codes tab** — upload an Excel file to add/update every depot's driver code, no restart needed
+- 📄 Built-in "download example template" so the file format is never a guessing game
 
 </td>
 <td width="50%">
 
 ### ⚙️ System Highlights
-- 📊 Excel = single source of truth for routes
+- 📊 Excel = single source of truth for routes **and** depot codes
 - 🔁 Auto forward & reverse direction detection
 - ❌ No false bus visibility after source stop
 - 🗂️ JSON auto-synced from Excel on startup
 - 🔐 Admin auth via config file, no DB needed
+- 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
 - ⚡ Redis buffer for high-frequency GPS writes
 - 🔄 Auto batch flush Redis → MySQL every 60s
 
@@ -90,18 +94,20 @@
 | Java | 17 | Core language |
 | Spring Boot | 3.x | REST API framework |
 | Spring Security | 6.x | Admin authentication |
-| Apache POI | 5.x | Excel route file processing |
+| Apache POI | 5.x | Excel processing (routes **and** depot codes, via `WorkbookFactory` — accepts `.xlsx`, `.xls`, `.xlsm`) |
 | MySQL | 8.0 | Persistent ride & location storage |
-| Redis | 7.x | High-frequency GPS location buffer |
+| Redis | 7.x | High-frequency GPS location buffer + driver token store |
 | Jackson | 2.x | JSON sync for stop dropdowns |
 
 ### Frontend
 | Technology | Purpose |
 |---|---|
 | HTML5 | Page structure |
-| Tailwind CSS | Styling & dark mode |
+| Tailwind CSS | Layout utilities & dark mode |
+| Google Fonts (Oswald, Inter, JetBrains Mono) | Brand type system — Oswald for headers/labels, Inter for body text, JetBrains Mono for IDs/codes/data |
 | Vanilla JavaScript | All interactivity |
-| Font Awesome | Icons |
+| Font Awesome | Icons (admin map view) |
+| Leaflet.js | Live map view of all active buses |
 
 ---
 
@@ -136,17 +142,22 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      DRIVER APP                         │
-│              GPS coordinates every tick                 │
+│    Depot + code verified once  →  X-Driver-Token issued │
+│         GPS coordinates sent every tick, with token      │
 └────────────────────────┬────────────────────────────────┘
-                         │ POST /api/ride/start
-                         │ POST /api/ride/location
+                         │ POST /api/driver/verify (once)
+                         │ POST /api/ride/start   (X-Driver-Token)
+                         │ POST /api/ride/location (X-Driver-Token)
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              SPRING BOOT BACKEND                        │
 │                                                         │
-│   RideController  ──►  RideService                      │
+│   DriverAuthController ─► DriverAccessService (depot codes)│
+│                        └─► DriverTokenService (Redis)    │
+│   RideController  ──►  RideService                       │
 │   LocationController ─► LocationService                 │
-│   RouteController ──►  RouteExcelLoader ─► Cache        │
+│   RouteController ──►  RouteExcelLoader ─► Cache         │
+│   AdminDepotController ─► DriverAccessService.reload()   │
 │                              │                          │
 │                              ▼                          │
 │                     RedisLocationService                 │
@@ -155,7 +166,7 @@
 │                        ▼         ▼                      │
 │                    ┌────────────────┐                   │
 │                    │     REDIS      │  ← GPS buffer     │
-│                    │ location:ride: │                   │
+│                    │ location:ride: │  ← driver:token:  │
 │                    └───────┬────────┘                   │
 │                            │ Flush every 60s            │
 │                            │ or on ride end             │
@@ -168,11 +179,11 @@
              │ GET last-loc / active rides
              ▼
 ┌────────────────────┐   ┌───────────────────────────────┐
-│   PASSENGER UI     │   │        EXCEL FILE             │
+│   PASSENGER UI     │   │        EXCEL FILES            │
 │                    │   │                               │
-│  Route Timeline    │   │  stop_name, lat, lng,         │
-│  ETA per stop      │   │  distance_km, slack_min       │
-│  Live bus icon     │   │                               │
+│  Route Timeline    │   │  Routes: stop_name, lat, lng,  │
+│  ETA per stop      │   │  distance_km, slack_min        │
+│  Live bus icon     │   │  Depot codes: depot_name, code │
 └────────────────────┘   └───────────────────────────────┘
 
                     ADMIN ACCESS
@@ -184,16 +195,16 @@
               (credentials from .properties)
                          │
                          ▼
-                 /admin-buses.html
+          /admin-buses.html (Active Buses / Depot Codes tabs)
 ```
 
 ---
 
 ## ⚡ Redis Integration
 
-WIMB uses Redis as a **high-speed write buffer** for GPS location updates.
+WIMB uses Redis for two things: a **high-speed write buffer** for GPS location updates, and a lightweight **driver token store**.
 
-### Why Redis?
+### Why Redis for GPS?
 GPS updates arrive every few seconds per active ride. Writing each update directly to MySQL causes high I/O and slow response times. Redis solves this by acting as an in-memory buffer.
 
 ### How it works
@@ -220,13 +231,63 @@ GPS Update (every ~3s)
 
 ### Redis Key Structure
 ```
-location:ride:1   →  List of JSON location objects
-location:ride:2   →  List of JSON location objects
+location:ride:1     →  List of JSON location objects
+location:ride:2     →  List of JSON location objects
+driver:token:<uuid> →  Bus number this token was issued for (TTL ~12h, one shift)
 ```
 
 ### Flush Strategy
 - **Scheduled flush** — `LocationFlushScheduler` runs every 60 seconds, drains all Redis keys to MySQL
 - **Ride end flush** — When a ride is cancelled or a new ride starts for the same bus, remaining Redis data is immediately flushed so no location data is ever lost
+- **Token expiry** — driver tokens expire on their own after ~12 hours; no cleanup job needed
+
+---
+
+## 🔑 Driver Verification (Depot Codes)
+
+Drivers don't get individual accounts. Instead, each **depot** (e.g. Alipurduar, Siliguri, Cooch Behar) has one shared code, managed entirely by the admin through an Excel upload — no code changes, no restart.
+
+### How it works
+```
+Driver opens driver.html
+        │
+        ▼
+Picks their depot + enters that depot's code  ──►  POST /api/driver/verify
+        │                                                  │
+        │                                     DriverAccessService checks
+        │                                     depot_name + code against
+        │                                     the uploaded Excel file
+        │                                                  │
+        │                                                  ▼
+        │                                     DriverTokenService issues a
+        │                                     token (stored in Redis,
+        │                                     ~12h TTL, tied to the bus
+        │                                     number entered)
+        ▼
+Token saved in the browser (localStorage) — remembered for the rest of
+the shift, so the code only needs to be entered once per device.
+        │
+        ▼
+Every ride action (start / location / cancel) sends the token in the
+X-Driver-Token header. The server checks the token resolves to the
+same bus number the request claims to control.
+```
+
+### Depot codes Excel format
+
+| depot_name | code |
+|---|---|
+| ALIPURDUAR | 101 |
+| SILIGURI | 201 |
+| COOCHBEHAR | 301 |
+
+- Uploaded from the admin panel's **Depot Codes** tab
+- Accepts `.xlsx`, `.xls`, or `.xlsm` — Apache POI's `WorkbookFactory` reads the actual file signature, not just the extension
+- Each upload **replaces** the entire depot list (not merged)
+- Stored on disk outside the build, at the path set by `wimb.depot.file.path` — so it survives restarts but doesn't need a rebuild to change
+- The admin panel can also download a ready-made example file to fill in and re-upload
+
+> 💡 This protects the write endpoints themselves (`/api/ride/start`, `/api/ride/location`, `/api/ride/cancel/**`), not just the driver page — even if someone finds the URL directly, they can't start or move a ride without a valid token.
 
 ---
 
@@ -237,7 +298,7 @@ Routes are managed entirely through **Excel files** — no code changes needed.
 src/main/resources/routes/route_APD_FLK.xlsx
 ```
 
-### Excel Format
+### Route Excel Format
 
 | stop_order | stop_name | latitude | longitude | distance_km | slack_min |
 |:---:|---|:---:|:---:|:---:|:---:|
@@ -247,6 +308,8 @@ src/main/resources/routes/route_APD_FLK.xlsx
 | 4 | Falakata | 26.51721 | 89.20694 | 15 | 0 |
 
 > ✅ Loaded once at startup · ✅ No DB needed · ✅ Auto-syncs `stops.json`
+
+For the depot codes Excel format (uploaded at runtime, not build-time), see [Driver Verification](#-driver-verification-depot-codes) above.
 
 ---
 
@@ -266,10 +329,13 @@ wimb.admin.password=wimb@2025
 | URL | Who can access |
 |---|:---:|
 | `/index.html` `/track.html` `/driver.html` | 🌐 Everyone |
-| `/api/ride/active` `/api/ride/start` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
+| `/api/ride/active` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
+| `/api/driver/**` (verify, depots list) | 🌐 Everyone |
+| `/api/ride/start` `/api/ride/location` `/api/ride/cancel/**` | 🌐 Public route, 🔑 but requires a valid `X-Driver-Token` header — enforced in the controller, not by Spring Security |
 | `/login.html` | 🌐 Everyone |
 | `/admin-buses.html` | 🔐 Admin only |
-| `/api/ride/active/all` | 🔐 Admin only |
+| `/api/ride/active/all` | 🔐 Admin only *(also read by the driver's own "resume ride" check)* |
+| `/admin/depots`, `/admin/depots/upload`, `/admin/depots/template` | 🔐 Admin only |
 
 ---
 
@@ -286,12 +352,40 @@ A bus is shown to a passenger **only if it has NOT yet crossed their source stop
 ## 🔗 API Endpoints
 
 <details>
+<summary><b>🔑 Driver Verification APIs</b></summary>
+
+#### Get Depot Names (for the dropdown)
+```http
+GET /api/driver/depots
+```
+Returns depot names only — never the codes.
+
+#### Verify Depot + Code
+```http
+POST /api/driver/verify
+Content-Type: application/json
+
+{
+  "depotName": "ALIPURDUAR",
+  "code": "101",
+  "busNumber": "WB-23A-1245"
+}
+```
+Returns a token on success, tied to the given bus number for ~12 hours:
+```json
+{ "token": "a1b2c3d4-..." }
+```
+
+</details>
+
+<details>
 <summary><b>🚌 Ride APIs</b></summary>
 
 #### Start Ride
 ```http
 POST /api/ride/start
 Content-Type: application/json
+X-Driver-Token: a1b2c3d4-...
 
 {
   "busNumber": "WB-23A-1245",
@@ -305,6 +399,7 @@ Content-Type: application/json
 ```http
 POST /api/ride/location
 Content-Type: application/json
+X-Driver-Token: a1b2c3d4-...
 
 {
   "rideId": 5,
@@ -319,7 +414,7 @@ Content-Type: application/json
 GET /api/ride/active?source=ALIPURDUAR&destination=FALAKATA
 ```
 
-#### Get All Active Buses *(Admin)*
+#### Get All Active Buses *(Admin — also used by the driver's resume check)*
 ```http
 GET /api/ride/active/all
 ```
@@ -327,6 +422,7 @@ GET /api/ride/active/all
 #### Cancel Ride
 ```http
 PUT /api/ride/cancel/{rideId}
+X-Driver-Token: a1b2c3d4-...
 ```
 
 </details>
@@ -352,6 +448,31 @@ GET /api/routes?source=ALIPURDUAR&destination=FALAKATA
 
 </details>
 
+<details>
+<summary><b>🏢 Admin Depot APIs</b></summary>
+
+#### View Current Depot Codes
+```http
+GET /admin/depots
+```
+
+#### Upload New Depot Codes File
+```http
+POST /admin/depots/upload
+Content-Type: multipart/form-data
+
+file: depot-codes.xlsx
+```
+Replaces the entire depot list and reloads it immediately — no restart.
+
+#### Download Example Template
+```http
+GET /admin/depots/template
+```
+Returns a ready-to-edit `.xlsx` with the correct headers and sample rows.
+
+</details>
+
 ---
 
 ## 🖥️ Frontend Pages
@@ -359,10 +480,10 @@ GET /api/routes?source=ALIPURDUAR&destination=FALAKATA
 | Page | Who uses it | Description |
 |---|---|---|
 | `index.html` | Passenger | Search buses, recent searches, quick results |
-| `track.html` | Passenger | Live route timeline, ETA, bus position |
-| `driver.html` | Driver | Start/resume ride, live GPS updates |
+| `track.html` | Passenger | Live route timeline, ETA, bus position, dark mode |
+| `driver.html` | Driver | Depot + code verification, start/resume ride, live GPS updates |
 | `login.html` | Admin | Secure login form |
-| `admin-buses.html` | Admin | All active buses, search, live stats |
+| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search) and **Depot Codes** (upload, template download, current list) |
 
 ---
 
@@ -377,13 +498,19 @@ WIMB/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
 │   │   ├── RouteController.java
-│   │   ├── DriverController.java
+│   │   ├── DriverAuthController.java    # /api/driver/verify, /api/driver/depots
+│   │   ├── AdminDepotController.java    # /admin/depots (view/upload/template)
 │   │   └── CsrfController.java
 │   ├── service/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
-│   │   └── RouteExcelLoader.java        # Loads Excel on startup
+│   │   ├── RouteExcelLoader.java        # Loads route Excel on startup
+│   │   ├── DriverAccessService.java     # Loads/reloads depot codes Excel
+│   │   └── DriverTokenService.java      # Issues/resolves driver tokens (Redis)
+│   ├── exception/
+│   │   ├── DriverNotVerifiedException.java
+│   │   └── ApiExceptionHandler.java     # Turns errors into JSON, not HTML pages
 │   ├── scheduler/
 │   │   └── LocationFlushScheduler.java  # Batch flush Redis → MySQL
 │   ├── model/
@@ -401,7 +528,7 @@ WIMB/
 │   │   ├── track.html                   # Route timeline
 │   │   ├── driver.html                  # Driver panel
 │   │   ├── login.html                   # Admin login
-│   │   ├── admin-buses.html             # Admin panel
+│   │   ├── admin-buses.html             # Admin panel (tabbed)
 │   │   ├── js/
 │   │   │   ├── index.js
 │   │   │   ├── track.js
@@ -410,8 +537,12 @@ WIMB/
 │   │   └── data/
 │   │       └── stops.json               # Auto-generated from Excel
 │   ├── routes/
-│   │   └── route_APD_FLK.xlsx           # Route master data
+│   │   └── route_APD_FLK.xlsx           # Route master data (build-time)
 │   └── application.properties
+│
+├── data/
+│   └── depot-codes.xlsx                 # Depot codes (runtime, admin-uploaded — not in the build)
+│
 └── pom.xml
 ```
 
@@ -467,6 +598,10 @@ spring.data.redis.timeout=2000ms
 # Admin credentials
 wimb.admin.username=admin
 wimb.admin.password=wimb@2025
+
+# Depot codes file (created/updated via the admin panel — no need to
+# create it manually; the app just waits for the first upload)
+wimb.depot.file.path=data/depot-codes.xlsx
 ```
 ```bash
 # 5. Build and run
@@ -475,16 +610,24 @@ wimb.admin.password=wimb@2025
 ```bash
 # 6. Open in browser
 open http://localhost:8080             # Passenger view
+open http://localhost:8080/driver.html # Driver panel
 open http://localhost:8080/login.html  # Admin login
+```
+```bash
+# 7. First-time setup: upload depot codes
+# Log in as admin → Depot Codes tab → download the example template,
+# fill in your real depots, and upload. Drivers can verify immediately
+# after — no restart required.
 ```
 
 ### Verify Redis is working
 ```bash
 # After starting a ride, check Redis
 redis-cli
-KEYS *                          # should show location:ride:1 etc.
+KEYS *                          # should show location:ride:1 and driver:token:* entries
 LLEN location:ride:1            # number of buffered locations
 LRANGE location:ride:1 0 -1     # all buffered location JSON
+TTL driver:token:<uuid>         # seconds remaining before that driver's token expires
 ```
 
 ---
@@ -492,10 +635,10 @@ LRANGE location:ride:1 0 -1     # all buffered location JSON
 ## 🚀 Future Enhancements
 
 - [ ] WebSocket live tracking (replace 3s polling)
-- [ ] Admin Excel upload panel (no restart needed)
+- [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for both routes and depot codes
 - [ ] Push notifications when bus is nearby
 - [ ] Multi-route support per Excel file
-- [ ] Driver authentication with OTP
+- [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
 - [ ] Mobile app (Android)
