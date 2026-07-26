@@ -103,20 +103,47 @@
     .theme-btn:hover  { transform: scale(1.1); }
     .theme-btn:active { transform: scale(0.95); }
 
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      padding: 14px 20px 0;
+    }
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover:not(.active) {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    .tab-btn.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+    .dark-mode .tab-btn.active { background: #2563eb; border-color: #2563eb; }
+
     /* ── Stats row ── */
     .stats-row {
       display: flex;
       gap: 12px;
       padding: 16px 20px 0;
-    }
-    .stat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 18px;
-      flex: 1;
-      box-shadow: var(--shadow);
-    }
+    }    .stat-card {
+           background: var(--bg-card);
+           border: 1px solid var(--border);
+           border-radius: 12px;
+           padding: 14px 18px;
+           flex: 1;
+           box-shadow: var(--shadow);
+         }
     .stat-label {
       font-size: 12px;
       font-weight: 500;
@@ -319,106 +346,116 @@
   </div>
 </div>
 
+<!-- ── TAB BAR ── -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabBtnBuses" onclick="switchTab('buses')">🚌 Active Buses</button>
+  <button class="tab-btn" id="tabBtnDepots" onclick="switchTab('depots')">🏢 Depot Codes</button>
+</div>
+
 <!-- ── STATS ROW ── -->
-<div class="stats-row">
-  <div class="stat-card">
-    <div class="stat-label">Active buses</div>
-    <div class="stat-value" id="statCount">—</div>
-    <div class="stat-sub">On route right now</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Routes covered</div>
-    <div class="stat-value" id="statRoutes">—</div>
-    <div class="stat-sub">Unique routes active</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Refresh</div>
-    <div class="stat-value" style="font-size:18px;" id="statNext">5s</div>
-    <div class="stat-sub">Auto-refreshing</div>
-  </div>
-</div>
-
-<!-- ── DEPOT CODES MANAGEMENT ── -->
-<div style="padding: 12px 20px 0;">
-  <div class="stat-card" style="flex:none;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
-      <div>
-        <div class="stat-label" style="margin-bottom:2px;">Depot Codes</div>
-        <div class="stat-sub" style="margin-top:0;">Drivers enter their depot's code before starting a ride. Upload a .xlsx with columns: depot_name, code.</div>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <input type="file" id="depotFileInput" accept=".xlsx"
-               style="font-size:12px; max-width:220px; color:var(--text-muted);"/>
-        <button onclick="uploadDepotFile()"
-                style="font-size:12px; font-weight:600; padding:7px 16px; border-radius:8px;
-                       border:none; background:#3b82f6; color:#fff; cursor:pointer;
-                       transition:background 0.2s;"
-                onmouseover="this.style.background='#2563eb'"
-                onmouseout="this.style.background='#3b82f6'">
-          ⬆ Upload
-        </button>
-      </div>
+<div id="tab-buses" class="tab-panel">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Active buses</div>
+      <div class="stat-value" id="statCount">—</div>
+      <div class="stat-sub">On route right now</div>
     </div>
-
-    <div id="depotUploadStatus" style="font-size:12.5px; min-height:16px; margin-bottom:10px;"></div>
-
-    <div id="depotTableWrap" style="overflow-x:auto;">
-      <table style="width:100%; border-collapse:collapse; font-size:13px;">
-        <thead>
-        <tr style="text-align:left; color:var(--text-faint); border-bottom:1px solid var(--border);">
-          <th style="padding:6px 8px; font-weight:600;">Depot</th>
-          <th style="padding:6px 8px; font-weight:600;">Code</th>
-        </tr>
-        </thead>
-        <tbody id="depotTableBody">
-        <tr><td colspan="2" style="padding:10px 8px; color:var(--text-faint);">Loading...</td></tr>
-        </tbody>
-      </table>
+    <div class="stat-card">
+      <div class="stat-label">Routes covered</div>
+      <div class="stat-value" id="statRoutes">—</div>
+      <div class="stat-sub">Unique routes active</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Refresh</div>
+      <div class="stat-value" style="font-size:18px;" id="statNext">5s</div>
+      <div class="stat-sub">Auto-refreshing</div>
     </div>
   </div>
-</div>
 
-<!-- ── SEARCH BAR ── -->
-<div style="padding: 12px 20px 0;">
-  <div style="position:relative;">
+  <!-- ── SEARCH BAR ── -->
+  <div style="padding: 12px 20px 0;">
+    <div style="position:relative;">
     <span style="position:absolute; left:14px; top:50%; transform:translateY(-50%);
                  font-size:16px; pointer-events:none;">🔍</span>
-    <input
-            id="searchInput"
-            type="text"
-            placeholder="Search by bus number, source or destination..."
-            oninput="filterBuses()"
-            style="width:100%; padding:11px 14px 11px 42px;
+      <input
+              id="searchInput"
+              type="text"
+              placeholder="Search by bus number, source or destination..."
+              oninput="filterBuses()"
+              style="width:100%; padding:11px 14px 11px 42px;
              background:var(--bg-card); color:var(--text-primary);
              border:1px solid var(--border); border-radius:12px;
              font-size:14px; outline:none;
              box-shadow: var(--shadow);
              transition: border-color 0.2s, box-shadow 0.2s;"
-            onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)'"
-            onblur="this.style.borderColor=''; this.style.boxShadow='var(--shadow)'"
-    />
-    <button
-            onclick="clearSearch()"
-            id="clearBtn"
-            style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%);
+              onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)'"
+              onblur="this.style.borderColor=''; this.style.boxShadow='var(--shadow)'"
+      />
+      <button
+              onclick="clearSearch()"
+              id="clearBtn"
+              style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%);
              background:var(--bg-page); border:none; cursor:pointer;
              font-size:13px; color:var(--text-muted); padding:3px 8px;
              border-radius:6px; font-weight:600;">
-      ✕ Clear
-    </button>
-  </div>
-  <div id="searchMeta" style="font-size:12px; color:var(--text-faint);
+        ✕ Clear
+      </button>
+    </div>
+    <div id="searchMeta" style="font-size:12px; color:var(--text-faint);
        margin-top:6px; padding-left:4px; min-height:18px;"></div>
-</div>
-
-<!-- ── BUS CARDS GRID ── -->
-<div class="card-grid" id="busGrid">
-  <div class="empty-state">
-    <div class="empty-icon">🚌</div>
-    <div class="empty-title">Loading buses...</div>
-    <div class="empty-sub">Fetching active rides</div>
   </div>
-</div>
+
+  <!-- ── BUS CARDS GRID ── -->
+  <div class="card-grid" id="busGrid">
+    <div class="empty-state">
+      <div class="empty-icon">🚌</div>
+      <div class="empty-title">Loading buses...</div>
+      <div class="empty-sub">Fetching active rides</div>
+    </div>
+  </div>
+</div><!-- /tab-buses -->
+
+<!-- ── DEPOT CODES TAB ── -->
+<div id="tab-depots" class="tab-panel" style="display:none;">
+  <div style="padding: 16px 20px 0;">
+    <div class="stat-card" style="flex:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="stat-label" style="margin-bottom:2px;">Depot Codes</div>
+          <div class="stat-sub" style="margin-top:0;">Drivers enter their depot's code before starting a ride. Upload a .xlsx with columns: depot_name, code.</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <input type="file" id="depotFileInput" accept=".xlsx"
+                 style="font-size:12px; max-width:220px; color:var(--text-muted);"/>
+          <button onclick="uploadDepotFile()"
+                  style="font-size:12px; font-weight:600; padding:7px 16px; border-radius:8px;
+                       border:none; background:#3b82f6; color:#fff; cursor:pointer;
+                       transition:background 0.2s;"
+                  onmouseover="this.style.background='#2563eb'"
+                  onmouseout="this.style.background='#3b82f6'">
+            ⬆ Upload
+          </button>
+        </div>
+      </div>
+
+      <div id="depotUploadStatus" style="font-size:12.5px; min-height:16px; margin-bottom:10px;"></div>
+
+      <div id="depotTableWrap" style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+          <tr style="text-align:left; color:var(--text-faint); border-bottom:1px solid var(--border);">
+            <th style="padding:6px 8px; font-weight:600;">Depot</th>
+            <th style="padding:6px 8px; font-weight:600;">Code</th>
+          </tr>
+          </thead>
+          <tbody id="depotTableBody">
+          <tr><td colspan="2" style="padding:10px 8px; color:var(--text-faint);">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /tab-depots -->
 
 <script src="/js/admin-buses.js"></script>
 <script>
@@ -501,6 +538,18 @@
   }
 
   loadDepotTable();
+
+  /* ── TABS ── */
+  function switchTab(tab) {
+    document.getElementById("tab-buses").style.display  = tab === "buses"  ? "" : "none";
+    document.getElementById("tab-depots").style.display  = tab === "depots" ? "" : "none";
+    document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
+    document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
+    localStorage.setItem("wimb_admin_tab", tab);
+  }
+
+  // Restore whichever tab the admin was last on
+  switchTab(localStorage.getItem("wimb_admin_tab") === "depots" ? "depots" : "buses");
 
   /* ── THEME ── */
   const appBody  = document.getElementById("appBody");
