@@ -24,5 +24,5 @@ public class Route {
     private String routeName;
 
     @Column(nullable = false)
-    private String filePath;    //  Excel file on disk
+    private String filePath;
 }
