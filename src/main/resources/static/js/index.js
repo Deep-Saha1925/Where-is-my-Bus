@@ -151,7 +151,6 @@ async function loadQuickResults() {
   }
 }
 
-/* ─── RENDER FULL BUS CARDS ─────────────────────────────────────── */
 function renderBusCards(buses, routeKey) {
   const busList       = document.getElementById("busList");
   const resultsHeader = document.getElementById("resultsHeader");
