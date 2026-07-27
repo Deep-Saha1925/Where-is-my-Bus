@@ -353,6 +353,7 @@
     @media (max-width: 480px) {
       .stats-row { flex-direction: column; }
       .card-grid { grid-template-columns: 1fr; padding: 12px; }
+      .stat-refresh { display: none; }
     }
   </style>
 </head>
@@ -403,7 +404,7 @@
       <div class="stat-value" id="statRoutes">—</div>
       <div class="stat-sub">Unique routes active</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card stat-refresh">
       <div class="stat-label">Refresh</div>
       <div class="stat-value" style="font-size:18px;" id="statNext">5s</div>
       <div class="stat-sub">Auto-refreshing</div>
