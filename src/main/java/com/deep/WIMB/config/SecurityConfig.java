@@ -29,7 +29,6 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        // Admin user loaded from application.properties — no database needed
         var admin = User.builder()
                 .username(adminUsername)
                 .password(passwordEncoder().encode(adminPassword))
