@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,17 +42,19 @@ public class AdminRouteController {
         return routeRepository.findAll().stream()
                 .map(route -> {
                     int stopCount = 0;
+
                     try {
                         stopCount = routeExcelLoader.getFullRoute(route.getRouteCode()).size();
                     } catch (Exception ignored) {
-                        // Route exists in DB but isn't loaded in memory (e.g. file went missing) —
-                        // surface it as 0 stops rather than failing the whole list.
+                        // Ignore if route is not loaded
                     }
-                    return Map.of(
-                            "routeCode", route.getRouteCode(),
-                            "routeName", route.getRouteName(),
-                            "stopCount", stopCount
-                    );
+
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("routeCode", route.getRouteCode());
+                    map.put("routeName", route.getRouteName());
+                    map.put("stopCount", stopCount);
+
+                    return map;
                 })
                 .collect(Collectors.toList());
     }
