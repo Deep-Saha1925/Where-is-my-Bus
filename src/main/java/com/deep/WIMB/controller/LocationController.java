@@ -37,7 +37,7 @@ public class LocationController {
         );
     }
 
-    // passenger fetches last known location — stays open, no token needed
+    // passenger fetches last known location
     @GetMapping("/last-loc/{rideId}")
     public Location getLastLocation(@PathVariable Long rideId){
         return locationService.getLastKnownLocation(rideId);
