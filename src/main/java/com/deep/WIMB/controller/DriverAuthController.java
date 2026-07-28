@@ -17,7 +17,6 @@ public class DriverAuthController {
     private final DriverAccessService driverAccessService;
     private final DriverTokenService driverTokenService;
 
-    // Public — just the depot names for the dropdown, never the codes
     @GetMapping("/depots")
     public List<String> getDepots() {
         return driverAccessService.getDepotNames();
