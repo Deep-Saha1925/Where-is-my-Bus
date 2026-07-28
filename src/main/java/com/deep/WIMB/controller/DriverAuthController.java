@@ -34,7 +34,7 @@ public class DriverAuthController {
         if (!driverAccessService.isValid(depotName, code)) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid depot or code"));
         }
-        // token is still issued per bus number, exactly as before —
+        // token is still issued per bus number, exactly as before
         // RideController's checks don't need to change at all
         return ResponseEntity.ok(Map.of("token", driverTokenService.issueToken(busNumber)));
     }
