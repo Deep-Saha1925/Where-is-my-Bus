@@ -20,6 +20,7 @@ public class LocationFlushScheduler {
     private final LocationRepository locationRepository;
 
     // Runs every 10 min
+    // Flushes location to DB
     @Scheduled(fixedRate = 600000)
     public void flushLocationsToDB() {
         log.info("Starting scheduled Redis → MySQL flush...");
