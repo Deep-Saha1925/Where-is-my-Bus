@@ -30,5 +30,4 @@ public class Ride {
 
     @ManyToOne
     private Bus bus;
-
 }
