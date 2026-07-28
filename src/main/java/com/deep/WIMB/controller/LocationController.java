@@ -19,7 +19,7 @@ public class LocationController {
     private final RideService rideService;
     private final DriverTokenService driverTokenService;
 
-    // Driver sends GPS (legacy path — kept for compatibility)
+    // Driver sends GPS
     @PostMapping("/update")
     public Location updateLocation(@RequestBody LocationUpdateRequest request,
                                    @RequestHeader(value = "X-Driver-Token", required = false) String driverToken) {
