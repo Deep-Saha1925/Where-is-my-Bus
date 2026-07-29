@@ -34,6 +34,7 @@ public class DriverAuthController {
         if (!driverAccessService.isValid(depotName, code)) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid depot or code"));
         }
+
         return ResponseEntity.ok(Map.of("token", driverTokenService.issueToken(busNumber)));
     }
 }
