@@ -17,11 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.file.Files;
-import java.util.HashMap;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/admin/routes")
@@ -31,99 +30,84 @@ public class AdminRouteController {
     private final RouteRepository routeRepository;
     private final RouteExcelLoader routeExcelLoader;
 
-    @Value("${wimb.route.upload.dir}")
-    private String routeUploadDir;
+    @Value("${wimb.route.dir}")
+    private String routeDir;
 
     private static final List<String> ALLOWED_EXTENSIONS = List.of(".xlsx", ".xls", ".xlsm");
 
-    // Admin-only via the existing "/admin/**" -> hasRole("ADMIN") rule in SecurityConfig.
     @GetMapping
-    public List<Map<String, Object>> listRoutes() {
-        return routeRepository.findAll().stream()
-                .map(route -> {
-                    int stopCount = 0;
-
-                    try {
-                        stopCount = routeExcelLoader.getFullRoute(route.getRouteCode()).size();
-                    } catch (Exception ignored) {
-                        // Ignore if route is not loaded
-                    }
-
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("routeCode", route.getRouteCode());
-                    map.put("routeName", route.getRouteName());
-                    map.put("stopCount", stopCount);
-
-                    return map;
-                })
-                .collect(Collectors.toList());
+    public List<Route> listRoutes() {
+        return routeExcelLoader.getAllRoutes();
     }
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadRoute(
-            @RequestParam("routeCode") String routeCodeRaw,
+            @RequestParam("routeCode") String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam("file") MultipartFile file
     ) {
-        String routeCode = routeCodeRaw == null ? "" : routeCodeRaw.trim().toUpperCase(Locale.ROOT);
+        String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
+        String name = routeName == null ? "" : routeName.trim();
 
-        if (routeCode.isEmpty()) {
+        if (code.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Route code is required"));
         }
-        if (routeName == null || routeName.isBlank()) {
+        if (name.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Route name is required"));
+        }
+        if (routeRepository.existsByRouteCode(code)) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "A route with code \"" + code + "\" already exists. Editing/replacing isn't supported yet."));
         }
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No file selected"));
         }
 
         String filename = file.getOriginalFilename();
-        boolean validExtension = filename != null &&
-                ALLOWED_EXTENSIONS.stream().anyMatch(ext -> filename.toLowerCase(Locale.ROOT).endsWith(ext));
-        if (!validExtension) {
+        String extension = ALLOWED_EXTENSIONS.stream()
+                .filter(ext -> filename != null && filename.toLowerCase(Locale.ROOT).endsWith(ext))
+                .findFirst()
+                .orElse(null);
+
+        if (extension == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Please upload an Excel file (.xlsx, .xls, or .xlsm)"
             ));
         }
 
-        if (routeRepository.existsByRouteCode(routeCode)) {
-            return ResponseEntity.status(409).body(Map.of(
-                    "error", "A route with code \"" + routeCode + "\" already exists. " +
-                            "Editing/replacing an existing route isn't supported yet — use a different code."
-            ));
-        }
-
         try {
-            File dir = new File(routeUploadDir);
-            dir.mkdirs();
-            File dest = new File(dir, routeCode + ".xlsx");
+            File dest = new File(routeDir, code + extension);
+            dest.getParentFile().mkdirs();
             Files.write(dest.toPath(), file.getBytes());
 
             Route route = new Route();
-            route.setRouteCode(routeCode);
-            route.setRouteName(routeName.trim());
+            route.setRouteCode(code);
+            route.setRouteName(name);
             route.setFilePath(dest.getPath());
-            routeRepository.save(route);
+            route.setUploadedAt(LocalDateTime.now());
 
-            routeExcelLoader.loadRouteFromDisk(routeCode, dest.getPath());
+            // Parse before committing to the DB — a malformed file fails loudly here
+            // instead of registering a route that can never actually be loaded.
+            routeExcelLoader.loadRouteFromDisk(route);
+            route.setStopCount(routeExcelLoader.getStopCount(code));
+
+            routeRepository.save(route);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Route added successfully",
-                    "routeCode", routeCode,
-                    "stopCount", routeExcelLoader.getFullRoute(routeCode).size()
+                    "routeCode", code,
+                    "stopCount", route.getStopCount()
             ));
         } catch (Exception e) {
-            // Roll back the DB record if the file wrote but parsing failed, so we don't end
-            // up with a "registered" route that never actually loaded.
-            routeRepository.findByRouteCode(routeCode).ifPresent(routeRepository::delete);
             return ResponseEntity.status(500).body(Map.of("error", "Upload failed: " + e.getMessage()));
         }
     }
 
+    // Ready-to-edit example file, same shape as your existing route Excel files.
     @GetMapping("/template")
     public ResponseEntity<byte[]> downloadTemplate() throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Route Stops");
+            Sheet sheet = workbook.createSheet("Route");
 
             Row header = sheet.createRow(0);
             String[] headers = {"stop_order", "stop_name", "latitude", "longitude", "distance_km", "slack_min"};
@@ -137,7 +121,6 @@ public class AdminRouteController {
                     {3, "Sonapur", 26.494, 89.368, 10.5, 2},
                     {4, "Falakata", 26.51721, 89.20694, 15.0, 0}
             };
-
             for (int i = 0; i < examples.length; i++) {
                 Row row = sheet.createRow(i + 1);
                 row.createCell(0).setCellValue((Integer) examples[i][0]);
@@ -147,10 +130,7 @@ public class AdminRouteController {
                 row.createCell(4).setCellValue((Double) examples[i][4]);
                 row.createCell(5).setCellValue((Integer) examples[i][5]);
             }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.setColumnWidth(i, 4500);
-            }
+            for (int i = 0; i < headers.length; i++) sheet.autoSizeColumn(i);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
