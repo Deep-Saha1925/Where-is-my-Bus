@@ -61,7 +61,6 @@ public class RouteExcelLoader {
         return sliceBetween(getFullRoute(legacyRouteKey), source, destination);
     }
 
-    /* ============== NEW: MULTI-ROUTE (admin-managed) ============== */
     /** Loads every registered Route from the DB into the cache. Safe to call again later. */
     public void loadAllRegisteredRoutes() {
         for (Route route : routeRepository.findAll()) {
