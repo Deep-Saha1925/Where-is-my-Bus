@@ -1,10 +1,9 @@
 package com.deep.WIMB.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -18,11 +17,15 @@ public class Route {
     private Long id;
 
     @Column(unique = true, nullable = false)
-    private String routeCode;   // e.g. "APD_FLK"
+    private String routeCode;   // e.g. APD_FLK — the internal key used everywhere
 
     @Column(nullable = false)
-    private String routeName;
+    private String routeName;   // e.g. "Alipurduar ⇄ Falakata" — shown to admin/drivers
 
     @Column(nullable = false)
-    private String filePath;
+    private String filePath;    // e.g. data/routes/APD_FLK.xlsx
+
+    private int stopCount;
+
+    private LocalDateTime uploadedAt;
 }
