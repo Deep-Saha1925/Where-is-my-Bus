@@ -62,7 +62,6 @@ public class RouteExcelLoader {
     }
 
     /* ============== NEW: MULTI-ROUTE (admin-managed) ============== */
-
     /** Loads every registered Route from the DB into the cache. Safe to call again later. */
     public void loadAllRegisteredRoutes() {
         for (Route route : routeRepository.findAll()) {
@@ -130,7 +129,6 @@ public class RouteExcelLoader {
     }
 
     /* ============== SHARED HELPERS ============== */
-
     private List<RouteStop> parseWorkbook(Workbook wb) {
         Sheet sheet = wb.getSheetAt(0);
         List<RouteStop> stops = new ArrayList<>();
