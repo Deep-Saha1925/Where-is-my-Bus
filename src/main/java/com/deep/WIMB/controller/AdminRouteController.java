@@ -86,8 +86,6 @@ public class AdminRouteController {
             route.setFilePath(dest.getPath());
             route.setUploadedAt(LocalDateTime.now());
 
-            // Parse before committing to the DB — a malformed file fails loudly here
-            // instead of registering a route that can never actually be loaded.
             routeExcelLoader.loadRouteFromDisk(route);
             route.setStopCount(routeExcelLoader.getStopCount(code));
 
