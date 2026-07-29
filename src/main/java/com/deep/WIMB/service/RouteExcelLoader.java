@@ -33,8 +33,8 @@ public class RouteExcelLoader {
 
     @PostConstruct
     public void init() throws Exception {
-        loadLegacyRoute();          // unchanged behavior
-        loadAllRegisteredRoutes();  // new: load whatever admin has already added
+        loadLegacyRoute();
+        loadAllRegisteredRoutes();
     }
 
     private void loadLegacyRoute() throws Exception {
