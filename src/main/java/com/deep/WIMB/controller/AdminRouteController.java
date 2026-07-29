@@ -103,7 +103,6 @@ public class AdminRouteController {
         }
     }
 
-    // Ready-to-edit example file, same shape as your existing route Excel files.
     @GetMapping("/template")
     public ResponseEntity<byte[]> downloadTemplate() throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
