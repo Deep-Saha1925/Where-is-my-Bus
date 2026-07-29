@@ -37,8 +37,6 @@ public class RouteExcelLoader {
         loadAllRegisteredRoutes();  // new: load whatever admin has already added
     }
 
-    /* ============== LEGACY (unchanged behavior) ============== */
-
     private void loadLegacyRoute() throws Exception {
         InputStream is = new ClassPathResource("routes/route_APD_FLK.xlsx").getInputStream();
         try (Workbook wb = WorkbookFactory.create(is)) {
