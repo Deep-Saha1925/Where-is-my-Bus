@@ -139,4 +139,28 @@ public class AdminRouteController {
                     .body(out.toByteArray());
         }
     }
+
+    @DeleteMapping("/{routeCode}")
+    public ResponseEntity<?> deleteRoute(@PathVariable String routeCode) {
+        String code = routeCode.trim().toUpperCase(Locale.ROOT);
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+
+        // Pull it out of the in-memory cache first, so no new ride can be
+        // started against it the instant this request is processed.
+        routeExcelLoader.removeRoute(code);
+
+        // Delete the underlying Excel file from disk too — don't leave orphans.
+        File file = new File(route.getFilePath());
+        if (file.exists() && !file.delete()) {
+            System.err.println("Warning: could not delete route file on disk: " + file.getPath());
+        }
+
+        routeRepository.delete(route);
+
+        return ResponseEntity.ok(Map.of("message", "Route \"" + code + "\" deleted"));
+    }
 }
