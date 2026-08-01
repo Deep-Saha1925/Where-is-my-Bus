@@ -345,6 +345,12 @@
     }
     .depot-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .depot-table td.code-cell { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); }
+    .row-delete-btn {
+      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 7px;
+      border: 1px solid var(--border); background: transparent; color: var(--text-faint);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .row-delete-btn:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
     .table-empty { padding: 14px 10px !important; color: var(--text-faint); text-align: center; }
 
     /* ── Keyframes ── */
@@ -599,9 +605,9 @@
       <div class="panel-card-body">
         <div style="overflow-x:auto;">
           <table class="depot-table">
-            <thead><tr><th>Code</th><th>Name</th><th>Stops</th></tr></thead>
+            <thead><tr><th>Code</th><th>Name</th><th>Stops</th><th>Actions</th></tr></thead>
             <tbody id="routeTableBody">
-            <tr><td colspan="3" class="table-empty">Loading...</td></tr>
+            <tr><td colspan="4" class="table-empty">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -712,7 +718,7 @@
               : "No routes registered yet";
 
       if (!routes.length) {
-        tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No routes added yet — use the form above</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No routes added yet — use the form above</td></tr>`;
         return;
       }
 
@@ -721,11 +727,38 @@
           <td class="code-cell">${r.routeCode}</td>
           <td>${r.routeName}</td>
           <td>${r.stopCount}</td>
+          <td><button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button></td>
         </tr>`).join("");
     } catch (err) {
       console.error("Failed to load routes:", err);
       countSub.textContent = "Failed to load";
-      tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+    }
+  }
+
+  async function deleteRoute(routeCode) {
+    if (!confirm(`Delete route "${routeCode}"? This can't be undone — its Excel file will also be removed from the server.`)) {
+      return;
+    }
+
+    try {
+      const csrfToken = document.getElementById("csrfToken").value;
+      const res = await fetch(
+              `/admin/routes/${encodeURIComponent(routeCode)}?_csrf=${encodeURIComponent(csrfToken)}`,
+              { method: "DELETE" }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Delete failed");
+        return;
+      }
+
+      loadRouteTable();
+    } catch (err) {
+      console.error(err);
+      alert("Delete failed: " + err.message);
     }
   }
 
