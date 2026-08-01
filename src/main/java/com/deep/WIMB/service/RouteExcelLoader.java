@@ -200,4 +200,8 @@ public class RouteExcelLoader {
         }
         return false;
     }
+
+    public void removeRoute(String routeCode) {
+        routeCache.remove(routeCode);
+    }
 }
