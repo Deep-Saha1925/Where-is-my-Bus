@@ -290,6 +290,10 @@
       font-family: 'JetBrains Mono', monospace; font-size: 12px;
       background: var(--bg-page); padding: 1px 6px; border-radius: 4px; color: var(--text-primary);
     }
+    .brand-label-sm {
+      display: block; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); margin-bottom: 5px;
+    }
 
     .example-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
     .example-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -388,6 +392,7 @@
 <div class="tab-bar">
   <button class="tab-btn active" id="tabBtnBuses" onclick="switchTab('buses')">🚌 Active Buses</button>
   <button class="tab-btn" id="tabBtnDepots" onclick="switchTab('depots')">🏢 Depot Codes</button>
+  <button class="tab-btn" id="tabBtnRoutes" onclick="switchTab('routes')">🛣️ Routes</button>
 </div>
 
 <!-- ── ACTIVE BUSES TAB ── -->
@@ -522,6 +527,90 @@
   </div>
 </div><!-- /tab-depots -->
 
+<!-- ── ROUTES TAB ── -->
+<div id="tab-routes" class="tab-panel" style="display:none;">
+  <div class="depot-layout">
+
+    <!-- Instructions + example -->
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-icon">📋</div>
+        <div>
+          <div class="panel-title">How to prepare the file</div>
+          <div class="panel-sub">Any Excel format works — .xlsx, .xls or .xlsm</div>
+        </div>
+      </div>
+      <div class="panel-card-body">
+        <ol class="hint-list">
+          <li>Row 1 is the header — use these exact column names.</li>
+          <li><code>stop_order</code> — 1, 2, 3... in the order a bus passes each stop</li>
+          <li><code>stop_name</code>, <code>latitude</code>, <code>longitude</code> — per stop</li>
+          <li><code>distance_km</code> — cumulative distance from the first stop</li>
+          <li><code>slack_min</code> — scheduled halt time at that stop, or 0</li>
+          <li>Give the route a short code (e.g. <code>APD_FLK</code>) and a readable name when you upload — this adds a new route, it won't overwrite any existing one.</li>
+        </ol>
+        <div class="example-table-wrap">
+          <table class="example-table">
+            <thead><tr><th>stop_order</th><th>stop_name</th><th>lat</th><th>lng</th><th>dist_km</th><th>slack</th></tr></thead>
+            <tbody>
+            <tr><td>1</td><td>Alipurduar</td><td>26.4799</td><td>89.5355</td><td>0</td><td>0</td></tr>
+            <tr><td>2</td><td>Sonapur</td><td>26.494</td><td>89.368</td><td>10.5</td><td>2</td></tr>
+            <tr><td>3</td><td>Falakata</td><td>26.51721</td><td>89.20694</td><td>15</td><td>0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <a href="/admin/routes/template" class="template-link">⬇ Download a ready-made example file</a>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <div class="panel-icon">➕</div>
+        <div>
+          <div class="panel-title">Add a new route</div>
+          <div class="panel-sub">Each upload adds a route — existing ones are untouched</div>
+        </div>
+      </div>
+      <div class="panel-card-body">
+        <label class="brand-label-sm">Route code</label>
+        <input type="text" id="routeCodeInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. APD_FLK"/>
+
+        <label class="brand-label-sm">Route name</label>
+        <input type="text" id="routeNameInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. Alipurduar ⇄ Falakata"/>
+
+        <label class="brand-label-sm">Excel file</label>
+        <input type="file" id="routeFileInput" accept=".xlsx,.xls,.xlsm" class="file-input"/>
+
+        <button onclick="uploadRouteFile()" class="upload-btn">Add Route</button>
+        <div id="routeUploadStatus" class="upload-status"></div>
+      </div>
+    </div>
+
+    <!-- Current routes -->
+    <div class="panel-card full-width">
+      <div class="panel-card-header">
+        <div class="panel-icon">🛣️</div>
+        <div>
+          <div class="panel-title">Registered routes</div>
+          <div class="panel-sub" id="routeCountSub">Loading...</div>
+        </div>
+      </div>
+      <div class="panel-card-body">
+        <div style="overflow-x:auto;">
+          <table class="depot-table">
+            <thead><tr><th>Code</th><th>Name</th><th>Stops</th></tr></thead>
+            <tbody id="routeTableBody">
+            <tr><td colspan="3" class="table-empty">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /tab-routes -->
+
 <script src="/js/admin-buses.js"></script>
 <script>
 
@@ -610,15 +699,106 @@
 
   loadDepotTable();
 
+  /* ── ROUTES ── */
+  async function loadRouteTable() {
+    const tbody = document.getElementById("routeTableBody");
+    const countSub = document.getElementById("routeCountSub");
+    try {
+      const res = await fetch("/admin/routes");
+      const routes = await res.json(); // [{ routeCode, routeName, stopCount, ... }]
+
+      countSub.textContent = routes.length
+              ? `${routes.length} route${routes.length > 1 ? "s" : ""} registered`
+              : "No routes registered yet";
+
+      if (!routes.length) {
+        tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No routes added yet — use the form above</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = routes.map(r => `
+        <tr>
+          <td class="code-cell">${r.routeCode}</td>
+          <td>${r.routeName}</td>
+          <td>${r.stopCount}</td>
+        </tr>`).join("");
+    } catch (err) {
+      console.error("Failed to load routes:", err);
+      countSub.textContent = "Failed to load";
+      tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+    }
+  }
+
+  async function uploadRouteFile() {
+    const codeInput = document.getElementById("routeCodeInput");
+    const nameInput = document.getElementById("routeNameInput");
+    const fileInput = document.getElementById("routeFileInput");
+    const statusEl = document.getElementById("routeUploadStatus");
+
+    const routeCode = codeInput.value.trim();
+    const routeName = nameInput.value.trim();
+
+    if (!routeCode || !routeName) {
+      statusEl.textContent = "Please enter both a route code and a route name";
+      statusEl.style.color = "#ef4444";
+      return;
+    }
+    if (!fileInput.files.length) {
+      statusEl.textContent = "Please choose an Excel file first";
+      statusEl.style.color = "#ef4444";
+      return;
+    }
+
+    statusEl.textContent = "Uploading...";
+    statusEl.style.color = "var(--text-muted)";
+
+    const formData = new FormData();
+    formData.append("routeCode", routeCode);
+    formData.append("routeName", routeName);
+    formData.append("file", fileInput.files[0]);
+    formData.append("_csrf", document.getElementById("csrfToken").value);
+
+    try {
+      const res = await fetch("/admin/routes/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        statusEl.textContent = data.error || "Upload failed";
+        statusEl.style.color = "#ef4444";
+        return;
+      }
+
+      statusEl.textContent = `✅ ${data.message} (${data.stopCount} stops)`;
+      statusEl.style.color = "#059669";
+      codeInput.value = "";
+      nameInput.value = "";
+      fileInput.value = "";
+      loadRouteTable();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Upload failed: " + err.message;
+      statusEl.style.color = "#ef4444";
+    }
+  }
+
+  loadRouteTable();
+
   /* ── TABS ── */
   function switchTab(tab) {
     document.getElementById("tab-buses").style.display  = tab === "buses"  ? "" : "none";
     document.getElementById("tab-depots").style.display = tab === "depots" ? "" : "none";
+    document.getElementById("tab-routes").style.display = tab === "routes" ? "" : "none";
     document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
     document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
+    document.getElementById("tabBtnRoutes").classList.toggle("active", tab === "routes");
     localStorage.setItem("wimb_admin_tab", tab);
   }
-  switchTab(localStorage.getItem("wimb_admin_tab") === "depots" ? "depots" : "buses");
+  const savedTab = localStorage.getItem("wimb_admin_tab");
+  switchTab(savedTab === "depots" || savedTab === "routes" ? savedTab : "buses");
 
   /* ── THEME ── */
   const appBody  = document.getElementById("appBody");
