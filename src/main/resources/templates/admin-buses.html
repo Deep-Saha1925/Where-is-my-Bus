@@ -351,6 +351,12 @@
       cursor: pointer; transition: all 0.15s;
     }
     .row-delete-btn:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.08); }
+    .row-update-btn {
+      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 7px;
+      border: 1px solid var(--border); background: transparent; color: var(--text-faint);
+      cursor: pointer; transition: all 0.15s; margin-right: 6px;
+    }
+    .row-update-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .table-empty { padding: 14px 10px !important; color: var(--text-faint); text-align: center; }
 
     /* ── Keyframes ── */
@@ -723,16 +729,84 @@
       }
 
       tbody.innerHTML = routes.map(r => `
-        <tr>
+        <tr id="routeRow-${r.routeCode}">
           <td class="code-cell">${r.routeCode}</td>
           <td>${r.routeName}</td>
           <td>${r.stopCount}</td>
-          <td><button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button></td>
+          <td style="white-space:nowrap;">
+            <button class="row-update-btn"
+                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}')">Update</button>
+            <button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button>
+          </td>
         </tr>`).join("");
     } catch (err) {
       console.error("Failed to load routes:", err);
       countSub.textContent = "Failed to load";
       tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+    }
+  }
+
+  function startEditRoute(routeCode, currentName) {
+    const row = document.getElementById(`routeRow-${routeCode}`);
+    if (!row) return;
+
+    row.innerHTML = `
+      <td class="code-cell">${routeCode}</td>
+      <td colspan="2">
+        <input type="text" id="editName-${routeCode}" value="${currentName.replace(/"/g, "&quot;")}"
+               class="file-input" style="border-style:solid; margin-bottom:6px;" placeholder="Route name"/>
+        <input type="file" id="editFile-${routeCode}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
+        <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">Leave the file blank to keep the current stops</div>
+        <div id="editStatus-${routeCode}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
+      </td>
+      <td style="white-space:nowrap; vertical-align:top;">
+        <button class="row-update-btn" onclick="saveRouteEdit('${routeCode}')">Save</button>
+        <button class="row-delete-btn" onclick="loadRouteTable()">Cancel</button>
+      </td>
+    `;
+  }
+
+  async function saveRouteEdit(routeCode) {
+    const nameInput = document.getElementById(`editName-${routeCode}`);
+    const fileInput = document.getElementById(`editFile-${routeCode}`);
+    const statusEl = document.getElementById(`editStatus-${routeCode}`);
+
+    const routeName = nameInput.value.trim();
+    if (!routeName) {
+      statusEl.textContent = "Route name can't be empty";
+      statusEl.style.color = "#ef4444";
+      return;
+    }
+
+    statusEl.textContent = "Saving...";
+    statusEl.style.color = "var(--text-muted)";
+
+    const formData = new FormData();
+    formData.append("routeName", routeName);
+    if (fileInput.files.length) {
+      formData.append("file", fileInput.files[0]);
+    }
+    formData.append("_csrf", document.getElementById("csrfToken").value);
+
+    try {
+      const res = await fetch(`/admin/routes/${encodeURIComponent(routeCode)}`, {
+        method: "PUT",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        statusEl.textContent = data.error || "Update failed";
+        statusEl.style.color = "#ef4444";
+        return;
+      }
+
+      loadRouteTable();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Update failed: " + err.message;
+      statusEl.style.color = "#ef4444";
     }
   }
 
