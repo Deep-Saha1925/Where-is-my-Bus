@@ -163,4 +163,57 @@ public class AdminRouteController {
 
         return ResponseEntity.ok(Map.of("message", "Route \"" + code + "\" deleted"));
     }
+
+    @PutMapping("/{routeCode}")
+    public ResponseEntity<?> updateRoute(
+            @PathVariable String routeCode,
+            @RequestParam("routeName") String routeName,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) {
+        String code = routeCode.trim().toUpperCase(Locale.ROOT);
+        String name = routeName == null ? "" : routeName.trim();
+
+        if (name.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Route name is required"));
+        }
+
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+
+        route.setRouteName(name);
+
+        // File is optional here — only touch it if the admin actually chose one
+        if (file != null && !file.isEmpty()) {
+            String filename = file.getOriginalFilename();
+            boolean validExtension = filename != null &&
+                    ALLOWED_EXTENSIONS.stream().anyMatch(ext -> filename.toLowerCase(Locale.ROOT).endsWith(ext));
+
+            if (!validExtension) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Please upload an Excel file (.xlsx, .xls, or .xlsm)"
+                ));
+            }
+
+            try {
+                // Overwrite at the exact same path the route was created with —
+                // route code and file location never change, only content does.
+                File dest = new File(route.getFilePath());
+                Files.write(dest.toPath(), file.getBytes());
+
+                routeExcelLoader.loadRouteFromDisk(route); // reload into cache immediately
+                route.setStopCount(routeExcelLoader.getStopCount(code));
+            } catch (Exception e) {
+                return ResponseEntity.status(500).body(Map.of("error", "Failed to update route file: " + e.getMessage()));
+            }
+        }
+
+        routeRepository.save(route);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Route \"" + code + "\" updated",
+                "stopCount", route.getStopCount()
+        ));
+    }
 }
