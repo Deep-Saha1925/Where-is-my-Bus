@@ -9,6 +9,7 @@ public class ActiveRideResponse {
     private Long rideId;
     private String busNumber;
     private String routeKey;
+    private String routeCode;
     private Double latitude;
     private Double longitude;
 
