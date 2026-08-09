@@ -22,6 +22,11 @@ public class Ride {
 
     private String routeKey;
 
+    // Which registered route (Route.routeCode) this ride actually runs on.
+    // Null on rows created before multi-route support existed — treat null
+    // as the legacy route everywhere this is read.
+    private String routeCode;
+
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 
