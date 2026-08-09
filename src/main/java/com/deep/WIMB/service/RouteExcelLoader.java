@@ -35,6 +35,7 @@ public class RouteExcelLoader {
     public void init() throws Exception {
         loadLegacyRoute();
         loadAllRegisteredRoutes();
+        updateStopsJson();
     }
 
     private void loadLegacyRoute() throws Exception {
@@ -42,9 +43,17 @@ public class RouteExcelLoader {
         try (Workbook wb = WorkbookFactory.create(is)) {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(legacyRouteKey, stops);
-            updateStopsJson(stops);
             System.out.println("Loaded legacy route " + legacyRouteKey + " with " + stops.size() + " stops");
         }
+    }
+
+    public String getLegacyRouteKey() {
+        return legacyRouteKey;
+    }
+
+    /** Resolves a possibly-null/blank routeCode down to the legacy route key. */
+    public String resolveRouteCode(String routeCode) {
+        return (routeCode == null || routeCode.isBlank()) ? legacyRouteKey : routeCode;
     }
 
     public int getStopOrderByName(String stopName) {
@@ -83,6 +92,10 @@ public class RouteExcelLoader {
             System.out.println("Loaded route " + route.getRouteCode()
                     + " (" + route.getRouteName() + ") with " + stops.size() + " stops");
         }
+        // Every admin-added/updated route needs to surface its stops on the
+        // passenger search page too, not just the legacy route — otherwise
+        // a newly-added route's stop names never appear in the datalist.
+        updateStopsJson();
     }
 
     public void reloadRoute(String routeCode) {
@@ -176,17 +189,33 @@ public class RouteExcelLoader {
         return segment;
     }
 
-    private void updateStopsJson(List<RouteStop> stops) {
+    /**
+     * Rebuilds stops.json from EVERY currently loaded route (legacy plus every
+     * admin-added one), not just whichever route was loaded most recently.
+     * This is what the passenger search page's autocomplete reads, so any
+     * route that's missing here is a route passengers can never search for.
+     */
+    private void updateStopsJson() {
         try {
-            List<String> stopNames = stops.stream().map(RouteStop::getStopName).toList();
+            // TreeSet with case-insensitive ordering: de-dupes stop names that
+            // appear on more than one route (e.g. a shared junction town),
+            // and keeps the list alphabetical for the dropdown.
+            Set<String> stopNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (List<RouteStop> stops : routeCache.values()) {
+                for (RouteStop stop : stops) {
+                    stopNames.add(stop.getStopName());
+                }
+            }
+
             Map<String, Object> json = new HashMap<>();
-            json.put("stops", stopNames);
+            json.put("stops", new ArrayList<>(stopNames));
 
             File file = new File(STOPS_JSON_PATH);
             file.getParentFile().mkdirs();
 
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, json);
-            System.out.println("Updated stops.json file");
+            System.out.println("Updated stops.json file (" + stopNames.size() + " stops across "
+                    + routeCache.size() + " route(s))");
         } catch (Exception e) {
             System.err.println("Error updating stops.json file");
             e.printStackTrace();
@@ -203,5 +232,7 @@ public class RouteExcelLoader {
 
     public void removeRoute(String routeCode) {
         routeCache.remove(routeCode);
+        // Deleted route's stops must disappear from the passenger search too.
+        updateStopsJson();
     }
 }
