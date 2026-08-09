@@ -84,7 +84,7 @@ function renderCards(rides) {
         }
       </div>
 
-      <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId})">
+      <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId}, '${ride.routeCode || ""}')">
         <span>📍</span> View on Map
       </button>
     </div>`;
@@ -124,8 +124,9 @@ async function loadActiveBuses() {
   }
 }
 
-function trackBus(routeKey, rideId) {
-  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}`;
+function trackBus(routeKey, rideId, routeCode) {
+  const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
+  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
 }
 
 loadActiveBuses();
