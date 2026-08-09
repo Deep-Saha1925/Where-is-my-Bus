@@ -200,10 +200,14 @@ function renderBusCards(buses, routeKey) {
         <span class="route-dest">${dest}</span>
       </div>
 
-      <button class="track-btn" onclick="track('${routeKey}', ${bus.rideId})">
-        <i class="fa-solid fa-location-dot"></i>
-        Track Bus
-      </button>
+      // quick results card
+      <div class="quick-card fade-up"
+           style="animation-delay:${i * 80}ms"
+           onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
+      
+      // search results card
+      <button class="track-btn" onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
+
     `;
 
     busList.appendChild(card);
@@ -261,8 +265,14 @@ async function searchBuses() {
 }
 
 /* ─── HELPERS ────────────────────────────────────────────────────── */
-function track(routeKey, rideId) {
-  window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}`;
+// function track(routeKey, rideId) {
+//   window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}`;
+// }
+
+// helper
+function track(routeKey, rideId, routeCode) {
+  const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
+  window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
 }
 
 function calculateETAFromDistance(distanceKm) {
