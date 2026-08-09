@@ -233,6 +233,7 @@ async function startRide() {
   const payload = {
     busNumber,
     routeKey: `${source}_${destination}`,
+    routeCode: selectedRouteCode || null,
     latitude:  coords.latitude,
     longitude: coords.longitude
   };
