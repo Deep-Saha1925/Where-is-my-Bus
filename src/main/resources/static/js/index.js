@@ -16,17 +16,17 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ─── STOPS ─────────────────────────────────────────────────────── */
 function loadStops() {
   fetch("/data/stops.json")
-    .then(r => r.json())
-    .then(data => {
-      const datalist = document.getElementById("stopsList");
-      datalist.innerHTML = "";
-      data.stops.forEach(stop => {
-        const opt = document.createElement("option");
-        opt.value = stop.toUpperCase();
-        datalist.appendChild(opt);
-      });
-    })
-    .catch(err => console.error("Error loading stops:", err));
+      .then(r => r.json())
+      .then(data => {
+        const datalist = document.getElementById("stopsList");
+        datalist.innerHTML = "";
+        data.stops.forEach(stop => {
+          const opt = document.createElement("option");
+          opt.value = stop.toUpperCase();
+          datalist.appendChild(opt);
+        });
+      })
+      .catch(err => console.error("Error loading stops:", err));
 }
 
 /* ─── RECENT SEARCHES ────────────────────────────────────────────── */
@@ -39,7 +39,7 @@ function saveRecent(source, destination) {
   if (!source || !destination) return;
   const entry = { source, destination, label: `${source} → ${destination}` };
   let recent  = getRecent().filter(
-    r => !(r.source === source && r.destination === destination)
+      r => !(r.source === source && r.destination === destination)
   );
   recent.unshift(entry);
   recent = recent.slice(0, MAX_RECENT);
@@ -98,7 +98,7 @@ async function loadQuickResults() {
 
   try {
     const res   = await fetch(
-      `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
     );
     const buses = await res.json();
 
@@ -120,7 +120,7 @@ async function loadQuickResults() {
     quickList.innerHTML = buses.map((bus, i) => `
       <div class="quick-card fade-up"
            style="animation-delay:${i * 80}ms"
-           onclick="track('${routeKey}', ${bus.rideId})">
+           onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
         <div class="bus-icon-wrap">🚌</div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:700; color:var(--text-primary);">
@@ -200,14 +200,10 @@ function renderBusCards(buses, routeKey) {
         <span class="route-dest">${dest}</span>
       </div>
 
-      // quick results card
-      <div class="quick-card fade-up"
-           style="animation-delay:${i * 80}ms"
-           onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
-      
-      // search results card
       <button class="track-btn" onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
-
+        <i class="fa-solid fa-location-dot"></i>
+        Track Bus
+      </button>
     `;
 
     busList.appendChild(card);
@@ -243,7 +239,7 @@ async function searchBuses() {
 
   try {
     const res   = await fetch(
-      `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
     );
     const buses = await res.json();
 
@@ -265,11 +261,6 @@ async function searchBuses() {
 }
 
 /* ─── HELPERS ────────────────────────────────────────────────────── */
-// function track(routeKey, rideId) {
-//   window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}`;
-// }
-
-// helper
 function track(routeKey, rideId, routeCode) {
   const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
   window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
