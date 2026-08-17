@@ -283,7 +283,6 @@ function renderTimeline() {
   hasEnteredOnce = true;
 }
 
-/* ─── HELPERS ───────────────────────────────────────────────────── */
 function timeAgo(ts) {
   if (!ts) return "just now";
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
