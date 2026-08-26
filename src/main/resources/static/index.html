@@ -582,7 +582,6 @@
             const dots       = document.getElementById('splash-dots');
             const appContent = document.getElementById('app-content');
 
-            // Step 1: animate elements in after a tiny paint delay
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     logo.classList.add('show');
@@ -592,12 +591,10 @@
                 });
             });
 
-            // Step 2: start fading out splash at 2s, overlap with content fade-in
             setTimeout(() => {
                 splash.classList.add('hide');
             }, 2000);
 
-            // Step 3: fade in content slightly after splash starts fading (smooth overlap)
             setTimeout(() => {
                 appContent.classList.add('show');
             }, 2200);
