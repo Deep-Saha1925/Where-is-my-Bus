@@ -17,17 +17,17 @@ function filterBuses() {
   const filtered = allRides.filter(ride => {
     const [src, dest] = ride.routeKey ? ride.routeKey.split("_") : ["", ""];
     return (
-      ride.busNumber?.toLowerCase().includes(query) ||
-      src.toLowerCase().includes(query) ||
-      dest.toLowerCase().includes(query)
+        ride.busNumber?.toLowerCase().includes(query) ||
+        src.toLowerCase().includes(query) ||
+        dest.toLowerCase().includes(query)
     );
   });
 
   renderCards(filtered);
 
   searchMeta.textContent = filtered.length === 0
-    ? `No buses found for "${query}"`
-    : `${filtered.length} bus${filtered.length > 1 ? "es" : ""} found for "${query}"`;
+      ? `No buses found for "${query}"`
+      : `${filtered.length} bus${filtered.length > 1 ? "es" : ""} found for "${query}"`;
 }
 
 function clearSearch() {
@@ -53,7 +53,7 @@ function renderCards(rides) {
 
   grid.innerHTML = rides.map((ride, i) => {
     const [source, destination] = ride.routeKey
-      ? ride.routeKey.split("_") : ["—", "—"];
+        ? ride.routeKey.split("_") : ["—", "—"];
 
     // Highlight matching text
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
@@ -79,12 +79,12 @@ function renderCards(rides) {
       <div class="meta-row">
         <span class="meta-chip">Ride #${ride.rideId}</span>
         ${ride.latitude && ride.longitude
-          ? `<span class="meta-chip">📍 ${Number(ride.latitude).toFixed(4)}, ${Number(ride.longitude).toFixed(4)}</span>`
-          : `<span class="meta-chip">📍 Location updating...</span>`
-        }
+        ? `<span class="meta-chip">📍 ${Number(ride.latitude).toFixed(4)}, ${Number(ride.longitude).toFixed(4)}</span>`
+        : `<span class="meta-chip">📍 Location updating...</span>`
+    }
       </div>
 
-      <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId})">
+      <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId}, '${ride.routeCode || ""}')">
         <span>📍</span> View on Map
       </button>
     </div>`;
@@ -103,7 +103,7 @@ async function loadActiveBuses() {
     document.getElementById("statCount").textContent  = rides.length;
     document.getElementById("statRoutes").textContent = uniqueRoutes;
     document.getElementById("lastRefreshed").textContent =
-      "Last updated " + new Date().toLocaleTimeString();
+        "Last updated " + new Date().toLocaleTimeString();
 
     // Only re-render if not currently searching
     const query = document.getElementById("searchInput")?.value.trim();
@@ -124,8 +124,9 @@ async function loadActiveBuses() {
   }
 }
 
-function trackBus(routeKey, rideId) {
-  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}`;
+function trackBus(routeKey, rideId, routeCode) {
+  const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
+  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
 }
 
 loadActiveBuses();

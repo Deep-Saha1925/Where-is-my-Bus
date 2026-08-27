@@ -81,8 +81,6 @@ public class RedisLocationService {
         }
 
         return keys;
-
-
     }
 
     public Location getLastLocationFromRedis(Long rideId) {
@@ -97,5 +95,4 @@ public class RedisLocationService {
             return null;
         }
     }
-
 }

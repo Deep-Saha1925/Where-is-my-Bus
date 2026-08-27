@@ -222,12 +222,23 @@
 
     <!-- STEP 2b: New ride form -->
     <div id="newRideSection" class="hidden">
+        <label class="brand-label">Route</label>
+        <select
+                id="routeCode"
+                required
+                class="brand-select mb-4"
+                onchange="onRouteChange()"
+        >
+            <option value="" disabled selected>Loading routes...</option>
+        </select>
+
         <label class="brand-label">Start Location</label>
         <input
                 id="source"
                 list="stopsList"
-                placeholder="Type source stop"
+                placeholder="Pick a route first"
                 class="brand-input mb-4"
+                disabled
                 required
         />
 
@@ -235,8 +246,9 @@
         <input
                 id="destination"
                 list="stopsList"
-                placeholder="Type destination stop"
+                placeholder="Pick a route first"
                 class="brand-input mb-5"
+                disabled
                 required
         />
 

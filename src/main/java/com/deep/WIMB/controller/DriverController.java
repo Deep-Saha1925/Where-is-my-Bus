@@ -12,5 +12,4 @@ public class DriverController {
     public String driverPage(){
         return "driver";
     }
-
 }

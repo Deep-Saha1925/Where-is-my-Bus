@@ -33,7 +33,16 @@ public class RideService {
     // ============ UPDATE RIDE REQUEST ================
     public StartRideRequest updateRequest(StartRideRequest request) {
         StartRideRequest updatedRequest = new StartRideRequest();
-        List<RouteStop> allRoute = routeExcelLoader.getFullRoute();
+
+        // Resolve which route this ride is actually on. Previously this
+        // always resolved the source stop against the legacy route
+        // (routeExcelLoader.getFullRoute() with no arg), so a driver on any
+        // admin-added route would silently fail to match, fall back to raw
+        // GPS coords, and — critically — never have a route reference saved
+        // on the Ride at all. That's the root cause of admins not being able
+        // to track journeys on non-legacy routes.
+        String routeCode = routeExcelLoader.resolveRouteCode(request.getRouteCode());
+        List<RouteStop> allRoute = routeExcelLoader.getFullRoute(routeCode);
 
         String routeKey = request.getRouteKey();
         int separatorIdx = routeKey.indexOf("_");
@@ -41,6 +50,8 @@ public class RideService {
             throw new RuntimeException("Invalid routeKey format: " + routeKey);
         }
         String src = routeKey.substring(0, separatorIdx).trim();
+
+        updatedRequest.setRouteCode(routeCode);
 
         for (RouteStop stop : allRoute) {
             if (stop.getStopName().equalsIgnoreCase(src)) {
@@ -54,7 +65,7 @@ public class RideService {
 
         // If no stop matched, still pass through the request as-is
         if (updatedRequest.getBusNumber() == null) {
-            System.err.println("⚠️ Source stop not found in route: " + src);
+            System.err.println("⚠️ Source stop not found in route " + routeCode + ": " + src);
             updatedRequest.setRouteKey(routeKey);
             updatedRequest.setBusNumber(request.getBusNumber());
             updatedRequest.setLatitude(request.getLatitude());
@@ -85,6 +96,7 @@ public class RideService {
         Ride ride = new Ride();
         ride.setBus(bus);
         ride.setRouteKey(request.getRouteKey());
+        ride.setRouteCode(routeExcelLoader.resolveRouteCode(request.getRouteCode()));
         ride.setStartTime(LocalDateTime.now());
         ride.setStatus(RideStatus.ACTIVE);
         ride = rideRepository.save(ride);
@@ -119,101 +131,101 @@ public class RideService {
     public List<ActiveRideResponse> getActiveRidesByRoute(
             String userSource, String userDestination) {
 
-        List<RouteStop> fullRoute = routeExcelLoader.getFullRoute();
-
-        int sourceOrder;
-        int destOrder;
-
-        try {
-            sourceOrder = routeExcelLoader.getStopOrderByName(userSource);
-            destOrder   = routeExcelLoader.getStopOrderByName(userDestination);
-            System.out.println("sourceOrder=" + sourceOrder + " destOrder=" + destOrder);
-        } catch (RuntimeException e) {
-            System.err.println("❌ Stop not found: " + e.getMessage());
-            return List.of();
-        }
-
-        boolean isForward = sourceOrder < destOrder;
         List<Ride> activeRides = rideRepository.findByStatus(RideStatus.ACTIVE);
 
         return activeRides.stream()
-                .map(ride -> {
-
-                    // Extract bus source & destination from routeKey
-                    String rideRouteKey = ride.getRouteKey();
-                    String busSource = null;
-                    String busDestination = null;
-
-                    if (rideRouteKey != null && rideRouteKey.contains("_")) {
-                        int idx = rideRouteKey.indexOf("_");
-                        busSource      = rideRouteKey.substring(0, idx).trim();
-                        busDestination = rideRouteKey.substring(idx + 1).trim();
-                    }
-
-                    // Get bus destination stop order
-                    int busDestOrder = -1;
-                    try {
-                        if (busDestination != null) {
-                            busDestOrder = routeExcelLoader.getStopOrderByName(busDestination);
-                        }
-                    } catch (RuntimeException e) {
-                        System.err.println("Bus dest stop not found: " + busDestination);
-                    }
-
-                    // bus destination order must be >= passenger destination order (forward)
-                    //      or bus destination order must be <= passenger destination order (backward)
-                    if (busDestOrder != -1) {
-                        if (isForward && busDestOrder < destOrder) {
-                            System.out.println("Ride " + ride.getId()
-                                    + " — bus dest=" + busDestination
-                                    + " won't reach passenger dest. Skipping.");
-                            return null;
-                        }
-                        if (!isForward && busDestOrder > destOrder) {
-                            System.out.println("Ride " + ride.getId()
-                                    + " — bus dest=" + busDestination
-                                    + " won't reach passenger dest. Skipping.");
-                            return null;
-                        }
-                    }
-
-                    Location lastLoc = getLatestLocation(ride.getId());
-                    if (lastLoc == null) return null;
-
-                    int busOrder = findStopOrder(fullRoute, lastLoc);
-                    System.out.println("Ride " + ride.getId() + " busOrder=" + busOrder);
-                    if (busOrder == -1) return null;
-
-                    // Forward: bus hasn't passed passenger source yet
-                    // Backward: bus hasn't passed passenger source yet (in reverse direction)
-                    boolean allowed;
-                    if (isForward) {
-                        allowed = busOrder <= sourceOrder;
-                    } else {
-                        allowed = busOrder >= sourceOrder;
-                    }
-
-                    if (!allowed) return null;
-
-                    RouteStop busStop = fullRoute.stream()
-                            .filter(s -> s.getStopOrder() == busOrder)
-                            .findFirst().orElse(null);
-                    RouteStop sourceStop = fullRoute.stream()
-                            .filter(s -> s.getStopOrder() == sourceOrder)
-                            .findFirst().orElse(null);
-
-                    if (busStop == null || sourceStop == null) return null;
-
-                    double remainingDistance = Math.abs(
-                            sourceStop.getDistanceFromStartKm()
-                                    - busStop.getDistanceFromStartKm());
-
-                    ActiveRideResponse dto = toDto(ride);
-                    dto.setRemainingDistanceKm(remainingDistance);
-                    return dto;
-                })
+                .map(ride -> resolveActiveRide(ride, userSource, userDestination))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Resolves a single active ride against a passenger's searched source/
+     * destination, using THAT RIDE'S OWN route — not a hardcoded legacy
+     * route. Previously every stop-order lookup here (sourceOrder,
+     * destOrder, the bus's own nearest-stop position) was always computed
+     * against routeExcelLoader.getFullRoute() with no route argument, which
+     * silently resolves to the legacy route only. That meant any bus running
+     * on an admin-added route could never appear in passenger search, and —
+     * combined with Ride never storing a route reference — the admin
+     * tracking view had no reliable way to know which route's stops to plot
+     * a bus against either. Returns null if this ride doesn't match/isn't
+     * resolvable for the given search.
+     */
+    private ActiveRideResponse resolveActiveRide(Ride ride, String userSource, String userDestination) {
+        String routeCode = routeExcelLoader.resolveRouteCode(ride.getRouteCode());
+        List<RouteStop> fullRoute;
+        try {
+            fullRoute = routeExcelLoader.getFullRoute(routeCode);
+        } catch (RuntimeException e) {
+            System.err.println("Ride " + ride.getId() + " — route " + routeCode + " not loaded. Skipping.");
+            return null;
+        }
+
+        int sourceOrder;
+        int destOrder;
+        try {
+            sourceOrder = routeExcelLoader.getStopOrderByName(routeCode, userSource);
+            destOrder   = routeExcelLoader.getStopOrderByName(routeCode, userDestination);
+        } catch (RuntimeException e) {
+            // This ride's route doesn't have these stop names at all —
+            // it's simply not a candidate for this search, not an error.
+            return null;
+        }
+
+        boolean isForward = sourceOrder < destOrder;
+
+        // Extract bus source & destination from routeKey
+        String rideRouteKey = ride.getRouteKey();
+        String busDestination = null;
+        if (rideRouteKey != null && rideRouteKey.contains("_")) {
+            int idx = rideRouteKey.indexOf("_");
+            busDestination = rideRouteKey.substring(idx + 1).trim();
+        }
+
+        // Get bus destination stop order (on its own route)
+        int busDestOrder = -1;
+        try {
+            if (busDestination != null) {
+                busDestOrder = routeExcelLoader.getStopOrderByName(routeCode, busDestination);
+            }
+        } catch (RuntimeException e) {
+            System.err.println("Bus dest stop not found on route " + routeCode + ": " + busDestination);
+        }
+
+        // bus destination order must be >= passenger destination order (forward)
+        //      or bus destination order must be <= passenger destination order (backward)
+        if (busDestOrder != -1) {
+            if (isForward && busDestOrder < destOrder) return null;
+            if (!isForward && busDestOrder > destOrder) return null;
+        }
+
+        Location lastLoc = getLatestLocation(ride.getId());
+        if (lastLoc == null) return null;
+
+        int busOrder = findStopOrder(fullRoute, lastLoc);
+        if (busOrder == -1) return null;
+
+        // Forward: bus hasn't passed passenger source yet
+        // Backward: bus hasn't passed passenger source yet (in reverse direction)
+        boolean allowed = isForward ? busOrder <= sourceOrder : busOrder >= sourceOrder;
+        if (!allowed) return null;
+
+        RouteStop busStop = fullRoute.stream()
+                .filter(s -> s.getStopOrder() == busOrder)
+                .findFirst().orElse(null);
+        RouteStop sourceStop = fullRoute.stream()
+                .filter(s -> s.getStopOrder() == sourceOrder)
+                .findFirst().orElse(null);
+
+        if (busStop == null || sourceStop == null) return null;
+
+        double remainingDistance = Math.abs(
+                sourceStop.getDistanceFromStartKm() - busStop.getDistanceFromStartKm());
+
+        ActiveRideResponse dto = toDto(ride);
+        dto.setRemainingDistanceKm(remainingDistance);
+        return dto;
     }
 
     // ================= ALL ACTIVE RIDES =================
@@ -283,6 +295,7 @@ public class RideService {
         dto.setRideId(ride.getId());
         dto.setBusNumber(ride.getBus().getBusNumber());
         dto.setRouteKey(ride.getRouteKey());
+        dto.setRouteCode(routeExcelLoader.resolveRouteCode(ride.getRouteCode()));
 
         Location latest = getLatestLocation(ride.getId());
         if (latest != null) {

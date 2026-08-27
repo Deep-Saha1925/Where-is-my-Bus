@@ -1,6 +1,12 @@
 const params    = new URLSearchParams(window.location.search);
 let rideId      = params.get("rideId");
 const routeKey  = params.get("routeKey");
+// Which registered route these stops belong to. Without this, every lookup
+// below silently fell back to the legacy route only, so a bus running on
+// any admin-added route could never have its stops/position resolved here —
+// this is why the admin "View on Map" / passenger "Track Bus" screen simply
+// never populated for non-legacy routes.
+let routeCode   = params.get("routeCode") || null;
 
 let routeStops     = [];
 let fullRouteStops = [];
@@ -26,8 +32,9 @@ setInterval(tick, 3000);
 /* ─── LOAD ROUTE STOPS ──────────────────────────────────────────── */
 async function loadRoute(src, dest) {
   try {
+    const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
     const segRes = await fetch(
-        `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
+        `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}${routeParam}`
     );
     routeStops = await segRes.json();
     if (rideId) await loadFullRoute();
@@ -48,9 +55,14 @@ async function loadFullRoute() {
     rideInfo = ride;
     document.getElementById("busNumberDisplay").innerText = ride.busNumber || "—";
 
+    // Prefer the ride's own routeCode (authoritative — comes straight from
+    // the DB) over whatever was in the URL, in case the two ever disagree.
+    if (ride.routeCode) routeCode = ride.routeCode;
+    const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
+
     const [rideSrc, rideDest] = ride.routeKey.split("_");
     const fullRes = await fetch(
-        `/api/routes?source=${encodeURIComponent(rideSrc)}&destination=${encodeURIComponent(rideDest)}`
+        `/api/routes?source=${encodeURIComponent(rideSrc)}&destination=${encodeURIComponent(rideDest)}${routeParam}`
     );
     fullRouteStops = await fullRes.json();
   } catch (err) {
@@ -271,7 +283,6 @@ function renderTimeline() {
   hasEnteredOnce = true;
 }
 
-/* ─── HELPERS ───────────────────────────────────────────────────── */
 function timeAgo(ts) {
   if (!ts) return "just now";
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);

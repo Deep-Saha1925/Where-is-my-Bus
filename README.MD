@@ -6,10 +6,11 @@
 <h3>Real-time bus tracking for North Bengal</h3>
 
 
-[![Java](https://img.shields.io/badge/Java-17-orange?style=flat-square&logo=java)](https://www.java.com)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?style=flat-square&logo=mysql)](https://www.mysql.com)
-[![Redis](https://img.shields.io/badge/Redis-7.x-red?style=flat-square&logo=redis)](https://redis.io)
+[![Java](https://img.shields.io/badge/Java-21-orange?style=flat-square&logo=java)](https://www.java.com)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-brightgreen?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=flat-square&logo=postgresql)](https://neon.tech)
+[![Redis](https://img.shields.io/badge/Redis-Upstash-red?style=flat-square&logo=redis)](https://upstash.com)
+[![Thymeleaf](https://img.shields.io/badge/Thymeleaf-3.x-005F0F?style=flat-square&logo=thymeleaf)](https://www.thymeleaf.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
 
@@ -23,7 +24,7 @@
 
 ## 📖 About
 
-**Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system built for North Bengal. Unlike traditional systems, WIMB uses a **hybrid approach** combining live GPS data with Excel-driven static route files — making it practical, offline-friendly, and maintainable by non-technical staff.
+**Where Is My Bus (WIMB)** is a real-time, route-based bus tracking system built for North Bengal. Unlike traditional systems, WIMB uses a **hybrid approach** combining live GPS data with Excel-driven route and access-control files — making it practical, offline-friendly, and maintainable by non-technical staff, without needing anyone to touch code.
 
 > No app install needed. Works in any browser. Designed for low-connectivity areas.
 
@@ -49,6 +50,7 @@
 ### 🚗 For Drivers
 - 🏢 Pick your depot + enter your depot's code (no personal login needed)
 - 🔐 Code verified once per shift, then remembered on that device
+- 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
 - ↩️ Resume active ride after refresh
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
 - 📡 Live location sent every GPS tick, protected by a per-bus driver token
@@ -62,23 +64,24 @@
 - 🔐 Secure login (Spring Security)
 - 📊 Live card grid of all active buses
 - 🔎 Search by bus number, source or destination
-- 🕐 Recent searches saved
 - 🔄 Auto-refresh every 5 seconds
 - 🏢 **Depot Codes tab** — upload an Excel file to add/update every depot's driver code, no restart needed
-- 📄 Built-in "download example template" so the file format is never a guessing game
+- 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
+- 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
 
 </td>
 <td width="50%">
 
 ### ⚙️ System Highlights
 - 📊 Excel = single source of truth for routes **and** depot codes
+- 🛣️ Multiple independent routes can coexist — each with its own stop list, own name, own code
 - 🔁 Auto forward & reverse direction detection
 - ❌ No false bus visibility after source stop
 - 🗂️ JSON auto-synced from Excel on startup
 - 🔐 Admin auth via config file, no DB needed
 - 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
 - ⚡ Redis buffer for high-frequency GPS writes
-- 🔄 Auto batch flush Redis → MySQL every 60s
+- 🔄 Auto batch flush Redis → PostgreSQL every 60s
 
 </td>
 </tr>
@@ -91,13 +94,16 @@
 ### Backend
 | Technology | Version | Purpose |
 |---|---|---|
-| Java | 17 | Core language |
-| Spring Boot | 3.x | REST API framework |
+| Java | 21 | Core language |
+| Spring Boot | 4.x | REST API framework |
 | Spring Security | 6.x | Admin authentication |
+| Thymeleaf | 3.x | Server-rendered views for `driver.html`, `admin.html`, `admin-buses.html` |
 | Apache POI | 5.x | Excel processing (routes **and** depot codes, via `WorkbookFactory` — accepts `.xlsx`, `.xls`, `.xlsm`) |
-| MySQL | 8.0 | Persistent ride & location storage |
-| Redis | 7.x | High-frequency GPS location buffer + driver token store |
+| PostgreSQL (Neon, hosted) | 16+ | Persistent ride, location & route storage |
+| Redis (Upstash, hosted) | — | High-frequency GPS location buffer + driver token store |
 | Jackson | 2.x | JSON sync for stop dropdowns |
+
+> ⚠️ Both the database and Redis connection strings live in `application.properties` — make sure real credentials aren't committed to a public repo. Use environment variables or a secrets manager for anything beyond local dev.
 
 ### Frontend
 | Technology | Purpose |
@@ -143,9 +149,11 @@
 ┌─────────────────────────────────────────────────────────┐
 │                      DRIVER APP                         │
 │    Depot + code verified once  →  X-Driver-Token issued │
+│         Route picked  →  source/destination scoped to it │
 │         GPS coordinates sent every tick, with token      │
 └────────────────────────┬────────────────────────────────┘
                          │ POST /api/driver/verify (once)
+                         │ GET  /api/routes/list, /api/routes/stops
                          │ POST /api/ride/start   (X-Driver-Token)
                          │ POST /api/ride/location (X-Driver-Token)
                          ▼
@@ -158,6 +166,7 @@
 │   LocationController ─► LocationService                 │
 │   RouteController ──►  RouteExcelLoader ─► Cache         │
 │   AdminDepotController ─► DriverAccessService.reload()   │
+│   AdminRouteController ─► RouteRepository + RouteExcelLoader│
 │                              │                          │
 │                              ▼                          │
 │                     RedisLocationService                 │
@@ -172,7 +181,8 @@
 │                            │ or on ride end             │
 │                            ▼                            │
 │                    ┌────────────────┐                   │
-│                    │     MYSQL      │  ← Persistent     │
+│                    │   POSTGRESQL   │  ← Ride, Location, │
+│                    │                │    Route, Bus      │
 │                    └────────────────┘                   │
 └────────────┬────────────────────────────────────────────┘
              │
@@ -195,17 +205,17 @@
               (credentials from .properties)
                          │
                          ▼
-          /admin-buses.html (Active Buses / Depot Codes tabs)
+     /admin-buses.html (Active Buses / Depot Codes / Routes tabs)
 ```
 
 ---
 
 ## ⚡ Redis Integration
 
-WIMB uses Redis for two things: a **high-speed write buffer** for GPS location updates, and a lightweight **driver token store**.
+WIMB uses Redis (hosted on Upstash) for two things: a **high-speed write buffer** for GPS location updates, and a lightweight **driver token store**.
 
 ### Why Redis for GPS?
-GPS updates arrive every few seconds per active ride. Writing each update directly to MySQL causes high I/O and slow response times. Redis solves this by acting as an in-memory buffer.
+GPS updates arrive every few seconds per active ride. Writing each update directly to the database causes high I/O and slow response times. Redis solves this by acting as an in-memory buffer.
 
 ### How it works
 
@@ -217,14 +227,14 @@ GPS Update (every ~3s)
         ↓
    Scheduler (every 60s)  ──OR──  Ride ends (immediate flush)
         ↓
-      MySQL (batch saveAll)
+   PostgreSQL (batch saveAll)
 ```
 
 ### Performance Comparison
 
 | Aspect | Without Redis | With Redis |
 |---|---|---|
-| Write speed | ~5–10ms (MySQL) | ~0.1ms (Redis) |
+| Write speed | ~5–10ms (DB) | ~0.1ms (Redis) |
 | DB load | Every 3s hit | Batched every 60s |
 | Live tracking | Query DB each time | Read from Redis cache |
 | Data safety | Always persisted | Flushed on ride end |
@@ -237,7 +247,7 @@ driver:token:<uuid> →  Bus number this token was issued for (TTL ~12h, one shi
 ```
 
 ### Flush Strategy
-- **Scheduled flush** — `LocationFlushScheduler` runs every 60 seconds, drains all Redis keys to MySQL
+- **Scheduled flush** — `LocationFlushScheduler` runs every 60 seconds, drains all Redis keys to the database
 - **Ride end flush** — When a ride is cancelled or a new ride starts for the same bus, remaining Redis data is immediately flushed so no location data is ever lost
 - **Token expiry** — driver tokens expire on their own after ~12 hours; no cleanup job needed
 
@@ -291,14 +301,21 @@ same bus number the request claims to control.
 
 ---
 
-## 📂 Route Data Management
+## 🛣️ Multi-Route Support
 
-Routes are managed entirely through **Excel files** — no code changes needed.
-```
-src/main/resources/routes/route_APD_FLK.xlsx
-```
+Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
 
-### Route Excel Format
+### How it works
+
+- Every route is a real `Route` record (code, display name, file location) backed by Postgres — not just a derived text string.
+- Admin manages routes from the **Routes tab**, same interaction pattern as Depot Codes:
+    - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
+    - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
+    - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
+    - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
+- Drivers now **pick their Route explicitly** before choosing Start Location / Destination (mirrors picking a Depot). The stop pickers are then scoped to only that route's stops — not a global list — which is what makes it safe for the same stop name (a shared junction town, say) to legitimately appear on more than one route without any ambiguity.
+
+### Route Excel format (same shape, whichever route it's for)
 
 | stop_order | stop_name | latitude | longitude | distance_km | slack_min |
 |:---:|---|:---:|:---:|:---:|:---:|
@@ -307,16 +324,23 @@ src/main/resources/routes/route_APD_FLK.xlsx
 | 3 | Sonapur | 26.494 | 89.368 | 10.5 | 2 |
 | 4 | Falakata | 26.51721 | 89.20694 | 15 | 0 |
 
-> ✅ Loaded once at startup · ✅ No DB needed · ✅ Auto-syncs `stops.json`
+- Accepts `.xlsx`, `.xls`, or `.xlsm`, same as depot codes
+- Admin-added routes are stored on disk at `wimb.route.dir` (default `data/routes/`), outside the build
+- The original `routes/route_APD_FLK.xlsx` still loads at startup exactly as before, under a fixed internal key — nothing that already worked was disturbed by adding this
 
-For the depot codes Excel format (uploaded at runtime, not build-time), see [Driver Verification](#-driver-verification-depot-codes) above.
+### ⚠️ Known current limitation
+
+`Ride` doesn't yet store *which route* it's actually on — that's the next piece of work. Practically, this means:
+- ✅ Starting a ride on any registered route (legacy or newly-added) works correctly — coordinates resolve against the right route.
+- ✅ GPS tracking (`/api/ride/location`) is entirely route-agnostic, so it's unaffected either way.
+- ⚠️ The passenger-facing live timeline (`track.html`) still resolves stop lookups without knowing which route a ride belongs to, so it can behave incorrectly for rides on anything other than the legacy route. Fixing this properly means giving `Ride`/`StartRideRequest` a real route reference instead of the current derived `"SOURCE_DESTINATION"` string — planned, not yet done.
 
 ---
 
 ## 🔐 Admin Security
 
 Admin panel is protected by **Spring Security** using `InMemoryUserDetailsManager`.  
-**No database required** — credentials live in `application.properties`.
+**No database required for admin auth** — credentials live in `application.properties`.
 ```properties
 wimb.admin.username=admin
 wimb.admin.password=wimb@2025
@@ -336,6 +360,7 @@ wimb.admin.password=wimb@2025
 | `/admin-buses.html` | 🔐 Admin only |
 | `/api/ride/active/all` | 🔐 Admin only *(also read by the driver's own "resume ride" check)* |
 | `/admin/depots`, `/admin/depots/upload`, `/admin/depots/template` | 🔐 Admin only |
+| `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
 
 ---
 
@@ -434,16 +459,28 @@ X-Driver-Token: a1b2c3d4-...
 ```http
 GET /api/location/last-loc/{rideId}
 ```
-> ⚡ Returns from Redis if ride is active, falls back to MySQL if not buffered.
+> ⚡ Returns from Redis if ride is active, falls back to the database if not buffered.
 
 </details>
 
 <details>
-<summary><b>🗺️ Route APIs</b></summary>
+<summary><b>🗺️ Route APIs (public)</b></summary>
 
-#### Get Route Stops
+#### Get Route Stops Between Two Stops
 ```http
-GET /api/routes?source=ALIPURDUAR&destination=FALAKATA
+GET /api/routes?source=ALIPURDUAR&destination=FALAKATA&routeCode=APD_FLK
+```
+`routeCode` is optional — omitting it falls back to the original legacy route, unchanged from before multi-route support existed.
+
+#### List All Routes (for the driver's route picker)
+```http
+GET /api/routes/list
+```
+Returns code, name, and stop count only — never the server file path.
+
+#### Get Every Stop on One Route
+```http
+GET /api/routes/stops?routeCode=APD_FLK
 ```
 
 </details>
@@ -473,6 +510,47 @@ Returns a ready-to-edit `.xlsx` with the correct headers and sample rows.
 
 </details>
 
+<details>
+<summary><b>🛣️ Admin Route APIs</b></summary>
+
+#### List All Routes (full detail)
+```http
+GET /admin/routes
+```
+
+#### Add a New Route
+```http
+POST /admin/routes/upload
+Content-Type: multipart/form-data
+
+routeCode: APD_FLK
+routeName: Alipurduar ⇄ Falakata
+file: route.xlsx
+```
+Fails if the route code already exists — use Update instead.
+
+#### Update a Route (name and/or file)
+```http
+PUT /admin/routes/{routeCode}
+Content-Type: multipart/form-data
+
+routeName: Alipurduar ⇄ Falakata (revised)
+file: (optional — omit to keep the existing stops)
+```
+
+#### Delete a Route
+```http
+DELETE /admin/routes/{routeCode}
+```
+Removes it from the cache, deletes the Excel file from disk, and removes the DB row.
+
+#### Download Example Template
+```http
+GET /admin/routes/template
+```
+
+</details>
+
 ---
 
 ## 🖥️ Frontend Pages
@@ -481,9 +559,9 @@ Returns a ready-to-edit `.xlsx` with the correct headers and sample rows.
 |---|---|---|
 | `index.html` | Passenger | Search buses, recent searches, quick results |
 | `track.html` | Passenger | Live route timeline, ETA, bus position, dark mode |
-| `driver.html` | Driver | Depot + code verification, start/resume ride, live GPS updates |
+| `driver.html` | Driver | Depot + code verification, route picker (stop lists scoped to it), start/resume ride, live GPS updates |
 | `login.html` | Admin | Secure login form |
-| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search) and **Depot Codes** (upload, template download, current list) |
+| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list) |
 
 ---
 
@@ -493,55 +571,73 @@ WIMB/
 ├── src/main/java/com/deep/WIMB/
 │   ├── config/
 │   │   ├── SecurityConfig.java          # Spring Security rules
-│   │   └── RedisConfig.java             # Redis template config
+│   │   ├── RedisConfig.java             # Redis template config
+│   │   └── CorsConfig.java
 │   ├── controller/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
-│   │   ├── RouteController.java
+│   │   ├── RouteController.java         # public route lookup/list/stops
 │   │   ├── DriverAuthController.java    # /api/driver/verify, /api/driver/depots
 │   │   ├── AdminDepotController.java    # /admin/depots (view/upload/template)
+│   │   ├── AdminRouteController.java    # /admin/routes (view/add/update/delete/template)
+│   │   ├── DriverController.java        # serves the driver.html view (Thymeleaf)
+│   │   ├── AdminController.java         # serves admin.html / admin-buses.html views
+│   │   ├── HomeController.java
 │   │   └── CsrfController.java
 │   ├── service/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
-│   │   ├── RouteExcelLoader.java        # Loads route Excel on startup
-│   │   ├── DriverAccessService.java     # Loads/reloads depot codes Excel
-│   │   └── DriverTokenService.java      # Issues/resolves driver tokens (Redis)
+│   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel
+│   │   ├── DriverAccessService.java     # loads/reloads depot codes Excel
+│   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
 │   │   ├── DriverNotVerifiedException.java
-│   │   └── ApiExceptionHandler.java     # Turns errors into JSON, not HTML pages
+│   │   └── ApiExceptionHandler.java     # turns errors into JSON, not HTML pages
 │   ├── scheduler/
-│   │   └── LocationFlushScheduler.java  # Batch flush Redis → MySQL
+│   │   └── LocationFlushScheduler.java  # batch flush Redis → PostgreSQL
 │   ├── model/
 │   │   ├── Ride.java
+│   │   ├── Bus.java
+│   │   ├── Route.java                   # routeCode, routeName, filePath, stopCount
 │   │   └── Location.java               # implements Serializable
+│   ├── enums/
+│   │   └── RideStatus.java
+│   ├── repository/
+│   │   ├── RideRepository.java
+│   │   ├── BusRepository.java
+│   │   └── RouteRepository.java
 │   └── dto/
 │       ├── StartRideRequest.java
 │       ├── LocationUpdateRequest.java
 │       ├── ActiveRideResponse.java
-│       └── RouteStop.java
+│       ├── RouteStop.java
+│       └── RouteSummary.java            # public-safe route listing (no file paths)
 │
 ├── src/main/resources/
+│   ├── templates/                       # Thymeleaf views
+│   │   ├── driver.html
+│   │   ├── admin.html
+│   │   └── admin-buses.html
 │   ├── static/
 │   │   ├── index.html                   # Passenger search
 │   │   ├── track.html                   # Route timeline
-│   │   ├── driver.html                  # Driver panel
 │   │   ├── login.html                   # Admin login
-│   │   ├── admin-buses.html             # Admin panel (tabbed)
 │   │   ├── js/
 │   │   │   ├── index.js
 │   │   │   ├── track.js
 │   │   │   ├── driver.js
 │   │   │   └── admin-buses.js
 │   │   └── data/
-│   │       └── stops.json               # Auto-generated from Excel
+│   │       └── stops.json               # auto-generated from the legacy route's Excel
 │   ├── routes/
-│   │   └── route_APD_FLK.xlsx           # Route master data (build-time)
+│   │   └── route_APD_FLK.xlsx           # legacy route master data (build-time)
 │   └── application.properties
 │
 ├── data/
-│   └── depot-codes.xlsx                 # Depot codes (runtime, admin-uploaded — not in the build)
+│   ├── depot-codes.xlsx                 # depot codes (runtime, admin-uploaded)
+│   └── routes/                          # every admin-added route's Excel file
+│       └── APD_FLK.xlsx
 │
 └── pom.xml
 ```
@@ -552,10 +648,10 @@ WIMB/
 
 ### Prerequisites
 
-- Java 17+
-- MySQL 8+
+- Java 21+
+- A PostgreSQL database (Neon or any Postgres instance)
 - Maven 3.8+
-- Redis 7+
+- A Redis instance (Upstash or any Redis-compatible instance)
 
 ### Steps
 ```bash
@@ -564,36 +660,20 @@ git clone https://github.com/Deep-Saha1925/Where-is-my-Bus.git
 cd Where-is-my-Bus
 ```
 ```bash
-# 2. Install and start Redis (Ubuntu)
-sudo apt install redis-server -y
-sudo systemctl start redis
-sudo systemctl enable redis
-
-# Verify Redis is running
-redis-cli ping   # should return PONG
-```
-```bash
-# 3. Create MySQL database
-mysql -u root -p
-```
-```sql
-CREATE DATABASE wimb;
-EXIT;
-```
-```bash
-# 4. Configure application.properties
+# 2. Configure application.properties
 ```
 ```properties
-# Database
-spring.datasource.url=jdbc:mysql://localhost:3306/wimb
-spring.datasource.username=root
-spring.datasource.password=yourpassword
+# Database (PostgreSQL — e.g. a free Neon project)
+spring.datasource.url=jdbc:postgresql://<host>/<db>?sslmode=require
+spring.datasource.username=<user>
+spring.datasource.password=<password>
 spring.jpa.hibernate.ddl-auto=update
 
-# Redis
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-spring.data.redis.timeout=2000ms
+# Redis (e.g. a free Upstash database)
+spring.data.redis.host=<host>
+spring.data.redis.port=<port>
+spring.data.redis.password=<password>
+spring.data.redis.ssl.enabled=true
 
 # Admin credentials
 wimb.admin.username=admin
@@ -602,28 +682,34 @@ wimb.admin.password=wimb@2025
 # Depot codes file (created/updated via the admin panel — no need to
 # create it manually; the app just waits for the first upload)
 wimb.depot.file.path=data/depot-codes.xlsx
+
+# Directory admin-added routes are stored in (same idea — created automatically)
+wimb.route.dir=data/routes
 ```
+> 🔒 Don't commit real credentials here if this repo is public — use environment variables or `application-local.properties` (gitignored) for anything beyond a personal dev setup.
+
 ```bash
-# 5. Build and run
+# 3. Build and run
 ./mvnw spring-boot:run
 ```
 ```bash
-# 6. Open in browser
+# 4. Open in browser
 open http://localhost:8080             # Passenger view
 open http://localhost:8080/driver.html # Driver panel
 open http://localhost:8080/login.html  # Admin login
 ```
 ```bash
-# 7. First-time setup: upload depot codes
-# Log in as admin → Depot Codes tab → download the example template,
-# fill in your real depots, and upload. Drivers can verify immediately
-# after — no restart required.
+# 5. First-time setup
+# Log in as admin →
+#   Depot Codes tab: download the example template, fill in real depots, upload.
+#   Routes tab: download the example template, fill in a real route, upload.
+# Drivers can verify and start rides immediately after — no restart required.
 ```
 
 ### Verify Redis is working
 ```bash
-# After starting a ride, check Redis
-redis-cli
+# After starting a ride, check Redis (via redis-cli pointed at your Upstash instance,
+# or the Upstash web console's Data Browser)
 KEYS *                          # should show location:ride:1 and driver:token:* entries
 LLEN location:ride:1            # number of buffered locations
 LRANGE location:ride:1 0 -1     # all buffered location JSON
@@ -635,9 +721,10 @@ TTL driver:token:<uuid>         # seconds remaining before that driver's token e
 ## 🚀 Future Enhancements
 
 - [ ] WebSocket live tracking (replace 3s polling)
-- [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for both routes and depot codes
+- [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for depot codes **and** routes
+- [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
+- [ ] Give `Ride` a real route reference, so `track.html` resolves correctly for any route, not just the legacy one
 - [ ] Push notifications when bus is nearby
-- [ ] Multi-route support per Excel file
 - [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
