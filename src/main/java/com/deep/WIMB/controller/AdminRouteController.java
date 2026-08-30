@@ -83,7 +83,10 @@ public class AdminRouteController {
             Route route = new Route();
             route.setRouteCode(code);
             route.setRouteName(name);
-            route.setFilePath(dest.getPath());
+            // Store with forward slashes regardless of the OS this happens to run
+            // on — dest.getPath() uses the platform's separator (backslash on
+            // Windows), which then fails to resolve on Linux in production.
+            route.setFilePath(dest.getPath().replace('\\', '/'));
             route.setUploadedAt(LocalDateTime.now());
 
             routeExcelLoader.loadRouteFromDisk(route);
@@ -199,7 +202,8 @@ public class AdminRouteController {
             try {
                 // Overwrite at the exact same path the route was created with —
                 // route code and file location never change, only content does.
-                File dest = new File(route.getFilePath());
+                // Normalize in case the stored path has Windows-style backslashes.
+                File dest = new File(route.getFilePath().replace('\\', '/'));
                 Files.write(dest.toPath(), file.getBytes());
 
                 routeExcelLoader.loadRouteFromDisk(route); // reload into cache immediately

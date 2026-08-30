@@ -81,9 +81,16 @@ public class RouteExcelLoader {
 
     /** (Re)loads a single route's Excel file from disk into the cache. */
     public void loadRouteFromDisk(Route route) throws Exception {
-        File file = new File(route.getFilePath());
+        // Route file paths may have been saved on a different OS (e.g. Windows,
+        // using backslashes) than the one this code is now running on (Linux
+        // in production). A literal backslash isn't a path separator on Linux,
+        // so without normalizing, java.io.File silently treats the whole
+        // string as one filename and never finds the file. Normalizing to
+        // forward slashes here makes previously-saved paths work everywhere.
+        String normalizedPath = route.getFilePath().replace('\\', '/');
+        File file = new File(normalizedPath);
         if (!file.exists()) {
-            throw new RuntimeException("Route file missing on disk: " + route.getFilePath());
+            throw new RuntimeException("Route file missing on disk: " + normalizedPath);
         }
         try (FileInputStream fis = new FileInputStream(file);
              Workbook wb = WorkbookFactory.create(fis)) {
