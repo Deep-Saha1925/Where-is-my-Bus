@@ -33,5 +33,4 @@ build/
 
 ### VS Code ###
 .vscode/
-data/
-.env*
+.env.old
