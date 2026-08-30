@@ -1,84 +1,185 @@
 const MAX_RECENT = 5;
 
 document.addEventListener("DOMContentLoaded", () => {
-  loadStops();
-  renderRecentChips();
-  loadQuickResults();
+    loadStops();
+    renderRecentChips();
+    loadQuickResults();
 
-  document.getElementById("source").addEventListener("keydown", e => {
-    if (e.key === "Enter") searchBuses();
-  });
-  document.getElementById("destination").addEventListener("keydown", e => {
-    if (e.key === "Enter") searchBuses();
-  });
+    document.getElementById("source").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchBuses();
+    });
+    document.getElementById("destination").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchBuses();
+    });
 });
 
 /* ─── STOPS ─────────────────────────────────────────────────────── */
+let allStops = [];
+
 function loadStops() {
-  fetch("/data/stops.json")
-      .then(r => r.json())
-      .then(data => {
-        const datalist = document.getElementById("stopsList");
-        datalist.innerHTML = "";
-        data.stops.forEach(stop => {
-          const opt = document.createElement("option");
-          opt.value = stop.toUpperCase();
-          datalist.appendChild(opt);
+    fetch("/data/stops.json")
+        .then(r => r.json())
+        .then(data => {
+            allStops = (data.stops || []).map(s => s.toUpperCase());
+            setupStopAutocomplete("source", "sourceDropdown");
+            setupStopAutocomplete("destination", "destinationDropdown");
+        })
+        .catch(err => console.error("Error loading stops:", err));
+}
+
+/* ─── CUSTOM DROPDOWN AUTOCOMPLETE ──────────────────────────────────
+   Replaces the native <datalist> popup with a styled dropdown that
+   matches the app's design, supports keyboard navigation, and lets
+   the user click a stop to select it. */
+function setupStopAutocomplete(inputId, dropdownId) {
+    const input    = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    let activeIndex = -1;
+    let currentMatches = [];
+
+    function highlight(text, query) {
+        if (!query) return text;
+        const idx = text.toUpperCase().indexOf(query.toUpperCase());
+        if (idx === -1) return text;
+        return text.slice(0, idx)
+            + "<mark>" + text.slice(idx, idx + query.length) + "</mark>"
+            + text.slice(idx + query.length);
+    }
+
+    function renderDropdown(query) {
+        currentMatches = allStops.filter(s => s.includes(query.toUpperCase()));
+        activeIndex = -1;
+
+        if (!query.trim()) {
+            dropdown.classList.remove("open");
+            dropdown.innerHTML = "";
+            return;
+        }
+
+        if (!currentMatches.length) {
+            dropdown.innerHTML = `<div class="stop-dropdown-empty">No matching stops</div>`;
+            dropdown.classList.add("open");
+            return;
+        }
+
+        dropdown.innerHTML = currentMatches.slice(0, 20).map((stop, i) => `
+      <div class="stop-option" data-index="${i}">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>${highlight(stop, query)}</span>
+      </div>
+    `).join("");
+        dropdown.classList.add("open");
+
+        dropdown.querySelectorAll(".stop-option").forEach(el => {
+            el.addEventListener("mousedown", e => {
+                e.preventDefault(); // keep focus, avoid blur closing dropdown first
+                const i = Number(el.dataset.index);
+                selectStop(currentMatches[i]);
+            });
         });
-      })
-      .catch(err => console.error("Error loading stops:", err));
+    }
+
+    function selectStop(stop) {
+        input.value = stop;
+        dropdown.classList.remove("open");
+        dropdown.innerHTML = "";
+        activeIndex = -1;
+    }
+
+    function updateActive() {
+        dropdown.querySelectorAll(".stop-option").forEach((el, i) => {
+            el.classList.toggle("active", i === activeIndex);
+        });
+        const activeEl = dropdown.querySelector(".stop-option.active");
+        if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+    }
+
+    input.addEventListener("input", () => renderDropdown(input.value));
+
+    input.addEventListener("focus", () => {
+        if (input.value.trim()) renderDropdown(input.value);
+    });
+
+    input.addEventListener("keydown", e => {
+        const open = dropdown.classList.contains("open") && currentMatches.length;
+        if (!open) return; // let the existing Enter-to-search listener handle it
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, Math.min(currentMatches.length, 20) - 1);
+            updateActive();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, 0);
+            updateActive();
+        } else if (e.key === "Enter") {
+            if (activeIndex >= 0) {
+                e.preventDefault();
+                selectStop(currentMatches[activeIndex]);
+            }
+            // if nothing highlighted, Enter falls through to the search listener
+        } else if (e.key === "Escape") {
+            dropdown.classList.remove("open");
+        }
+    });
+
+    document.addEventListener("click", e => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.remove("open");
+        }
+    });
 }
 
 /* ─── RECENT SEARCHES ────────────────────────────────────────────── */
 function getRecent() {
-  try { return JSON.parse(localStorage.getItem("wimb_passenger_recent") || "[]"); }
-  catch { return []; }
+    try { return JSON.parse(localStorage.getItem("wimb_passenger_recent") || "[]"); }
+    catch { return []; }
 }
 
 function saveRecent(source, destination) {
-  if (!source || !destination) return;
-  const entry = { source, destination, label: `${source} → ${destination}` };
-  let recent  = getRecent().filter(
-      r => !(r.source === source && r.destination === destination)
-  );
-  recent.unshift(entry);
-  recent = recent.slice(0, MAX_RECENT);
-  localStorage.setItem("wimb_passenger_recent", JSON.stringify(recent));
-  renderRecentChips();
+    if (!source || !destination) return;
+    const entry = { source, destination, label: `${source} → ${destination}` };
+    let recent  = getRecent().filter(
+        r => !(r.source === source && r.destination === destination)
+    );
+    recent.unshift(entry);
+    recent = recent.slice(0, MAX_RECENT);
+    localStorage.setItem("wimb_passenger_recent", JSON.stringify(recent));
+    renderRecentChips();
 }
 
 function removeRecent(index) {
-  const recent = getRecent();
-  recent.splice(index, 1);
-  localStorage.setItem("wimb_passenger_recent", JSON.stringify(recent));
-  renderRecentChips();
-  loadQuickResults();
+    const recent = getRecent();
+    recent.splice(index, 1);
+    localStorage.setItem("wimb_passenger_recent", JSON.stringify(recent));
+    renderRecentChips();
+    loadQuickResults();
 }
 
 function clearAllRecent() {
-  localStorage.removeItem("wimb_passenger_recent");
-  renderRecentChips();
-  document.getElementById("quickResults").style.display = "none";
+    localStorage.removeItem("wimb_passenger_recent");
+    renderRecentChips();
+    document.getElementById("quickResults").style.display = "none";
 }
 
 function applyRecent(source, destination) {
-  document.getElementById("source").value      = source;
-  document.getElementById("destination").value = destination;
-  searchBuses();
+    document.getElementById("source").value      = source;
+    document.getElementById("destination").value = destination;
+    searchBuses();
 }
 
 function renderRecentChips() {
-  const recent  = getRecent();
-  const section = document.getElementById("recentSection");
-  const chips   = document.getElementById("recentChips");
+    const recent  = getRecent();
+    const section = document.getElementById("recentSection");
+    const chips   = document.getElementById("recentChips");
 
-  if (!recent.length) {
-    section.style.display = "none";
-    return;
-  }
+    if (!recent.length) {
+        section.style.display = "none";
+        return;
+    }
 
-  section.style.display = "block";
-  chips.innerHTML = recent.map((r, i) => `
+    section.style.display = "block";
+    chips.innerHTML = recent.map((r, i) => `
     <div class="recent-chip"
          onclick="applyRecent('${r.source}', '${r.destination}')">
       <i class="fa-solid fa-clock-rotate-left" style="font-size:11px; opacity:0.7"></i>
@@ -91,33 +192,33 @@ function renderRecentChips() {
 
 /* ─── QUICK RESULTS ─────────────────────────────────────────────── */
 async function loadQuickResults() {
-  const recent = getRecent();
-  if (!recent.length) return;
+    const recent = getRecent();
+    if (!recent.length) return;
 
-  const { source, destination } = recent[0];
+    const { source, destination } = recent[0];
 
-  try {
-    const res   = await fetch(
-        `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
-    );
-    const buses = await res.json();
+    try {
+        const res   = await fetch(
+            `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        );
+        const buses = await res.json();
 
-    const quickResults = document.getElementById("quickResults");
-    const quickList    = document.getElementById("quickList");
-    const quickCount   = document.getElementById("quickCount");
-    const quickRoute   = document.getElementById("quickRoute");
+        const quickResults = document.getElementById("quickResults");
+        const quickList    = document.getElementById("quickList");
+        const quickCount   = document.getElementById("quickCount");
+        const quickRoute   = document.getElementById("quickRoute");
 
-    if (!buses.length) {
-      quickResults.style.display = "none";
-      return;
-    }
+        if (!buses.length) {
+            quickResults.style.display = "none";
+            return;
+        }
 
-    quickResults.style.display = "block";
-    quickCount.textContent     = `${buses.length} active`;
-    quickRoute.textContent     = `${source} → ${destination}`;
+        quickResults.style.display = "block";
+        quickCount.textContent     = `${buses.length} active`;
+        quickRoute.textContent     = `${source} → ${destination}`;
 
-    const routeKey = `${source}_${destination}`;
-    quickList.innerHTML = buses.map((bus, i) => `
+        const routeKey = `${source}_${destination}`;
+        quickList.innerHTML = buses.map((bus, i) => `
       <div class="quick-card fade-up"
            style="animation-delay:${i * 80}ms"
            onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
@@ -146,29 +247,29 @@ async function loadQuickResults() {
       </div>
     `).join("");
 
-  } catch (err) {
-    console.error("Quick results failed:", err);
-  }
+    } catch (err) {
+        console.error("Quick results failed:", err);
+    }
 }
 
 function renderBusCards(buses, routeKey) {
-  const busList       = document.getElementById("busList");
-  const resultsHeader = document.getElementById("resultsHeader");
-  const resultsCount  = document.getElementById("resultsCount");
+    const busList       = document.getElementById("busList");
+    const resultsHeader = document.getElementById("resultsHeader");
+    const resultsCount  = document.getElementById("resultsCount");
 
-  resultsHeader.style.display = "flex";
-  resultsCount.textContent    = `${buses.length} bus${buses.length > 1 ? "es" : ""} found`;
-  busList.innerHTML           = "";
+    resultsHeader.style.display = "flex";
+    resultsCount.textContent    = `${buses.length} bus${buses.length > 1 ? "es" : ""} found`;
+    busList.innerHTML           = "";
 
-  buses.forEach((bus, i) => {
-    let src = "N/A", dest = "N/A";
-    if (bus.routeKey?.includes("_")) [src, dest] = bus.routeKey.split("_");
+    buses.forEach((bus, i) => {
+        let src = "N/A", dest = "N/A";
+        if (bus.routeKey?.includes("_")) [src, dest] = bus.routeKey.split("_");
 
-    const card = document.createElement("div");
-    card.className        = "bus-card";
-    card.style.animationDelay = `${i * 80}ms`;
+        const card = document.createElement("div");
+        card.className        = "bus-card";
+        card.style.animationDelay = `${i * 80}ms`;
 
-    card.innerHTML = `
+        card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="bus-icon-wrap">🚌</div>
@@ -206,78 +307,78 @@ function renderBusCards(buses, routeKey) {
       </button>
     `;
 
-    busList.appendChild(card);
-  });
+        busList.appendChild(card);
+    });
 }
 
 /* ─── MAIN SEARCH ────────────────────────────────────────────────── */
 async function searchBuses() {
-  const source      = document.getElementById("source").value.trim();
-  const destination = document.getElementById("destination").value.trim();
+    const source      = document.getElementById("source").value.trim();
+    const destination = document.getElementById("destination").value.trim();
 
-  if (!source || !destination) {
-    alert("Please select both source and destination");
-    return;
-  }
-  if (source === destination) {
-    alert("Source and destination cannot be the same");
-    return;
-  }
-
-  const routeKey      = `${source}_${destination}`;
-  const busList       = document.getElementById("busList");
-  const loading       = document.getElementById("loading");
-  const noResults     = document.getElementById("noResults");
-  const resultsHeader = document.getElementById("resultsHeader");
-  const quickResults  = document.getElementById("quickResults");
-
-  busList.innerHTML           = "";
-  noResults.style.display     = "none";
-  resultsHeader.style.display = "none";
-  quickResults.style.display  = "none";
-  loading.style.display       = "block";
-
-  try {
-    const res   = await fetch(
-        `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
-    );
-    const buses = await res.json();
-
-    loading.style.display = "none";
-    saveRecent(source, destination);
-
-    if (!buses.length) {
-      noResults.style.display = "block";
-      return;
+    if (!source || !destination) {
+        alert("Please select both source and destination");
+        return;
+    }
+    if (source === destination) {
+        alert("Source and destination cannot be the same");
+        return;
     }
 
-    renderBusCards(buses, routeKey);
+    const routeKey      = `${source}_${destination}`;
+    const busList       = document.getElementById("busList");
+    const loading       = document.getElementById("loading");
+    const noResults     = document.getElementById("noResults");
+    const resultsHeader = document.getElementById("resultsHeader");
+    const quickResults  = document.getElementById("quickResults");
 
-  } catch (err) {
-    loading.style.display = "none";
-    alert("Failed to fetch buses");
-    console.error(err);
-  }
+    busList.innerHTML           = "";
+    noResults.style.display     = "none";
+    resultsHeader.style.display = "none";
+    quickResults.style.display  = "none";
+    loading.style.display       = "block";
+
+    try {
+        const res   = await fetch(
+            `/api/ride/active?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        );
+        const buses = await res.json();
+
+        loading.style.display = "none";
+        saveRecent(source, destination);
+
+        if (!buses.length) {
+            noResults.style.display = "block";
+            return;
+        }
+
+        renderBusCards(buses, routeKey);
+
+    } catch (err) {
+        loading.style.display = "none";
+        alert("Failed to fetch buses");
+        console.error(err);
+    }
 }
 
 /* ─── HELPERS ────────────────────────────────────────────────────── */
 function track(routeKey, rideId, routeCode) {
-  const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-  window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
+    const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
+    window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
 }
 
 function calculateETAFromDistance(distanceKm) {
-  if (distanceKm == null) return "Updating";
-  const mins = Math.ceil((distanceKm / 30) * 60);
-  if (mins <= 1) return "Arriving";
-  return `${mins} min`;
+    if (distanceKm == null) return "Updating";
+    const mins = Math.ceil((distanceKm / 30) * 60);
+    if (mins <= 1) return "Arriving";
+    return `${mins} min`;
 }
 
 /* ─── SWAP STOPS ─────────────────────────────────────────────────── */
 function swapStops() {
-  const src  = document.getElementById("source");
-  const dest = document.getElementById("destination");
-  const temp = src.value;
-  src.value  = dest.value;
-  dest.value = temp;
+    const src  = document.getElementById("source");
+    const dest = document.getElementById("destination");
+    const temp = src.value;
+    src.value  = dest.value;
+    dest.value = temp;
 }
