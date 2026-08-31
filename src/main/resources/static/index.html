@@ -562,8 +562,18 @@
                 <div class="header-sub">Real-time bus tracking</div>
             </div>
         </div>
-        <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
-                aria-label="Toggle dark mode">🌙</button>
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <a href="/driver" class="theme-btn" title="Driver login" aria-label="Driver login"
+               style="text-decoration:none;">
+                <i class="fa-solid fa-bus" style="font-size:15px; color:var(--text-muted);"></i>
+            </a>
+            <a href="/admin" class="theme-btn" title="Staff / Admin login" aria-label="Staff or Admin login"
+               style="text-decoration:none;">
+                <i class="fa-solid fa-lock" style="font-size:14px; color:var(--text-muted);"></i>
+            </a>
+            <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
+                    aria-label="Toggle dark mode">🌙</button>
+        </div>
     </header>
 
     <main>
