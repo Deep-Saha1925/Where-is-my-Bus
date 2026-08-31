@@ -12,11 +12,16 @@
 [![Redis](https://img.shields.io/badge/Redis-Upstash-red?style=flat-square&logo=redis)](https://upstash.com)
 [![Thymeleaf](https://img.shields.io/badge/Thymeleaf-3.x-005F0F?style=flat-square&logo=thymeleaf)](https://www.thymeleaf.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
+[![Docker](https://img.shields.io/badge/Docker-Deployed-2496ED?style=flat-square&logo=docker)](Dockerfile)
+[![Render](https://img.shields.io/badge/Hosted%20on-Render-46E3B7?style=flat-square&logo=render)](https://render.com)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
 
 *Solving the problem of uncertain bus timings in semi-urban and rural regions*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Setup](#-setup--run) · [API Docs](#-api-endpoints) · [Author](#-author)
+**🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
+*(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
+
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
 
 </div>
 
@@ -38,11 +43,13 @@
 
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
+- ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
 - 📍 Live route timeline (like "Where is my Train")
 - 🚌 Animated bus icon on current stop
 - ⏱️ ETA per stop from bus position
 - 🌙 Dark mode support
+- 🧭 One-tap header shortcuts to the Driver panel and Admin login — no manual URL typing needed
 
 </td>
 <td width="50%">
@@ -82,6 +89,8 @@
 - 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
 - ⚡ Redis buffer for high-frequency GPS writes
 - 🔄 Auto batch flush Redis → PostgreSQL every 60s
+- 🐳 Containerized with Docker, deployed on Render
+- 🗺️ Route file paths normalized at load time — Excel files registered on one OS (e.g. Windows during local dev) still resolve correctly in production on Linux
 
 </td>
 </tr>
@@ -102,8 +111,9 @@
 | PostgreSQL (Neon, hosted) | 16+ | Persistent ride, location & route storage |
 | Redis (Upstash, hosted) | — | High-frequency GPS location buffer + driver token store |
 | Jackson | 2.x | JSON sync for stop dropdowns |
+| Docker | — | Multi-stage build (Maven build → slim JRE runtime image) |
 
-> ⚠️ Both the database and Redis connection strings live in `application.properties` — make sure real credentials aren't committed to a public repo. Use environment variables or a secrets manager for anything beyond local dev.
+> ⚠️ Both the database and Redis connection strings are supplied via **environment variables** (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`) — never hardcoded in `application.properties`, and never committed to the repo. See [Deployment](#-deployment) for the full list.
 
 ### Frontend
 | Technology | Purpose |
@@ -111,8 +121,8 @@
 | HTML5 | Page structure |
 | Tailwind CSS | Layout utilities & dark mode |
 | Google Fonts (Oswald, Inter, JetBrains Mono) | Brand type system — Oswald for headers/labels, Inter for body text, JetBrains Mono for IDs/codes/data |
-| Vanilla JavaScript | All interactivity |
-| Font Awesome | Icons (admin map view) |
+| Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting |
+| Font Awesome | Icons (admin map view, header shortcuts, stop dropdown) |
 | Leaflet.js | Live map view of all active buses |
 
 ---
@@ -202,7 +212,7 @@
               Spring Security Filter
                          │
               InMemoryUserDetailsManager
-              (credentials from .properties)
+              (credentials from environment variables)
                          │
                          ▼
      /admin-buses.html (Active Buses / Depot Codes / Routes tabs)
@@ -309,11 +319,12 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 
 - Every route is a real `Route` record (code, display name, file location) backed by Postgres — not just a derived text string.
 - Admin manages routes from the **Routes tab**, same interaction pattern as Depot Codes:
-    - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
-    - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
-    - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
-    - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
+  - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
+  - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
+  - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
+  - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
 - Drivers now **pick their Route explicitly** before choosing Start Location / Destination (mirrors picking a Depot). The stop pickers are then scoped to only that route's stops — not a global list — which is what makes it safe for the same stop name (a shared junction town, say) to legitimately appear on more than one route without any ambiguity.
+- Registered route file paths are **normalized at load time** (forward slashes, regardless of the OS they were originally saved on) — a route added during local development on Windows still loads correctly once deployed to a Linux container.
 
 ### Route Excel format (same shape, whichever route it's for)
 
@@ -339,14 +350,14 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 
 ## 🔐 Admin Security
 
-Admin panel is protected by **Spring Security** using `InMemoryUserDetailsManager`.  
-**No database required for admin auth** — credentials live in `application.properties`.
+Admin panel is protected by **Spring Security** using `InMemoryUserDetailsManager`.
+**No database required for admin auth** — credentials are supplied via **environment variables**, never hardcoded in `application.properties` or committed to the repo:
 ```properties
-wimb.admin.username=admin
-wimb.admin.password=wimb@2025
+wimb.admin.username=${ADMIN_USERNAME}
+wimb.admin.password=${ADMIN_PASSWORD}
 ```
 
-> 💡 To change credentials, update `application.properties` and restart. No code changes needed.
+> 💡 To change credentials, update the `ADMIN_USERNAME` / `ADMIN_PASSWORD` environment variables on your host (see [Deployment](#-deployment)) and restart. No code changes needed.
 
 ### Access Control
 
@@ -361,6 +372,8 @@ wimb.admin.password=wimb@2025
 | `/api/ride/active/all` | 🔐 Admin only *(also read by the driver's own "resume ride" check)* |
 | `/admin/depots`, `/admin/depots/upload`, `/admin/depots/template` | 🔐 Admin only |
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
+
+> On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
 
 ---
 
@@ -557,7 +570,7 @@ GET /admin/routes/template
 
 | Page | Who uses it | Description |
 |---|---|---|
-| `index.html` | Passenger | Search buses, recent searches, quick results |
+| `index.html` | Passenger | Search buses via a custom styled autocomplete dropdown, recent searches, quick results, header shortcuts to Driver/Admin |
 | `track.html` | Passenger | Live route timeline, ETA, bus position, dark mode |
 | `driver.html` | Driver | Depot + code verification, route picker (stop lists scoped to it), start/resume ride, live GPS updates |
 | `login.html` | Admin | Secure login form |
@@ -588,7 +601,7 @@ WIMB/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
-│   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel
+│   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes Excel
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
@@ -620,11 +633,11 @@ WIMB/
 │   │   ├── admin.html
 │   │   └── admin-buses.html
 │   ├── static/
-│   │   ├── index.html                   # Passenger search
+│   │   ├── index.html                   # Passenger search, custom stop dropdown, Driver/Admin shortcuts
 │   │   ├── track.html                   # Route timeline
 │   │   ├── login.html                   # Admin login
 │   │   ├── js/
-│   │   │   ├── index.js
+│   │   │   ├── index.js                 # includes custom autocomplete dropdown logic
 │   │   │   ├── track.js
 │   │   │   ├── driver.js
 │   │   │   └── admin-buses.js
@@ -632,13 +645,14 @@ WIMB/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
 │   ├── routes/
 │   │   └── route_APD_FLK.xlsx           # legacy route master data (build-time)
-│   └── application.properties
+│   └── application.properties           # reads all secrets from environment variables
 │
 ├── data/
-│   ├── depot-codes.xlsx                 # depot codes (runtime, admin-uploaded)
+│   ├── depot-codes.xlsx                 # depot codes (runtime, admin-uploaded; seeded into the Docker image)
 │   └── routes/                          # every admin-added route's Excel file
 │       └── APD_FLK.xlsx
 │
+├── Dockerfile                           # multi-stage build: Maven build → slim JRE runtime
 └── pom.xml
 ```
 
@@ -660,24 +674,25 @@ git clone https://github.com/Deep-Saha1925/Where-is-my-Bus.git
 cd Where-is-my-Bus
 ```
 ```bash
-# 2. Configure application.properties
+# 2. Set environment variables for local development
 ```
+`application.properties` reads everything from environment variables — nothing sensitive is hardcoded or committed:
 ```properties
 # Database (PostgreSQL — e.g. a free Neon project)
-spring.datasource.url=jdbc:postgresql://<host>/<db>?sslmode=require
-spring.datasource.username=<user>
-spring.datasource.password=<password>
+spring.datasource.url=${DB_URL}
+spring.datasource.username=${DB_USERNAME}
+spring.datasource.password=${DB_PASSWORD}
 spring.jpa.hibernate.ddl-auto=update
 
 # Redis (e.g. a free Upstash database)
-spring.data.redis.host=<host>
-spring.data.redis.port=<port>
-spring.data.redis.password=<password>
+spring.data.redis.host=${REDIS_HOST}
+spring.data.redis.port=${REDIS_PORT:6379}
+spring.data.redis.password=${REDIS_PASSWORD}
 spring.data.redis.ssl.enabled=true
 
 # Admin credentials
-wimb.admin.username=admin
-wimb.admin.password=wimb@2025
+wimb.admin.username=${ADMIN_USERNAME}
+wimb.admin.password=${ADMIN_PASSWORD}
 
 # Depot codes file (created/updated via the admin panel — no need to
 # create it manually; the app just waits for the first upload)
@@ -686,7 +701,9 @@ wimb.depot.file.path=data/depot-codes.xlsx
 # Directory admin-added routes are stored in (same idea — created automatically)
 wimb.route.dir=data/routes
 ```
-> 🔒 Don't commit real credentials here if this repo is public — use environment variables or `application-local.properties` (gitignored) for anything beyond a personal dev setup.
+Set the actual values as real environment variables — e.g. in IntelliJ's Run Configuration (via the EnvFile plugin or built-in env-file support pointed at a local, gitignored `.env` file), or exported in your shell before running.
+
+> 🔒 Never commit real credentials — not in `application.properties`, not in any file tracked by git. Use environment variables (locally via `.env` + your IDE, in production via your host's environment variable settings) for every environment beyond a fully offline personal test.
 
 ```bash
 # 3. Build and run
@@ -718,12 +735,46 @@ TTL driver:token:<uuid>         # seconds remaining before that driver's token e
 
 ---
 
+## 🚀 Deployment
+
+WIMB is deployed on **[Render](https://render.com)** using **Docker**, since Render has no native Java runtime — the `Dockerfile` at the project root handles the build.
+
+### How it's built
+A multi-stage `Dockerfile`:
+1. **Build stage** — `eclipse-temurin:21-jdk`, runs `./mvnw clean package` to produce the jar
+2. **Runtime stage** — `eclipse-temurin:21-jre` (slim), copies in the built jar plus the seed `data/` folder (depot codes + route Excel files needed at startup), and runs `java -jar app.jar`
+
+### Environment variables (set on the host, never in the repo)
+
+| Variable | Purpose |
+|---|---|
+| `PORT` | Set automatically by Render — the app binds to it via `server.port=${PORT:8080}` |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Admin login credentials |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Neon Postgres connection |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Upstash Redis connection |
+
+### Deploying your own instance
+
+1. Fork/clone the repo and push it to your own GitHub account
+2. On Render: **New → Web Service**, connect the repo, set **Runtime → Docker** (Render auto-detects the `Dockerfile`)
+3. Add the environment variables above under the service's **Environment** tab, using your own Neon/Upstash credentials
+4. Deploy — Render builds the image and gives you a public HTTPS URL
+5. Log in as admin and upload your real depot codes + at least one route (see [Setup & Run](#-setup--run) step 5)
+
+### Notes on the free tier
+- **Cold starts** — the service sleeps after ~15 minutes idle; the first request after a gap takes 30–50s to wake up
+- **Ephemeral filesystem** — any file written to disk at runtime (e.g. a route uploaded through the admin panel *after* the container started) does **not** survive a redeploy or restart, since the container filesystem resets to whatever's baked into the Docker image. The two files seeded into the image at build time (`data/depot-codes.xlsx`, `data/routes/*.xlsx`) always persist across restarts; anything uploaded live does not, until it's also committed into the image. Moving admin uploads to the database or object storage (e.g. S3-compatible storage) would remove this limitation — not yet done.
+
+---
+
 ## 🚀 Future Enhancements
 
 - [ ] WebSocket live tracking (replace 3s polling)
 - [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for depot codes **and** routes
 - [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
+- [x] ~~Deploy to production~~ — done: Docker + Render, live at the link above
 - [ ] Give `Ride` a real route reference, so `track.html` resolves correctly for any route, not just the legacy one
+- [ ] Move admin-uploaded files (routes, depot codes) off the container's ephemeral disk and into the database or object storage, so they survive redeploys automatically
 - [ ] Push notifications when bus is nearby
 - [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
 - [ ] Passenger seat booking
