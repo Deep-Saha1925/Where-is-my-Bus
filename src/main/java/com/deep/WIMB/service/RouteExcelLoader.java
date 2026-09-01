@@ -10,9 +10,10 @@ import org.apache.poi.ss.usermodel.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.*;
 
 @Service
@@ -79,21 +80,39 @@ public class RouteExcelLoader {
         }
     }
 
-    /** (Re)loads a single route's Excel file from disk into the cache. */
+    /** (Re)loads a single route into the cache — from its stored DB bytes if
+     *  present, otherwise (for routes saved before this migration) from disk
+     *  as a one-time fallback that immediately persists the bytes into the
+     *  DB so every future load no longer depends on disk at all. */
     public void loadRouteFromDisk(Route route) throws Exception {
-        // Route file paths may have been saved on a different OS (e.g. Windows,
-        // using backslashes) than the one this code is now running on (Linux
-        // in production). A literal backslash isn't a path separator on Linux,
-        // so without normalizing, java.io.File silently treats the whole
-        // string as one filename and never finds the file. Normalizing to
-        // forward slashes here makes previously-saved paths work everywhere.
-        String normalizedPath = route.getFilePath().replace('\\', '/');
-        File file = new File(normalizedPath);
-        if (!file.exists()) {
-            throw new RuntimeException("Route file missing on disk: " + normalizedPath);
+        byte[] bytes = route.getFileData();
+
+        if (bytes == null) {
+            // Legacy route saved before file content moved into Postgres —
+            // recover it from disk this one time, if it's still there.
+            // Paths may have been saved on a different OS (Windows
+            // backslashes) than this one (Linux in production); a literal
+            // backslash isn't a separator on Linux, so normalize first.
+            String normalizedPath = route.getFilePath().replace('\\', '/');
+            File file = new File(normalizedPath);
+            if (!file.exists()) {
+                throw new RuntimeException(
+                        "Route file missing on disk and no data stored in the database: " + normalizedPath
+                                + " — the file needs to be re-uploaded via the admin panel.");
+            }
+            bytes = Files.readAllBytes(file.toPath());
+
+            // Migrate: persist into the DB right now so this fallback path
+            // is never needed again for this route, even after the disk
+            // file is inevitably lost on the next container restart.
+            route.setFileData(bytes);
+            routeRepository.save(route);
+            System.out.println("Migrated route " + route.getRouteCode()
+                    + " from disk into the database — it no longer depends on local disk.");
         }
-        try (FileInputStream fis = new FileInputStream(file);
-             Workbook wb = WorkbookFactory.create(fis)) {
+
+        try (InputStream is = new ByteArrayInputStream(bytes);
+             Workbook wb = WorkbookFactory.create(is)) {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(route.getRouteCode(), stops);
             System.out.println("Loaded route " + route.getRouteCode()
