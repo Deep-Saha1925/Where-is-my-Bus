@@ -76,18 +76,28 @@ public class AdminRouteController {
         }
 
         try {
-            File dest = new File(routeDir, code + extension);
-            dest.getParentFile().mkdirs();
-            Files.write(dest.toPath(), file.getBytes());
+            byte[] fileBytes = file.getBytes();
 
             Route route = new Route();
             route.setRouteCode(code);
             route.setRouteName(name);
-            // Store with forward slashes regardless of the OS this happens to run
-            // on — dest.getPath() uses the platform's separator (backslash on
-            // Windows), which then fails to resolve on Linux in production.
-            route.setFilePath(dest.getPath().replace('\\', '/'));
+            // filePath is now purely informational (shown in the admin table);
+            // the actual content lives in fileData below, which is what's
+            // used for loading — so this never breaks even if disk writes fail.
+            route.setFilePath(routeDir + "/" + code + extension);
+            route.setFileData(fileBytes);
             route.setUploadedAt(LocalDateTime.now());
+
+            // Best-effort disk copy too — harmless if it works, and if this
+            // container's disk gets wiped on the next restart, it doesn't
+            // matter, since loading reads from fileData above, not from here.
+            try {
+                File dest = new File(routeDir, code + extension);
+                dest.getParentFile().mkdirs();
+                Files.write(dest.toPath(), fileBytes);
+            } catch (Exception diskEx) {
+                System.err.println("Note: could not also write route file to disk (non-fatal): " + diskEx.getMessage());
+            }
 
             routeExcelLoader.loadRouteFromDisk(route);
             route.setStopCount(routeExcelLoader.getStopCount(code));
@@ -156,10 +166,16 @@ public class AdminRouteController {
         // started against it the instant this request is processed.
         routeExcelLoader.removeRoute(code);
 
-        // Delete the underlying Excel file from disk too — don't leave orphans.
-        File file = new File(route.getFilePath());
-        if (file.exists() && !file.delete()) {
-            System.err.println("Warning: could not delete route file on disk: " + file.getPath());
+        // Best-effort disk cleanup too — not required, since fileData in the
+        // DB (already removed via routeExcelLoader.removeRoute + repository
+        // delete below) was the actual source of truth, not this file.
+        try {
+            File file = new File(route.getFilePath().replace('\\', '/'));
+            if (file.exists() && !file.delete()) {
+                System.err.println("Note: could not delete route file on disk (non-fatal): " + file.getPath());
+            }
+        } catch (Exception ignored) {
+            // Disk cleanup is a nicety, not a requirement — never fail the delete over it.
         }
 
         routeRepository.delete(route);
@@ -200,11 +216,18 @@ public class AdminRouteController {
             }
 
             try {
-                // Overwrite at the exact same path the route was created with —
-                // route code and file location never change, only content does.
-                // Normalize in case the stored path has Windows-style backslashes.
-                File dest = new File(route.getFilePath().replace('\\', '/'));
-                Files.write(dest.toPath(), file.getBytes());
+                byte[] fileBytes = file.getBytes();
+                route.setFileData(fileBytes);
+
+                // Best-effort disk copy — same reasoning as upload: nice to
+                // have for debugging, never required for the app to work.
+                try {
+                    File dest = new File(route.getFilePath().replace('\\', '/'));
+                    if (dest.getParentFile() != null) dest.getParentFile().mkdirs();
+                    Files.write(dest.toPath(), fileBytes);
+                } catch (Exception diskEx) {
+                    System.err.println("Note: could not also write route file to disk (non-fatal): " + diskEx.getMessage());
+                }
 
                 routeExcelLoader.loadRouteFromDisk(route); // reload into cache immediately
                 route.setStopCount(routeExcelLoader.getStopCount(code));
