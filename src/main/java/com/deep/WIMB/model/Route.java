@@ -23,7 +23,16 @@ public class Route {
     private String routeName;   // e.g. "Alipurduar ⇄ Falakata" — shown to admin/drivers
 
     @Column(nullable = false)
-    private String filePath;    // e.g. data/routes/APD_FLK.xlsx
+    private String filePath;    // legacy/informational only — kept for display, no longer read from
+
+    // The actual Excel file content, stored directly in Postgres. This is the
+    // source of truth for loading a route's stops — unlike a path on the
+    // container's local disk, this survives every restart and redeploy,
+    // since it lives in the (persistent, hosted) database along with
+    // everything else about the route.
+    @Lob
+    @Column(nullable = true, columnDefinition = "bytea")
+    private byte[] fileData;
 
     private int stopCount;
 
