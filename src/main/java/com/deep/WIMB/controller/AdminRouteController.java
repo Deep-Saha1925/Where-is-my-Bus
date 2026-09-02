@@ -59,7 +59,8 @@ public class AdminRouteController {
     public ResponseEntity<?> uploadRoute(
             @RequestParam("routeCode") String routeCode,
             @RequestParam("routeName") String routeName,
-            @RequestParam("file") MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "busNumbers", required = false) String busNumbers
     ) {
         String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -102,6 +103,7 @@ public class AdminRouteController {
             route.setFilePath(routeDir + "/" + code + extension);
             route.setFileData(fileBytes);
             route.setUploadedAt(LocalDateTime.now());
+            route.setBusNumbers(parseBusNumbers(busNumbers));
 
             // Best-effort disk copy too — harmless if it works, and if this
             // container's disk gets wiped on the next restart, it doesn't
