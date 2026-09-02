@@ -204,7 +204,8 @@ public class AdminRouteController {
     public ResponseEntity<?> updateRoute(
             @PathVariable String routeCode,
             @RequestParam("routeName") String routeName,
-            @RequestParam(value = "file", required = false) MultipartFile file
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "busNumbers", required = false) String busNumbers
     ) {
         String code = routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
