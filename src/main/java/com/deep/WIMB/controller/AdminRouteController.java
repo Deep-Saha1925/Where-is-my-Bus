@@ -19,6 +19,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Map;
 
@@ -38,6 +39,20 @@ public class AdminRouteController {
     @GetMapping
     public List<Route> listRoutes() {
         return routeExcelLoader.getAllRoutes();
+    }
+
+    /** Parses a comma-separated "bus numbers" field from the admin form into
+     *  a clean list — trims each entry, drops blanks, keeps original casing
+     *  since plate formats vary. Optional: a blank/absent field just means
+     *  no buses are registered yet for this route. */
+    private List<String> parseBusNumbers(String raw) {
+        if (raw == null || raw.isBlank()) return new ArrayList<>();
+        List<String> result = new ArrayList<>();
+        for (String piece : raw.split(",")) {
+            String trimmed = piece.trim();
+            if (!trimmed.isEmpty()) result.add(trimmed);
+        }
+        return result;
     }
 
     @PostMapping("/upload")
