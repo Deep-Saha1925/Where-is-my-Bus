@@ -1,6 +1,7 @@
 package com.deep.WIMB.service;
 
 import com.deep.WIMB.dto.RouteStop;
+import com.deep.WIMB.dto.DepotRouteMatch;
 import com.deep.WIMB.model.Route;
 import com.deep.WIMB.repository.RouteRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -164,6 +165,49 @@ public class RouteExcelLoader {
         return sliceBetween(getFullRoute(routeCode), source, destination);
     }
 
+    /**
+     * Static, non-live search: which registered route(s) connect two depot
+     * names, regardless of whether any bus is currently on the road. This
+     * checks every loaded route (legacy + admin-registered) for both stop
+     * names, so a depot can be an endpoint OR an intermediate stop.
+     */
+    public List<DepotRouteMatch> findRoutesBetweenDepots(String source, String destination) {
+        List<DepotRouteMatch> matches = new ArrayList<>();
+
+        for (Map.Entry<String, List<RouteStop>> entry : routeCache.entrySet()) {
+            String routeCode = entry.getKey();
+            List<RouteStop> fullRoute = entry.getValue();
+
+            List<RouteStop> segment;
+            try {
+                segment = sliceBetween(fullRoute, source, destination);
+            } catch (RuntimeException notFound) {
+                continue; // this route doesn't touch both depots — skip it
+            }
+
+            String routeName;
+            List<String> busNumbers;
+            if (routeCode.equals(legacyRouteKey)) {
+                routeName = "Alipurduar \u21C4 Falakata (default route)";
+                busNumbers = Collections.emptyList();
+            } else {
+                Route route = routeRepository.findByRouteCode(routeCode).orElse(null);
+                if (route == null) continue; // shouldn't happen, but stay safe
+                routeName = route.getRouteName();
+                busNumbers = route.getBusNumbers() == null ? Collections.emptyList() : route.getBusNumbers();
+            }
+
+            double distance = segment.isEmpty() ? 0 : segment.get(segment.size() - 1).getDistanceFromStartKm();
+
+            matches.add(new DepotRouteMatch(
+                    routeCode, routeName, source, destination,
+                    segment.size(), distance, busNumbers
+            ));
+        }
+
+        return matches;
+    }
+
     private List<RouteStop> parseWorkbook(Workbook wb) {
         Sheet sheet = wb.getSheetAt(0);
         List<RouteStop> stops = new ArrayList<>();
@@ -266,9 +310,9 @@ public class RouteExcelLoader {
 
         List<RouteStop> segment;
         if (sourceIdx < destIdx) {
-            segment = new ArrayList<>(fullRoute.subList(sourceIdx, destIdx + 1));
+            segment = copyStops(fullRoute.subList(sourceIdx, destIdx + 1));
         } else {
-            segment = new ArrayList<>(fullRoute.subList(destIdx, sourceIdx + 1));
+            segment = copyStops(fullRoute.subList(destIdx, sourceIdx + 1));
             Collections.reverse(segment);
         }
 
