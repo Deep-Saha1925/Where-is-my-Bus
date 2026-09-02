@@ -6,6 +6,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -43,4 +45,15 @@ public class Route {
     private int stopCount;
 
     private LocalDateTime uploadedAt;
+
+    // Optional, admin-entered list of bus numbers that run this route.
+    // This is purely static/informational — completely separate from the
+    // live Ride mechanism above. It exists so the "search buses between
+    // depots" feature can answer "does a service exist here" even when
+    // nothing is live right now. Buses can (and do) rotate day to day, so
+    // this list is a best-effort roster, not a guarantee of what's running.
+    @ElementCollection
+    @CollectionTable(name = "route_buses", joinColumns = @JoinColumn(name = "route_id"))
+    @Column(name = "bus_number")
+    private List<String> busNumbers = new ArrayList<>();
 }
