@@ -1,5 +1,6 @@
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.dto.DepotRouteMatch;
 import com.deep.WIMB.dto.RouteStop;
 import com.deep.WIMB.dto.RouteSummary;
 import com.deep.WIMB.service.RouteExcelLoader;
@@ -47,5 +48,17 @@ public class RouteController {
     @GetMapping("/stops")
     public List<RouteStop> getRouteStops(@RequestParam String routeCode) {
         return loader.getFullRoute(routeCode);
+    }
+
+    // Static/non-live "does a service exist between these two depots" search.
+    // Unlike GET /api/ride/active, this never looks at GPS or live rides —
+    // it answers from admin-registered routes + bus rosters, so it still
+    // gives a useful answer even when nothing is on the road right now.
+    @GetMapping("/by-depots")
+    public List<DepotRouteMatch> getRoutesBetweenDepots(
+            @RequestParam String source,
+            @RequestParam String destination
+    ) {
+        return loader.findRoutesBetweenDepots(source, destination);
     }
 }
