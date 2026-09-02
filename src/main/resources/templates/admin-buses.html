@@ -594,7 +594,16 @@
         <label class="brand-label-sm">Excel file</label>
         <input type="file" id="routeFileInput" accept=".xlsx,.xls,.xlsm" class="file-input"/>
 
+        <label class="brand-label-sm">Bus numbers (optional)</label>
+        <input type="text" id="routeBusesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
+               placeholder="e.g. WB-23A-1245, WB-23A-1290"/>
+        <div style="font-size:11px; color:var(--text-faint); margin-top:-6px; margin-bottom:10px;">
+          Comma-separated. This just powers the passenger's "buses between depots" search —
+          it's a roster, not live tracking, so it's fine to leave blank or update it later.
+        </div>
+
         <button onclick="uploadRouteFile()" class="upload-btn">Add Route</button>
+
         <div id="routeUploadStatus" class="upload-status"></div>
       </div>
     </div>
