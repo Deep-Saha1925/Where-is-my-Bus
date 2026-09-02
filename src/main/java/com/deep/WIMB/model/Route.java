@@ -2,6 +2,8 @@ package com.deep.WIMB.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -30,7 +32,11 @@ public class Route {
     // container's local disk, this survives every restart and redeploy,
     // since it lives in the (persistent, hosted) database along with
     // everything else about the route.
-    @Lob
+    // Note: intentionally NOT @Lob. On Hibernate 6 + Postgres, @Lob on a
+    // byte[] defaults to the Large Object (oid/bigint) strategy, which
+    // doesn't match a "bytea" column and causes an insert-time type
+    // mismatch. @JdbcTypeCode(VARBINARY) maps this correctly to bytea.
+    @JdbcTypeCode(SqlTypes.VARBINARY)
     @Column(nullable = true, columnDefinition = "bytea")
     private byte[] fileData;
 
