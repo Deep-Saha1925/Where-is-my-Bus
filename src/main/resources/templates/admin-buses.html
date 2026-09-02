@@ -726,32 +726,37 @@
     const countSub = document.getElementById("routeCountSub");
     try {
       const res = await fetch("/admin/routes");
-      const routes = await res.json(); // [{ routeCode, routeName, stopCount, ... }]
+      const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, ... }]
 
       countSub.textContent = routes.length
               ? `${routes.length} route${routes.length > 1 ? "s" : ""} registered`
               : "No routes registered yet";
 
       if (!routes.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No routes added yet — use the form above</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No routes added yet — use the form above</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = routes.map(r => `
+      tbody.innerHTML = routes.map(r => {
+        const buses = (r.busNumbers && r.busNumbers.length) ? r.busNumbers.join(", ") : "—";
+        const busesAttr = (r.busNumbers || []).join(", ").replace(/'/g, "\\'");
+        return `
         <tr id="routeRow-${r.routeCode}">
           <td class="code-cell">${r.routeCode}</td>
           <td>${r.routeName}</td>
           <td>${r.stopCount}</td>
+          <td style="font-size:12.5px; color:var(--text-muted); max-width:220px;">${buses}</td>
           <td style="white-space:nowrap;">
             <button class="row-update-btn"
-                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}')">Update</button>
+                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}', '${busesAttr}')">Update</button>
             <button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button>
           </td>
-        </tr>`).join("");
+        </tr>`;
+      }).join("");
     } catch (err) {
       console.error("Failed to load routes:", err);
       countSub.textContent = "Failed to load";
-      tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
     }
   }
 
