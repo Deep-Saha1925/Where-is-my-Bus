@@ -356,6 +356,26 @@ public class RouteExcelLoader {
         }
     }
 
+    /** Deep-copies each RouteStop so callers (and repeated calls of this
+     *  method, e.g. once per route from findRoutesBetweenDepots) can freely
+     *  mutate the returned segment's distances without corrupting the
+     *  shared routeCache entries every other caller reads from. Fixes a
+     *  latent bug where sliceBetween used to rewrite cached stops in place. */
+    private List<RouteStop> copyStops(List<RouteStop> source) {
+        List<RouteStop> copies = new ArrayList<>(source.size());
+        for (RouteStop original : source) {
+            RouteStop copy = new RouteStop();
+            copy.setStopOrder(original.getStopOrder());
+            copy.setStopName(original.getStopName());
+            copy.setLatitude(original.getLatitude());
+            copy.setLongitude(original.getLongitude());
+            copy.setDistanceFromStartKm(original.getDistanceFromStartKm());
+            copy.setSlackTimeMin(original.getSlackTimeMin());
+            copies.add(copy);
+        }
+        return copies;
+    }
+
     private boolean isAnyCellMissing(Row row, int... idxs) {
         for (int idx : idxs) {
             Cell c = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
