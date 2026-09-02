@@ -220,6 +220,12 @@ public class AdminRouteController {
         }
 
         route.setRouteName(name);
+        // busNumbers is only touched when the field was actually submitted,
+        // so callers that don't know about this feature yet (e.g. an old
+        // cached admin page) can't accidentally wipe an existing roster.
+        if (busNumbers != null) {
+            route.setBusNumbers(parseBusNumbers(busNumbers));
+        }
 
         // File is optional here — only touch it if the admin actually chose one
         if (file != null && !file.isEmpty()) {
