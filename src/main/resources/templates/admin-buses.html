@@ -905,7 +905,9 @@
       codeInput.value = "";
       nameInput.value = "";
       fileInput.value = "";
+      busesInput.value = "";
       loadRouteTable();
+
     } catch (err) {
       console.error(err);
       statusEl.textContent = "Upload failed: " + err.message;
