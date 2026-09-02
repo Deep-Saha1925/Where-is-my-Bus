@@ -760,15 +760,18 @@
     }
   }
 
-  function startEditRoute(routeCode, currentName) {
+  function startEditRoute(routeCode, currentName, currentBuses) {
     const row = document.getElementById(`routeRow-${routeCode}`);
     if (!row) return;
 
     row.innerHTML = `
       <td class="code-cell">${routeCode}</td>
-      <td colspan="2">
+      <td colspan="3">
         <input type="text" id="editName-${routeCode}" value="${currentName.replace(/"/g, "&quot;")}"
                class="file-input" style="border-style:solid; margin-bottom:6px;" placeholder="Route name"/>
+        <input type="text" id="editBuses-${routeCode}" value="${(currentBuses || "").replace(/"/g, "&quot;")}"
+               class="file-input" style="border-style:solid; margin-bottom:6px;"
+               placeholder="Bus numbers, comma-separated (optional)"/>
         <input type="file" id="editFile-${routeCode}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
         <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">Leave the file blank to keep the current stops</div>
         <div id="editStatus-${routeCode}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
@@ -782,6 +785,7 @@
 
   async function saveRouteEdit(routeCode) {
     const nameInput = document.getElementById(`editName-${routeCode}`);
+    const busesInput = document.getElementById(`editBuses-${routeCode}`);
     const fileInput = document.getElementById(`editFile-${routeCode}`);
     const statusEl = document.getElementById(`editStatus-${routeCode}`);
 
@@ -797,6 +801,7 @@
 
     const formData = new FormData();
     formData.append("routeName", routeName);
+    formData.append("busNumbers", busesInput.value.trim());
     if (fileInput.files.length) {
       formData.append("file", fileInput.files[0]);
     }
@@ -851,13 +856,14 @@
   }
 
   async function uploadRouteFile() {
-    const codeInput = document.getElementById("routeCodeInput");
-    const nameInput = document.getElementById("routeNameInput");
-    const fileInput = document.getElementById("routeFileInput");
-    const statusEl = document.getElementById("routeUploadStatus");
+      const codeInput = document.getElementById("routeCodeInput");
+      const nameInput = document.getElementById("routeNameInput");
+      const fileInput = document.getElementById("routeFileInput");
+      const busesInput = document.getElementById("routeBusesInput");
+      const statusEl = document.getElementById("routeUploadStatus");
 
-    const routeCode = codeInput.value.trim();
-    const routeName = nameInput.value.trim();
+      const routeCode = codeInput.value.trim();
+      const routeName = nameInput.value.trim();
 
     if (!routeCode || !routeName) {
       statusEl.textContent = "Please enter both a route code and a route name";
@@ -877,6 +883,7 @@
     formData.append("routeCode", routeCode);
     formData.append("routeName", routeName);
     formData.append("file", fileInput.files[0]);
+    formData.append("busNumbers", busesInput.value.trim());
     formData.append("_csrf", document.getElementById("csrfToken").value);
 
     try {
