@@ -1031,16 +1031,19 @@
 
   /* ── TABS ── */
   function switchTab(tab) {
-    document.getElementById("tab-buses").style.display  = tab === "buses"  ? "" : "none";
-    document.getElementById("tab-depots").style.display = tab === "depots" ? "" : "none";
-    document.getElementById("tab-routes").style.display = tab === "routes" ? "" : "none";
-    document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
-    document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
-    document.getElementById("tabBtnRoutes").classList.toggle("active", tab === "routes");
-    localStorage.setItem("wimb_admin_tab", tab);
+      document.getElementById("tab-buses").style.display      = tab === "buses"     ? "" : "none";
+      document.getElementById("tab-depots").style.display     = tab === "depots"    ? "" : "none";
+      document.getElementById("tab-routes").style.display     = tab === "routes"    ? "" : "none";
+      document.getElementById("tab-busroster").style.display  = tab === "busroster" ? "" : "none";
+      document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
+      document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
+      document.getElementById("tabBtnRoutes").classList.toggle("active", tab === "routes");
+      document.getElementById("tabBtnBusRoster").classList.toggle("active", tab === "busroster");
+      localStorage.setItem("wimb_admin_tab", tab);
   }
   const savedTab = localStorage.getItem("wimb_admin_tab");
-  switchTab(savedTab === "depots" || savedTab === "routes" ? savedTab : "buses");
+  const validTabs = ["depots", "routes", "busroster"];
+  switchTab(validTabs.includes(savedTab) ? savedTab : "buses");
 
   /* ── THEME ── */
   const appBody  = document.getElementById("appBody");
