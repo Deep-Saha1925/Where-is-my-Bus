@@ -2,6 +2,7 @@ const MAX_RECENT = 5;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadStops();
+    loadDepots();
     renderRecentChips();
     loadQuickResults();
 
@@ -10,6 +11,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     document.getElementById("destination").addEventListener("keydown", e => {
         if (e.key === "Enter") searchBuses();
+    });
+    document.getElementById("depotSource").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchDepotRoutes();
+    });
+    document.getElementById("depotDestination").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchDepotRoutes();
     });
 });
 
@@ -21,10 +28,24 @@ function loadStops() {
         .then(r => r.json())
         .then(data => {
             allStops = (data.stops || []).map(s => s.toUpperCase());
-            setupStopAutocomplete("source", "sourceDropdown");
-            setupStopAutocomplete("destination", "destinationDropdown");
+            setupStopAutocomplete("source", "sourceDropdown", allStops);
+            setupStopAutocomplete("destination", "destinationDropdown", allStops);
         })
         .catch(err => console.error("Error loading stops:", err));
+}
+
+/* ─── DEPOTS (static, non-live "search by depot" tab) ───────────── */
+let allDepots = [];
+
+function loadDepots() {
+    fetch("/api/driver/depots")
+        .then(r => r.json())
+        .then(data => {
+            allDepots = (data || []).map(s => s.toUpperCase());
+            setupStopAutocomplete("depotSource", "depotSourceDropdown", allDepots);
+            setupStopAutocomplete("depotDestination", "depotDestinationDropdown", allDepots);
+        })
+        .catch(err => console.error("Error loading depots:", err));
 }
 
 /* ─── CUSTOM DROPDOWN AUTOCOMPLETE ──────────────────────────────────
