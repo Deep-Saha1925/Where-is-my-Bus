@@ -1016,10 +1016,11 @@
         return;
       }
 
-      statusEl.textContent = data.warning ? `✅ ${data.message} — ⚠️ ${data.warning}` : `✅ ${data.message}`;
-      statusEl.style.color = data.warning ? "#d97706" : "#059669";
-      fileInput.value = "";
-      loadRouteTable();
+        statusEl.textContent = data.warning ? `✅ ${data.message} — ⚠️ ${data.warning}` : `✅ ${data.message}`;
+        statusEl.style.color = data.warning ? "#d97706" : "#059669";
+        fileInput.value = "";
+        loadRouteTable();
+        loadBusRosterTable();
     } catch (err) {
       console.error(err);
       statusEl.textContent = "Upload failed: " + err.message;
