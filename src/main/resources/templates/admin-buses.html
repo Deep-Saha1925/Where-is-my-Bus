@@ -1029,6 +1029,45 @@
 
   loadRouteTable();
 
+  /* ── BUS ROSTER (reads the same /admin/routes data as the Routes tab) ── */
+  async function loadBusRosterTable() {
+      const tbody = document.getElementById("busRosterTableBody");
+      const countSub = document.getElementById("busRosterCountSub");
+      try {
+          const res = await fetch("/admin/routes");
+          const routes = await res.json();
+
+          const withBuses = routes.filter(r => r.busNumbers && r.busNumbers.length);
+
+          countSub.textContent = withBuses.length
+              ? `${withBuses.length} of ${routes.length} route${routes.length > 1 ? "s" : ""} have a registered roster`
+              : `No routes have a registered bus roster yet`;
+
+          if (!routes.length) {
+              tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No routes registered yet — add one in the Routes tab first</td></tr>`;
+              return;
+          }
+
+          tbody.innerHTML = routes.map(r => {
+              const buses = (r.busNumbers && r.busNumbers.length)
+                  ? r.busNumbers.join(", ")
+                  : `<span style="color:var(--text-faint);">— none registered —</span>`;
+              return `
+        <tr>
+          <td class="code-cell">${r.routeCode}</td>
+          <td>${r.routeName}</td>
+          <td style="font-size:12.5px; color:var(--text-muted);">${buses}</td>
+        </tr>`;
+          }).join("");
+      } catch (err) {
+          console.error("Failed to load bus rosters:", err);
+          countSub.textContent = "Failed to load";
+          tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load</td></tr>`;
+      }
+  }
+
+  loadBusRosterTable();
+
   /* ── TABS ── */
   function switchTab(tab) {
       document.getElementById("tab-buses").style.display      = tab === "buses"     ? "" : "none";
