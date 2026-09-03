@@ -52,9 +52,10 @@ function loadDepots() {
    Replaces the native <datalist> popup with a styled dropdown that
    matches the app's design, supports keyboard navigation, and lets
    the user click a stop to select it. */
-function setupStopAutocomplete(inputId, dropdownId) {
+function setupStopAutocomplete(inputId, dropdownId, list) {
     const input    = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
+    const options  = list || [];
     let activeIndex = -1;
     let currentMatches = [];
 
