@@ -18,10 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/admin/routes")
@@ -164,6 +161,114 @@ public class AdminRouteController {
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=route-template.xlsx")
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(out.toByteArray());
+        }
+    }
+
+    // Bulk alternative to the per-route "busNumbers" field above: upload one
+    // sheet covering many routes at once. Rows are grouped by route_code, and
+    // each matching route's bus list is fully replaced with that group —
+    // same "whole list, not merge" semantics as the per-route field already
+    // has. Routes NOT mentioned in the file are left completely untouched
+    // (unlike the Depot Codes upload, which replaces everything).
+    @PostMapping("/buses/upload")
+    public ResponseEntity<?> uploadBusRoster(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No file selected"));
+        }
+
+        String filename = file.getOriginalFilename();
+        boolean validExtension = filename != null &&
+                ALLOWED_EXTENSIONS.stream().anyMatch(ext -> filename.toLowerCase(Locale.ROOT).endsWith(ext));
+
+        if (!validExtension) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Please upload an Excel file (.xlsx, .xls, or .xlsm)"
+            ));
+        }
+
+        Map<String, List<String>> rosterByRoute = new LinkedHashMap<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter formatter = new DataFormatter();
+
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // skip header row
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                String code = formatter.formatCellValue(row.getCell(0)).trim().toUpperCase(Locale.ROOT);
+                String bus = formatter.formatCellValue(row.getCell(1)).trim();
+
+                if (code.isEmpty() || bus.isEmpty()) continue;
+                rosterByRoute.computeIfAbsent(code, k -> new ArrayList<>()).add(bus);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to parse file: " + e.getMessage()));
+        }
+
+        if (rosterByRoute.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "No valid rows found — expected columns: route_code, bus_number"
+            ));
+        }
+
+        int updatedRoutes = 0;
+        List<String> unknownCodes = new ArrayList<>();
+
+        for (Map.Entry<String, List<String>> entry : rosterByRoute.entrySet()) {
+            Route route = routeRepository.findByRouteCode(entry.getKey()).orElse(null);
+            if (route == null) {
+                unknownCodes.add(entry.getKey());
+                continue;
+            }
+            route.setBusNumbers(entry.getValue());
+            routeRepository.save(route);
+            updatedRoutes++;
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Bus roster updated for " + updatedRoutes + " route" + (updatedRoutes == 1 ? "" : "s"));
+        response.put("routesUpdated", updatedRoutes);
+        if (!unknownCodes.isEmpty()) {
+            response.put("warning", "These route codes weren't found and were skipped: " + String.join(", ", unknownCodes));
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    // Generates a ready-to-edit example .xlsx for the bulk bus-roster upload above.
+    @GetMapping("/buses/template")
+    public ResponseEntity<byte[]> downloadBusRosterTemplate() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Bus Roster");
+
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("route_code");
+            header.createCell(1).setCellValue("bus_number");
+
+            String[][] examples = {
+                    {"APD_FLK", "WB-23A-1245"},
+                    {"APD_FLK", "WB-23A-1290"},
+                    {"APD_SLG", "WB-23B-0456"}
+            };
+            for (int i = 0; i < examples.length; i++) {
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(examples[i][0]);
+                row.createCell(1).setCellValue(examples[i][1]);
+            }
+
+            sheet.setColumnWidth(0, 4000);
+            sheet.setColumnWidth(1, 5000);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=bus-roster-template.xlsx")
                     .contentType(MediaType.parseMediaType(
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(out.toByteArray());
