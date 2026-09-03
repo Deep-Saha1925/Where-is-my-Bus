@@ -954,6 +954,48 @@
     }
   }
 
+  async function uploadBusRosterFile() {
+    const fileInput = document.getElementById("busRosterFileInput");
+    const statusEl = document.getElementById("busRosterUploadStatus");
+
+    if (!fileInput.files.length) {
+      statusEl.textContent = "Please choose an Excel file first";
+      statusEl.style.color = "#ef4444";
+      return;
+    }
+
+    statusEl.textContent = "Uploading...";
+    statusEl.style.color = "var(--text-muted)";
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    formData.append("_csrf", document.getElementById("csrfToken").value);
+
+    try {
+      const res = await fetch("/admin/routes/buses/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        statusEl.textContent = data.error || "Upload failed";
+        statusEl.style.color = "#ef4444";
+        return;
+      }
+
+      statusEl.textContent = data.warning ? `✅ ${data.message} — ⚠️ ${data.warning}` : `✅ ${data.message}`;
+      statusEl.style.color = data.warning ? "#d97706" : "#059669";
+      fileInput.value = "";
+      loadRouteTable();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Upload failed: " + err.message;
+      statusEl.style.color = "#ef4444";
+    }
+  }
+
   loadRouteTable();
 
   /* ── TABS ── */
