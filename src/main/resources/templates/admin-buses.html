@@ -622,7 +622,7 @@
           <table class="depot-table">
             <thead><tr><th>Code</th><th>Name</th><th>Stops</th><th>Buses</th><th>Actions</th></tr></thead>
             <tbody id="routeTableBody">
-            <tr><td colspan="4" class="table-empty">Loading...</td></tr>
+            <tr><td colspan="5" class="table-empty">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -630,6 +630,45 @@
     </div>
 
   </div>
+</div><!-- /tab-routes     <!-- Bulk bus roster upload -->
+<div class="panel-card full-width">
+  <div class="panel-card-header">
+    <div class="panel-icon">🚌</div>
+    <div>
+      <div class="panel-title">Bulk-update bus rosters</div>
+      <div class="panel-sub">Set bus numbers for many routes in one file, instead of editing them one by one</div>
+    </div>
+  </div>
+  <div class="panel-card-body">
+    <ol class="hint-list">
+      <li>Row 1 is the header — use these exact column names.</li>
+      <li><code>route_code</code> — must match an existing route's code exactly</li>
+      <li><code>bus_number</code> — one row per bus; add multiple rows with the same route_code to list several buses on one route</li>
+      <li>For each route_code in the file, its bus list is fully replaced with what's in the file. Routes not mentioned in the file are left untouched.</li>
+    </ol>
+    <div class="example-table-wrap">
+      <table class="example-table">
+        <thead><tr><th>route_code</th><th>bus_number</th></tr></thead>
+        <tbody>
+        <tr><td>APD_FLK</td><td>WB-23A-1245</td></tr>
+        <tr><td>APD_FLK</td><td>WB-23A-1290</td></tr>
+        <tr><td>APD_SLG</td><td>WB-23B-0456</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a href="/admin/routes/buses/template" class="template-link">⬇ Download a ready-made example file</a>
+
+    <div class="replace-warning" style="margin-top:14px;">
+      ⚠️ <span>For each <code>route_code</code> in the file, its bus list is <b>replaced entirely</b> — not merged with what's already set. Routes not in the file are untouched.</span>
+    </div>
+
+    <input type="file" id="busRosterFileInput" accept=".xlsx,.xls,.xlsm" class="file-input" style="margin-top:10px;"/>
+    <button onclick="uploadBusRosterFile()" class="upload-btn">Upload Bus Roster</button>
+    <div id="busRosterUploadStatus" class="upload-status"></div>
+  </div>
+</div>
+
+</div>
 </div><!-- /tab-routes -->
 
 <script src="/js/admin-buses.js"></script>
