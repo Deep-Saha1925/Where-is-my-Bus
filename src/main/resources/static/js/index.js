@@ -404,3 +404,11 @@ function swapStops() {
     src.value  = dest.value;
     dest.value = temp;
 }
+
+function swapDepots() {
+    const src  = document.getElementById("depotSource");
+    const dest = document.getElementById("depotDestination");
+    const temp = src.value;
+    src.value  = dest.value;
+    dest.value = temp;
+}
