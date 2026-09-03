@@ -69,7 +69,7 @@ function setupStopAutocomplete(inputId, dropdownId, list) {
     }
 
     function renderDropdown(query) {
-        currentMatches = allStops.filter(s => s.includes(query.toUpperCase()));
+        currentMatches = options.filter(s => s.includes(query.toUpperCase()));
         activeIndex = -1;
 
         if (!query.trim()) {
