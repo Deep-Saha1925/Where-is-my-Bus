@@ -434,3 +434,79 @@ function switchSearchTab(tab) {
         document.getElementById("busList").innerHTML             = "";
     }
 }
+
+/* ─── DEPOT-TO-DEPOT SEARCH (static — not live GPS) ─────────────── */
+async function searchDepotRoutes() {
+    const source      = document.getElementById("depotSource").value.trim();
+    const destination  = document.getElementById("depotDestination").value.trim();
+
+    if (!source || !destination) {
+        alert("Please select both depots");
+        return;
+    }
+    if (source === destination) {
+        alert("Source and destination depots cannot be the same");
+        return;
+    }
+
+    const section        = document.getElementById("depotResultsSection");
+    const loading         = document.getElementById("depotLoading");
+    const noResults       = document.getElementById("depotNoResults");
+    const resultsHeader   = document.getElementById("depotResultsHeader");
+    const resultsCount    = document.getElementById("depotResultsCount");
+    const routeList       = document.getElementById("depotRouteList");
+
+    section.style.display       = "block";
+    routeList.innerHTML         = "";
+    noResults.style.display     = "none";
+    resultsHeader.style.display = "none";
+    loading.style.display       = "block";
+
+    try {
+        const res = await fetch(
+            `/api/routes/by-depots?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        );
+        const matches = await res.json();
+
+        loading.style.display = "none";
+
+        if (!matches.length) {
+            noResults.style.display = "block";
+            return;
+        }
+
+        resultsHeader.style.display = "flex";
+        resultsCount.textContent    = `${matches.length} route${matches.length > 1 ? "s" : ""} found`;
+
+        routeList.innerHTML = matches.map((m, i) => {
+            const busChips = (m.busNumbers && m.busNumbers.length)
+                ? m.busNumbers.map(b => `<span class="bus-roster-chip"><i class="fa-solid fa-bus" style="margin-right:5px; font-size:10px;"></i>${b}</span>`).join("")
+                : `<span style="font-size:12.5px; color:var(--text-faint);">
+                     No specific bus numbers registered yet — buses on this route can vary day to day.
+                   </span>`;
+
+            return `
+              <div class="depot-route-card" style="margin-bottom:12px; animation-delay:${i * 80}ms;">
+                <div class="route-pill" style="margin-top:0;">
+                  <span class="route-src">${m.sourceDepot}</span>
+                  <i class="fa-solid fa-arrow-right route-arrow"></i>
+                  <span class="route-dest">${m.destinationDepot}</span>
+                </div>
+                <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">
+                  ${m.routeName}
+                </div>
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+                  <i class="fa-solid fa-route" style="margin-right:4px; color:var(--text-faint);"></i>
+                  ${m.stopsBetween} stop${m.stopsBetween > 1 ? "s" : ""} &middot; ${m.distanceKm.toFixed(1)} km
+                </div>
+                <div>${busChips}</div>
+              </div>
+            `;
+        }).join("");
+
+    } catch (err) {
+        loading.style.display = "none";
+        alert("Failed to fetch routes");
+        console.error(err);
+    }
+}
