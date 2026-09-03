@@ -412,3 +412,25 @@ function swapDepots() {
     src.value  = dest.value;
     dest.value = temp;
 }
+
+/* ─── SEARCH TABS: Live Buses vs Depot Routes ───────────────────── */
+function switchSearchTab(tab) {
+    const isLive = tab === "live";
+
+    document.getElementById("liveSearchPanel").style.display  = isLive ? "" : "none";
+    document.getElementById("depotSearchPanel").style.display = isLive ? "none" : "";
+    document.getElementById("tabBtnLive").classList.toggle("active", isLive);
+    document.getElementById("tabBtnDepot").classList.toggle("active", !isLive);
+
+    if (isLive) {
+        document.getElementById("depotResultsSection").style.display = "none";
+        renderRecentChips();
+        loadQuickResults();
+    } else {
+        document.getElementById("recentSection").style.display  = "none";
+        document.getElementById("quickResults").style.display   = "none";
+        document.getElementById("resultsHeader").style.display   = "none";
+        document.getElementById("noResults").style.display       = "none";
+        document.getElementById("busList").innerHTML             = "";
+    }
+}
