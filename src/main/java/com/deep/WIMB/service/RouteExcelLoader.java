@@ -187,23 +187,25 @@ public class RouteExcelLoader {
 
             String routeName;
             List<String> busNumbers;
+            List<String> departureTimes;
             if (routeCode.equals(legacyRouteKey)) {
                 routeName = "Alipurduar \u21C4 Falakata (default route)";
                 busNumbers = Collections.emptyList();
+                departureTimes = Collections.emptyList();
             } else {
                 Route route = routeRepository.findByRouteCode(routeCode).orElse(null);
                 if (route == null) continue; // shouldn't happen, but stay safe
                 routeName = route.getRouteName();
                 busNumbers = route.getBusNumbers() == null ? Collections.emptyList() : route.getBusNumbers();
+                departureTimes = route.getDepartureTimes() == null ? Collections.emptyList() : route.getDepartureTimes();
             }
 
             double distance = segment.isEmpty() ? 0 : segment.get(segment.size() - 1).getDistanceFromStartKm();
 
             matches.add(new DepotRouteMatch(
                     routeCode, routeName, source, destination,
-                    segment.size(), distance, busNumbers
-            ));
-        }
+                    segment.size(), distance, busNumbers, departureTimes
+            ));        }
 
         return matches;
     }
