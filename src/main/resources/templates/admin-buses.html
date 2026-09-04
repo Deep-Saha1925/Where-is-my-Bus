@@ -839,56 +839,62 @@
 
   /* ── ROUTES ── */
   async function loadRouteTable() {
-    const tbody = document.getElementById("routeTableBody");
-    const countSub = document.getElementById("routeCountSub");
-    try {
-      const res = await fetch("/admin/routes");
-      const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, ... }]
+      const tbody = document.getElementById("routeTableBody");
+      const countSub = document.getElementById("routeCountSub");
+      try {
+          const res = await fetch("/admin/routes");
+          const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, departureTimes, ... }]
 
-      countSub.textContent = routes.length
+          countSub.textContent = routes.length
               ? `${routes.length} route${routes.length > 1 ? "s" : ""} registered`
               : "No routes registered yet";
 
-      if (!routes.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No routes added yet — use the form above</td></tr>`;
-        return;
-      }
+          if (!routes.length) {
+              tbody.innerHTML = `<tr><td colspan="6" class="table-empty">No routes added yet — use the form above</td></tr>`;
+              return;
+          }
 
-      tbody.innerHTML = routes.map(r => {
-        const buses = (r.busNumbers && r.busNumbers.length) ? r.busNumbers.join(", ") : "—";
-        const busesAttr = (r.busNumbers || []).join(", ").replace(/'/g, "\\'");
-        return `
+          tbody.innerHTML = routes.map(r => {
+              const buses = (r.busNumbers && r.busNumbers.length) ? r.busNumbers.join(", ") : "—";
+              const busesAttr = (r.busNumbers || []).join(", ").replace(/'/g, "\\'");
+              const departures = (r.departureTimes && r.departureTimes.length) ? r.departureTimes.join(", ") : "—";
+              const departuresAttr = (r.departureTimes || []).join(", ").replace(/'/g, "\\'");
+              return `
         <tr id="routeRow-${r.routeCode}">
           <td class="code-cell">${r.routeCode}</td>
           <td>${r.routeName}</td>
           <td>${r.stopCount}</td>
-          <td style="font-size:12.5px; color:var(--text-muted); max-width:220px;">${buses}</td>
+          <td style="font-size:12.5px; color:var(--text-muted); max-width:200px;">${buses}</td>
+          <td style="font-size:12.5px; color:var(--text-muted); max-width:180px;">${departures}</td>
           <td style="white-space:nowrap;">
             <button class="row-update-btn"
-                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}', '${busesAttr}')">Update</button>
+                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}', '${busesAttr}', '${departuresAttr}')">Update</button>
             <button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button>
           </td>
         </tr>`;
-      }).join("");
-    } catch (err) {
-      console.error("Failed to load routes:", err);
-      countSub.textContent = "Failed to load";
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
-    }
+          }).join("");
+      } catch (err) {
+          console.error("Failed to load routes:", err);
+          countSub.textContent = "Failed to load";
+          tbody.innerHTML = `<tr><td colspan="6" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+      }
   }
 
-  function startEditRoute(routeCode, currentName, currentBuses) {
-    const row = document.getElementById(`routeRow-${routeCode}`);
-    if (!row) return;
+  function startEditRoute(routeCode, currentName, currentBuses, currentDepartures) {
+      const row = document.getElementById(`routeRow-${routeCode}`);
+      if (!row) return;
 
-    row.innerHTML = `
+      row.innerHTML = `
       <td class="code-cell">${routeCode}</td>
-      <td colspan="3">
+      <td colspan="4">
         <input type="text" id="editName-${routeCode}" value="${currentName.replace(/"/g, "&quot;")}"
                class="file-input" style="border-style:solid; margin-bottom:6px;" placeholder="Route name"/>
         <input type="text" id="editBuses-${routeCode}" value="${(currentBuses || "").replace(/"/g, "&quot;")}"
                class="file-input" style="border-style:solid; margin-bottom:6px;"
                placeholder="Bus numbers, comma-separated (optional)"/>
+        <input type="text" id="editDepartures-${routeCode}" value="${(currentDepartures || "").replace(/"/g, "&quot;")}"
+               class="file-input" style="border-style:solid; margin-bottom:6px;"
+               placeholder="Departure times, comma-separated (optional), e.g. 06:00, 09:30"/>
         <input type="file" id="editFile-${routeCode}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
         <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">Leave the file blank to keep the current stops</div>
         <div id="editStatus-${routeCode}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
@@ -901,28 +907,30 @@
   }
 
   async function saveRouteEdit(routeCode) {
-    const nameInput = document.getElementById(`editName-${routeCode}`);
-    const busesInput = document.getElementById(`editBuses-${routeCode}`);
-    const fileInput = document.getElementById(`editFile-${routeCode}`);
-    const statusEl = document.getElementById(`editStatus-${routeCode}`);
+      const nameInput = document.getElementById(`editName-${routeCode}`);
+      const busesInput = document.getElementById(`editBuses-${routeCode}`);
+      const departuresInput = document.getElementById(`editDepartures-${routeCode}`);
+      const fileInput = document.getElementById(`editFile-${routeCode}`);
+      const statusEl = document.getElementById(`editStatus-${routeCode}`);
 
-    const routeName = nameInput.value.trim();
-    if (!routeName) {
-      statusEl.textContent = "Route name can't be empty";
-      statusEl.style.color = "#ef4444";
-      return;
-    }
+      const routeName = nameInput.value.trim();
+      if (!routeName) {
+          statusEl.textContent = "Route name can't be empty";
+          statusEl.style.color = "#ef4444";
+          return;
+      }
 
-    statusEl.textContent = "Saving...";
-    statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = "Saving...";
+      statusEl.style.color = "var(--text-muted)";
 
-    const formData = new FormData();
-    formData.append("routeName", routeName);
-    formData.append("busNumbers", busesInput.value.trim());
-    if (fileInput.files.length) {
-      formData.append("file", fileInput.files[0]);
-    }
-    formData.append("_csrf", document.getElementById("csrfToken").value);
+      const formData = new FormData();
+      formData.append("routeName", routeName);
+      formData.append("busNumbers", busesInput.value.trim());
+      formData.append("departureTimes", departuresInput.value.trim());
+      if (fileInput.files.length) {
+          formData.append("file", fileInput.files[0]);
+      }
+      formData.append("_csrf", document.getElementById("csrfToken").value);
 
     try {
       const res = await fetch(`/admin/routes/${encodeURIComponent(routeCode)}`, {
@@ -977,6 +985,7 @@
       const nameInput = document.getElementById("routeNameInput");
       const fileInput = document.getElementById("routeFileInput");
       const busesInput = document.getElementById("routeBusesInput");
+      const departuresInput = document.getElementById("routeDeparturesInput");
       const statusEl = document.getElementById("routeUploadStatus");
 
       const routeCode = codeInput.value.trim();
@@ -999,9 +1008,10 @@
     const formData = new FormData();
     formData.append("routeCode", routeCode);
     formData.append("routeName", routeName);
-    formData.append("file", fileInput.files[0]);
-    formData.append("busNumbers", busesInput.value.trim());
-    formData.append("_csrf", document.getElementById("csrfToken").value);
+      formData.append("file", fileInput.files[0]);
+      formData.append("busNumbers", busesInput.value.trim());
+      formData.append("departureTimes", departuresInput.value.trim());
+      formData.append("_csrf", document.getElementById("csrfToken").value);
 
     try {
       const res = await fetch("/admin/routes/upload", {
@@ -1019,11 +1029,12 @@
 
       statusEl.textContent = `✅ ${data.message} (${data.stopCount} stops)`;
       statusEl.style.color = "#059669";
-      codeInput.value = "";
-      nameInput.value = "";
-      fileInput.value = "";
-      busesInput.value = "";
-      loadRouteTable();
+        codeInput.value = "";
+        nameInput.value = "";
+        fileInput.value = "";
+        busesInput.value = "";
+        departuresInput.value = "";
+        loadRouteTable();
 
     } catch (err) {
       console.error(err);
@@ -1069,15 +1080,58 @@
         loadRouteTable();
         loadBusRosterTable();
     } catch (err) {
-      console.error(err);
-      statusEl.textContent = "Upload failed: " + err.message;
-      statusEl.style.color = "#ef4444";
+        console.error(err);
+        statusEl.textContent = "Upload failed: " + err.message;
+        statusEl.style.color = "#ef4444";
     }
+  }
+
+  async function uploadDepartureTimesFile() {
+      const fileInput = document.getElementById("departureFileInput");
+      const statusEl = document.getElementById("departureUploadStatus");
+
+      if (!fileInput.files.length) {
+          statusEl.textContent = "Please choose an Excel file first";
+          statusEl.style.color = "#ef4444";
+          return;
+      }
+
+      statusEl.textContent = "Uploading...";
+      statusEl.style.color = "var(--text-muted)";
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      formData.append("_csrf", document.getElementById("csrfToken").value);
+
+      try {
+          const res = await fetch("/admin/routes/departures/upload", {
+              method: "POST",
+              body: formData
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+              statusEl.textContent = data.error || "Upload failed";
+              statusEl.style.color = "#ef4444";
+              return;
+          }
+
+          statusEl.textContent = data.warning ? `✅ ${data.message} — ⚠️ ${data.warning}` : `✅ ${data.message}`;
+          statusEl.style.color = data.warning ? "#d97706" : "#059669";
+          fileInput.value = "";
+          loadRouteTable();
+          loadBusRosterTable();
+      } catch (err) {
+          console.error(err);
+          statusEl.textContent = "Upload failed: " + err.message;
+          statusEl.style.color = "#ef4444";
+      }
   }
 
   loadRouteTable();
 
-  /* ── BUS ROSTER (reads the same /admin/routes data as the Routes tab) ── */
+  /* ── SCHEDULE (reads the same /admin/routes data as the Routes tab) ── */
   async function loadBusRosterTable() {
       const tbody = document.getElementById("busRosterTableBody");
       const countSub = document.getElementById("busRosterCountSub");
@@ -1085,14 +1139,15 @@
           const res = await fetch("/admin/routes");
           const routes = await res.json();
 
-          const withBuses = routes.filter(r => r.busNumbers && r.busNumbers.length);
+          const withSchedule = routes.filter(r =>
+              (r.busNumbers && r.busNumbers.length) || (r.departureTimes && r.departureTimes.length));
 
-          countSub.textContent = withBuses.length
-              ? `${withBuses.length} of ${routes.length} route${routes.length > 1 ? "s" : ""} have a registered roster`
-              : `No routes have a registered bus roster yet`;
+          countSub.textContent = withSchedule.length
+              ? `${withSchedule.length} of ${routes.length} route${routes.length > 1 ? "s" : ""} have a registered roster or timetable`
+              : `No routes have a registered roster or timetable yet`;
 
           if (!routes.length) {
-              tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No routes registered yet — add one in the Routes tab first</td></tr>`;
+              tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No routes registered yet — add one in the Routes tab first</td></tr>`;
               return;
           }
 
@@ -1100,20 +1155,23 @@
               const buses = (r.busNumbers && r.busNumbers.length)
                   ? r.busNumbers.join(", ")
                   : `<span style="color:var(--text-faint);">— none registered —</span>`;
+              const departures = (r.departureTimes && r.departureTimes.length)
+                  ? r.departureTimes.join(", ")
+                  : `<span style="color:var(--text-faint);">— none registered —</span>`;
               return `
         <tr>
           <td class="code-cell">${r.routeCode}</td>
           <td>${r.routeName}</td>
           <td style="font-size:12.5px; color:var(--text-muted);">${buses}</td>
+          <td style="font-size:12.5px; color:var(--text-muted);">${departures}</td>
         </tr>`;
           }).join("");
       } catch (err) {
-          console.error("Failed to load bus rosters:", err);
+          console.error("Failed to load schedule:", err);
           countSub.textContent = "Failed to load";
-          tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load</td></tr>`;
       }
   }
-
   loadBusRosterTable();
 
   /* ── TABS ── */
