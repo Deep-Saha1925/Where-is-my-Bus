@@ -436,6 +436,21 @@ function switchSearchTab(tab) {
 }
 
 /* ─── DEPOT-TO-DEPOT SEARCH (static — not live GPS) ─────────────── */
+/* Best-effort parser for admin-entered free-text times (e.g. "06:00",
+ * "6:00 AM") into minutes-since-midnight, purely for sorting the timetable
+ * chronologically. Unparseable entries just sort to the end. */
+function timeSortKey(t) {
+    if (!t) return Infinity;
+    const match = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/);
+    if (!match) return Infinity;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridiem = match[3] ? match[3].toUpperCase() : null;
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+}
+
 async function searchDepotRoutes() {
     const source      = document.getElementById("depotSource").value.trim();
     const destination  = document.getElementById("depotDestination").value.trim();
@@ -475,31 +490,48 @@ async function searchDepotRoutes() {
             return;
         }
 
-        resultsHeader.style.display = "flex";
-        resultsCount.textContent    = `${matches.length} route${matches.length > 1 ? "s" : ""} found`;
+        // Flatten route matches into one timetable row per scheduled
+        // departure time — same idea as a train timetable: one row per
+        // service, not one card per route. Routes with no departure times
+        // registered yet fall back to a single "no timetable" row (using
+        // the bus roster as soft context if one exists).
+        const rows = [];
+        matches.forEach(m => {
+            if (m.departureTimes && m.departureTimes.length) {
+                m.departureTimes.forEach(time => rows.push({ ...m, time }));
+            } else {
+                rows.push({ ...m, time: null });
+            }
+        });
+        rows.sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
 
-        routeList.innerHTML = matches.map((m, i) => {
-            const busChips = (m.busNumbers && m.busNumbers.length)
-                ? m.busNumbers.map(b => `<span class="bus-roster-chip"><i class="fa-solid fa-bus" style="margin-right:5px; font-size:10px;"></i>${b}</span>`).join("")
-                : `<span style="font-size:12.5px; color:var(--text-faint);">
-                     No specific bus numbers registered yet — buses on this route can vary day to day.
-                   </span>`;
+        resultsHeader.style.display = "flex";
+        resultsCount.textContent    = `${rows.length} departure${rows.length > 1 ? "s" : ""} found`;
+
+        routeList.innerHTML = rows.map((r, i) => {
+            if (r.time) {
+                return `
+                  <div class="depot-route-card timetable-row" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
+                    <div class="timetable-time">${r.time}</div>
+                    <div class="timetable-info">
+                      <div class="timetable-route-name">${r.routeName}</div>
+                      <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; ${r.stopsBetween} stop${r.stopsBetween > 1 ? "s" : ""} &middot; ${r.distanceKm.toFixed(1)} km</div>
+                    </div>
+                  </div>
+                `;
+            }
+
+            const busNote = (r.busNumbers && r.busNumbers.length)
+                ? `Buses: ${r.busNumbers.join(", ")}`
+                : "buses run periodically";
 
             return `
-              <div class="depot-route-card" style="margin-bottom:12px; animation-delay:${i * 80}ms;">
-                <div class="route-pill" style="margin-top:0;">
-                  <span class="route-src">${m.sourceDepot}</span>
-                  <i class="fa-solid fa-arrow-right route-arrow"></i>
-                  <span class="route-dest">${m.destinationDepot}</span>
+              <div class="depot-route-card timetable-row timetable-row--fallback" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
+                <div class="timetable-time"><i class="fa-solid fa-clock"></i></div>
+                <div class="timetable-info">
+                  <div class="timetable-route-name">${r.routeName}</div>
+                  <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; no fixed timetable registered yet &middot; ${busNote}</div>
                 </div>
-                <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">
-                  ${m.routeName}
-                </div>
-                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-                  <i class="fa-solid fa-route" style="margin-right:4px; color:var(--text-faint);"></i>
-                  ${m.stopsBetween} stop${m.stopsBetween > 1 ? "s" : ""} &middot; ${m.distanceKm.toFixed(1)} km
-                </div>
-                <div>${busChips}</div>
               </div>
             `;
         }).join("");
