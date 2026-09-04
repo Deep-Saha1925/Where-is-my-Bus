@@ -595,35 +595,42 @@
         <label class="brand-label-sm">Excel file</label>
         <input type="file" id="routeFileInput" accept=".xlsx,.xls,.xlsm" class="file-input"/>
 
-        <label class="brand-label-sm">Bus numbers (optional)</label>
-        <input type="text" id="routeBusesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
-               placeholder="e.g. WB-23A-1245, WB-23A-1290"/>
-        <div style="font-size:11px; color:var(--text-faint); margin-top:-6px; margin-bottom:10px;">
-          Comma-separated. This just powers the passenger's "buses between depots" search —
-          it's a roster, not live tracking, so it's fine to leave blank or update it later.
-        </div>
+          <label class="brand-label-sm">Bus numbers (optional)</label>
+          <input type="text" id="routeBusesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
+                 placeholder="e.g. WB-23A-1245, WB-23A-1290"/>
+          <div style="font-size:11px; color:var(--text-faint); margin-top:-6px; margin-bottom:10px;">
+              Comma-separated. This just powers the passenger's "buses between depots" search —
+              it's a roster, not live tracking, so it's fine to leave blank or update it later.
+          </div>
 
-        <button onclick="uploadRouteFile()" class="upload-btn">Add Route</button>
+          <label class="brand-label-sm">Departure times (optional)</label>
+          <input type="text" id="routeDeparturesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
+                 placeholder="e.g. 06:00, 09:30, 14:15"/>
+          <div style="font-size:11px; color:var(--text-faint); margin-top:-6px; margin-bottom:10px;">
+              Comma-separated scheduled departure times. Shown to passengers as a timetable —
+              every entry is assumed to run daily.
+          </div>
 
-        <div id="routeUploadStatus" class="upload-status"></div>
+          <button onclick="uploadRouteFile()" class="upload-btn">Add Route</button>
+          <div id="routeUploadStatus" class="upload-status"></div>
       </div>
     </div>
 
-    <!-- Current routes -->
-    <div class="panel-card full-width">
-      <div class="panel-card-header">
-        <div class="panel-icon">🛣️</div>
-        <div>
-          <div class="panel-title">Registered routes</div>
-          <div class="panel-sub" id="routeCountSub">Loading...</div>
-        </div>
-      </div>
-      <div class="panel-card-body">
-        <div style="overflow-x:auto;">
-          <table class="depot-table">
-            <thead><tr><th>Code</th><th>Name</th><th>Stops</th><th>Buses</th><th>Actions</th></tr></thead>
-            <tbody id="routeTableBody">
-            <tr><td colspan="5" class="table-empty">Loading...</td></tr>
+      <!-- Current routes -->
+      <div class="panel-card full-width">
+          <div class="panel-card-header">
+              <div class="panel-icon">🛣️</div>
+              <div>
+                  <div class="panel-title">Registered routes</div>
+                  <div class="panel-sub" id="routeCountSub">Loading...</div>
+              </div>
+          </div>
+          <div class="panel-card-body">
+              <div style="overflow-x:auto;">
+                  <table class="depot-table">
+                      <thead><tr><th>Code</th><th>Name</th><th>Stops</th><th>Buses</th><th>Departures</th><th>Actions</th></tr></thead>
+                      <tbody id="routeTableBody">
+                      <tr><td colspan="6" class="table-empty">Loading...</td></tr>
             </tbody>
           </table>
         </div>
