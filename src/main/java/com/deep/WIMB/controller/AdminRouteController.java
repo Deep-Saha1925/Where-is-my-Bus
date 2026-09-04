@@ -38,11 +38,12 @@ public class AdminRouteController {
         return routeExcelLoader.getAllRoutes();
     }
 
-    /** Parses a comma-separated "bus numbers" field from the admin form into
-     *  a clean list — trims each entry, drops blanks, keeps original casing
-     *  since plate formats vary. Optional: a blank/absent field just means
-     *  no buses are registered yet for this route. */
-    private List<String> parseBusNumbers(String raw) {
+    /** Parses a comma-separated field from the admin form into a clean list —
+     *  trims each entry, drops blanks. Used for both bus numbers and
+     *  departure times since the parsing rules are identical; departure
+     *  times are kept as free-text (e.g. "06:00" or "6:00 AM") rather than
+     *  strictly validated, since this is informational, not scheduling logic. */
+    private List<String> parseCommaList(String raw) {
         if (raw == null || raw.isBlank()) return new ArrayList<>();
         List<String> result = new ArrayList<>();
         for (String piece : raw.split(",")) {
@@ -57,7 +58,8 @@ public class AdminRouteController {
             @RequestParam("routeCode") String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers
+            @RequestParam(value = "busNumbers", required = false) String busNumbers,
+            @RequestParam(value = "departureTimes", required = false) String departureTimes
     ) {
         String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
