@@ -56,4 +56,15 @@ public class Route {
     @CollectionTable(name = "route_buses", joinColumns = @JoinColumn(name = "route_id"))
     @Column(name = "bus_number")
     private List<String> busNumbers = new ArrayList<>();
+
+    // Optional, admin-entered scheduled departure times for this route (e.g.
+    // "06:00", "09:30"), stored as plain strings — no fixed schedule ID, no
+    // per-day rules, no live-status blending. Every entry is assumed to run
+    // daily. This powers the depot-to-depot timetable search: one result row
+    // per departure time, same idea as a train timetable but deliberately
+    // simpler.
+    @ElementCollection
+    @CollectionTable(name = "route_departures", joinColumns = @JoinColumn(name = "route_id"))
+    @Column(name = "departure_time")
+    private List<String> departureTimes = new ArrayList<>();
 }
