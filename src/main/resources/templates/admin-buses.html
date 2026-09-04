@@ -685,21 +685,61 @@
             </div>
         </div>
 
-        <!-- Current rosters (read-only view, sourced from the Routes list) -->
+        <!-- Bulk departure-time upload -->
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">🕐</div>
+                <div>
+                    <div class="panel-title">Bulk-update timetables</div>
+                    <div class="panel-sub">Set departure times for many routes in one file, instead of editing them one by one</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <ol class="hint-list">
+                    <li>Row 1 is the header — use these exact column names.</li>
+                    <li><code>route_code</code> — must match an existing route's code exactly (see the Routes tab)</li>
+                    <li><code>departure_time</code> — one row per departure; add multiple rows with the same route_code to list several timings on one route</li>
+                    <li>Every entry is assumed to run daily — there's no day-of-week or live status here, just a plain scheduled time.</li>
+                    <li>For each route_code in the file, its timetable is fully replaced with what's in the file. Routes not mentioned in the file are left untouched.</li>
+                </ol>
+                <div class="example-table-wrap">
+                    <table class="example-table">
+                        <thead><tr><th>route_code</th><th>departure_time</th></tr></thead>
+                        <tbody>
+                        <tr><td>APD_FLK</td><td>06:00</td></tr>
+                        <tr><td>APD_FLK</td><td>09:30</td></tr>
+                        <tr><td>APD_FLK</td><td>14:15</td></tr>
+                        <tr><td>APD_SLG</td><td>07:45</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <a href="/admin/routes/departures/template" class="template-link">⬇ Download a ready-made example file</a>
+
+                <div class="replace-warning" style="margin-top:14px;">
+                    ⚠️ <span>For each <code>route_code</code> in the file, its timetable is <b>replaced entirely</b> — not merged with what's already set. Routes not in the file are untouched.</span>
+                </div>
+
+                <input type="file" id="departureFileInput" accept=".xlsx,.xls,.xlsm" class="file-input" style="margin-top:10px;"/>
+                <button onclick="uploadDepartureTimesFile()" class="upload-btn">Upload Timetable</button>
+                <div id="departureUploadStatus" class="upload-status"></div>
+            </div>
+        </div>
+
+        <!-- Current schedule (read-only view, sourced from the Routes list) -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
                 <div class="panel-icon">📋</div>
                 <div>
-                    <div class="panel-title">Current bus rosters by route</div>
+                    <div class="panel-title">Current schedule by route</div>
                     <div class="panel-sub" id="busRosterCountSub">Loading...</div>
                 </div>
             </div>
             <div class="panel-card-body">
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
-                        <thead><tr><th>Route code</th><th>Route name</th><th>Buses</th></tr></thead>
+                        <thead><tr><th>Route code</th><th>Route name</th><th>Buses</th><th>Departures</th></tr></thead>
                         <tbody id="busRosterTableBody">
-                        <tr><td colspan="3" class="table-empty">Loading...</td></tr>
+                        <tr><td colspan="4" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
