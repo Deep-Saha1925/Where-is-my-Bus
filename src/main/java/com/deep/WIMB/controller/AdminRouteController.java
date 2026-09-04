@@ -102,7 +102,8 @@ public class AdminRouteController {
             route.setFilePath(routeDir + "/" + code + extension);
             route.setFileData(fileBytes);
             route.setUploadedAt(LocalDateTime.now());
-            route.setBusNumbers(parseBusNumbers(busNumbers));
+            route.setBusNumbers(parseCommaList(busNumbers));
+            route.setDepartureTimes(parseCommaList(departureTimes));
 
             // Best-effort disk copy too — harmless if it works, and if this
             // container's disk gets wiped on the next restart, it doesn't
