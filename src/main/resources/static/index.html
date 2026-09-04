@@ -274,15 +274,46 @@
             color: #fff;
         }
 
-        /* ── Depot route result cards ── */
+        /* ── Depot timetable result rows ── */
         .depot-route-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 16px;
             box-shadow: var(--shadow);
             animation: fadeUp 0.35s ease both;
             min-width: 0;
+            overflow: hidden;
+        }
+        .timetable-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+        }
+        .timetable-time {
+            font-size: 20px;
+            font-weight: 800;
+            color: #6366f1;
+            min-width: 76px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .dark-mode .timetable-time { color: #818cf8; }
+        .timetable-row--fallback .timetable-time {
+            color: var(--text-faint);
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .timetable-info { flex: 1; min-width: 0; }
+        .timetable-route-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+        }
+        .timetable-meta {
+            font-size: 12px;
+            color: var(--text-muted);
         }
         .bus-roster-chip {
             display: inline-flex;
