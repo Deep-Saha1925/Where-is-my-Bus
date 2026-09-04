@@ -420,7 +420,8 @@ public class AdminRouteController {
             @PathVariable String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers
+            @RequestParam(value = "busNumbers", required = false) String busNumbers,
+            @RequestParam(value = "departureTimes", required = false) String departureTimes
     ) {
         String code = routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -435,11 +436,14 @@ public class AdminRouteController {
         }
 
         route.setRouteName(name);
-        // busNumbers is only touched when the field was actually submitted,
-        // so callers that don't know about this feature yet (e.g. an old
-        // cached admin page) can't accidentally wipe an existing roster.
+        // busNumbers/departureTimes are only touched when actually submitted,
+        // so callers that don't know about these fields yet (e.g. an old
+        // cached admin page) can't accidentally wipe existing data.
         if (busNumbers != null) {
-            route.setBusNumbers(parseBusNumbers(busNumbers));
+            route.setBusNumbers(parseCommaList(busNumbers));
+        }
+        if (departureTimes != null) {
+            route.setDepartureTimes(parseCommaList(departureTimes));
         }
 
         // File is optional here — only touch it if the admin actually chose one
