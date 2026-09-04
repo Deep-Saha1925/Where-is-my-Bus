@@ -278,6 +278,113 @@ public class AdminRouteController {
         }
     }
 
+    // Bulk alternative to the per-route "departureTimes" field: upload one
+    // sheet covering many routes' timetables at once. Same semantics as the
+    // bus-roster bulk upload above — full replace per route_code mentioned,
+    // routes not in the file are untouched.
+    @PostMapping("/departures/upload")
+    public ResponseEntity<?> uploadDepartureTimes(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No file selected"));
+        }
+
+        String filename = file.getOriginalFilename();
+        boolean validExtension = filename != null &&
+                ALLOWED_EXTENSIONS.stream().anyMatch(ext -> filename.toLowerCase(Locale.ROOT).endsWith(ext));
+
+        if (!validExtension) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Please upload an Excel file (.xlsx, .xls, or .xlsm)"
+            ));
+        }
+
+        Map<String, List<String>> timesByRoute = new LinkedHashMap<>();
+
+        try (InputStream is = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter formatter = new DataFormatter();
+
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) { // skip header row
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                String code = formatter.formatCellValue(row.getCell(0)).trim().toUpperCase(Locale.ROOT);
+                String time = formatter.formatCellValue(row.getCell(1)).trim();
+
+                if (code.isEmpty() || time.isEmpty()) continue;
+                timesByRoute.computeIfAbsent(code, k -> new ArrayList<>()).add(time);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to parse file: " + e.getMessage()));
+        }
+
+        if (timesByRoute.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "No valid rows found — expected columns: route_code, departure_time"
+            ));
+        }
+
+        int updatedRoutes = 0;
+        List<String> unknownCodes = new ArrayList<>();
+
+        for (Map.Entry<String, List<String>> entry : timesByRoute.entrySet()) {
+            Route route = routeRepository.findByRouteCode(entry.getKey()).orElse(null);
+            if (route == null) {
+                unknownCodes.add(entry.getKey());
+                continue;
+            }
+            route.setDepartureTimes(entry.getValue());
+            routeRepository.save(route);
+            updatedRoutes++;
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Timetable updated for " + updatedRoutes + " route" + (updatedRoutes == 1 ? "" : "s"));
+        response.put("routesUpdated", updatedRoutes);
+        if (!unknownCodes.isEmpty()) {
+            response.put("warning", "These route codes weren't found and were skipped: " + String.join(", ", unknownCodes));
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    // Generates a ready-to-edit example .xlsx for the bulk departure-time upload above.
+    @GetMapping("/departures/template")
+    public ResponseEntity<byte[]> downloadDepartureTemplate() throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Departure Times");
+
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("route_code");
+            header.createCell(1).setCellValue("departure_time");
+
+            String[][] examples = {
+                    {"APD_FLK", "06:00"},
+                    {"APD_FLK", "09:30"},
+                    {"APD_FLK", "14:15"},
+                    {"APD_SLG", "07:45"}
+            };
+            for (int i = 0; i < examples.length; i++) {
+                Row row = sheet.createRow(i + 1);
+                row.createCell(0).setCellValue(examples[i][0]);
+                row.createCell(1).setCellValue(examples[i][1]);
+            }
+
+            sheet.setColumnWidth(0, 4000);
+            sheet.setColumnWidth(1, 4000);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=departure-times-template.xlsx")
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(out.toByteArray());
+        }
+    }
+
     @DeleteMapping("/{routeCode}")
     public ResponseEntity<?> deleteRoute(@PathVariable String routeCode) {
         String code = routeCode.trim().toUpperCase(Locale.ROOT);
