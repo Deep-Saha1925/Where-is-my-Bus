@@ -22,4 +22,5 @@ public class DepotRouteMatch {
     private int stopsBetween;      // inclusive count of stops from source to destination
     private double distanceKm;
     private List<String> busNumbers; // may be empty if admin hasn't registered any yet
+    private List<String> departureTimes; // e.g. ["06:00", "09:30"] — may be empty if no schedule registered yet
 }
