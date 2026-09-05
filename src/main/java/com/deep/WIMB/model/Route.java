@@ -2,6 +2,8 @@ package com.deep.WIMB.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,7 +34,7 @@ public class Route {
     // container's local disk, this survives every restart and redeploy,
     // since it lives in the (persistent, hosted) database along with
     // everything else about the route.
-    @Lob
+    @JdbcTypeCode(SqlTypes.VARBINARY)
     @Column(nullable = true, columnDefinition = "bytea")
     private byte[] fileData;
 
