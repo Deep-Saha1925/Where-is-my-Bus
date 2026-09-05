@@ -633,17 +633,10 @@
             </div>
         </div>
 
-    </div>
-</div><!-- /tab-routes -->
-
-<!-- ── BUS ROSTER TAB ── -->
-<div id="tab-busroster" class="tab-panel" style="display:none;">
-    <div class="depot-layout">
-
         <!-- Bulk bus roster upload -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
-                <div class="panel-icon">🚐</div>
+                <div class="panel-icon">🚌</div>
                 <div>
                     <div class="panel-title">Bulk-update bus rosters</div>
                     <div class="panel-sub">Set bus numbers for many routes in one file, instead of editing them one by one</div>
@@ -652,7 +645,7 @@
             <div class="panel-card-body">
                 <ol class="hint-list">
                     <li>Row 1 is the header — use these exact column names.</li>
-                    <li><code>route_code</code> — must match an existing route's code exactly (see the Routes tab)</li>
+                    <li><code>route_code</code> — must match an existing route's code exactly</li>
                     <li><code>bus_number</code> — one row per bus; add multiple rows with the same route_code to list several buses on one route</li>
                     <li>For each route_code in the file, its bus list is fully replaced with what's in the file. Routes not mentioned in the file are left untouched.</li>
                 </ol>
@@ -677,6 +670,13 @@
                 <div id="busRosterUploadStatus" class="upload-status"></div>
             </div>
         </div>
+
+    </div>
+</div><!-- /tab-routes -->
+
+<!-- ── SCHEDULE TAB ── -->
+<div id="tab-busroster" class="tab-panel" style="display:none;">
+    <div class="depot-layout">
 
         <!-- Timetable: manual add-one-row form + single bulk file upload -->
         <div class="panel-card full-width">
