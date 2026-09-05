@@ -1,7 +1,7 @@
 package com.deep.WIMB.service;
 
-import com.deep.WIMB.dto.RouteStop;
 import com.deep.WIMB.dto.DepotRouteMatch;
+import com.deep.WIMB.dto.RouteStop;
 import com.deep.WIMB.model.Route;
 import com.deep.WIMB.repository.RouteRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -205,7 +205,8 @@ public class RouteExcelLoader {
             matches.add(new DepotRouteMatch(
                     routeCode, routeName, source, destination,
                     segment.size(), distance, busNumbers, departureTimes
-            ));        }
+            ));
+        }
 
         return matches;
     }
@@ -223,80 +224,16 @@ public class RouteExcelLoader {
                 continue;
             }
 
-            try {
-                RouteStop stop = new RouteStop();
-                stop.setStopOrder((int) getNumericValue(r.getCell(0)));
-                stop.setStopName(getStringValue(r.getCell(1)).trim());
-                stop.setLatitude(getNumericValue(r.getCell(2)));
-                stop.setLongitude(getNumericValue(r.getCell(3)));
-                stop.setDistanceFromStartKm(getNumericValue(r.getCell(4)));
-                stop.setSlackTimeMin((int) getNumericValue(r.getCell(5)));
-                stops.add(stop);
-            } catch (Exception e) {
-                // Excel row numbers are 1-based and include the header, so the
-                // sheet row the admin sees is i + 1.
-                throw new RuntimeException("Row " + (i + 1) + ": " + e.getMessage(), e);
-            }
+            RouteStop stop = new RouteStop();
+            stop.setStopOrder((int) r.getCell(0).getNumericCellValue());
+            stop.setStopName(r.getCell(1).getStringCellValue().trim());
+            stop.setLatitude(r.getCell(2).getNumericCellValue());
+            stop.setLongitude(r.getCell(3).getNumericCellValue());
+            stop.setDistanceFromStartKm(r.getCell(4).getNumericCellValue());
+            stop.setSlackTimeMin((int) r.getCell(5).getNumericCellValue());
+            stops.add(stop);
         }
         return stops;
-    }
-
-    /**
-     * Reads a numeric value from a cell regardless of whether Excel stored it
-     * as an actual number or as text (common when a sheet is exported from
-     * CSV/Google Sheets, or a column got formatted as Text). Only throws if
-     * the cell's content genuinely isn't a number.
-     */
-    // Matches text like "5:30", "00:05:00", "12:00:00" — the text Excel
-    // leaves behind when a numeric value was typed into a Time-formatted
-    // cell (e.g. slack_min "5" becomes the literal text "00:05:00").
-    private static final java.util.regex.Pattern TIME_LIKE_PATTERN =
-            java.util.regex.Pattern.compile("^(\\d{1,3}):(\\d{1,2})(?::(\\d{1,2}))?$");
-
-    private double getNumericValue(Cell cell) {
-        switch (cell.getCellType()) {
-            case NUMERIC:
-                return cell.getNumericCellValue();
-            case STRING:
-                String raw = cell.getStringCellValue().trim();
-                try {
-                    return Double.parseDouble(raw);
-                } catch (NumberFormatException e) {
-                    java.util.regex.Matcher timeMatch = TIME_LIKE_PATTERN.matcher(raw);
-                    if (timeMatch.matches()) {
-                        // Interpret as HH:MM[:SS] and convert to total minutes,
-                        // since a stray time-formatted cell is almost always a
-                        // duration value, not an actual clock time.
-                        int hours = Integer.parseInt(timeMatch.group(1));
-                        int minutes = Integer.parseInt(timeMatch.group(2));
-                        int seconds = timeMatch.group(3) != null ? Integer.parseInt(timeMatch.group(3)) : 0;
-                        return hours * 60 + minutes + seconds / 60.0;
-                    }
-                    throw new RuntimeException("expected a number in column "
-                            + (char) ('A' + cell.getColumnIndex()) + " but found \"" + raw + "\"");
-                }
-            case FORMULA:
-                // Fall back to POI's cached evaluated value for the formula.
-                return cell.getNumericCellValue();
-            default:
-                throw new RuntimeException("expected a number in column "
-                        + (char) ('A' + cell.getColumnIndex()) + " but the cell is empty/unsupported");
-        }
-    }
-
-    /**
-     * Reads a text value from a cell even if Excel happens to have stored it
-     * as a number (e.g. a stop name that's all digits).
-     */
-    private String getStringValue(Cell cell) {
-        switch (cell.getCellType()) {
-            case STRING:
-                return cell.getStringCellValue();
-            case NUMERIC:
-                return String.valueOf(cell.getNumericCellValue());
-            default:
-                return cell.toString();
-        }
     }
 
     private List<RouteStop> sliceBetween(List<RouteStop> fullRoute, String source, String destination) {
