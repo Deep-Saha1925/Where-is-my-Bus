@@ -4,7 +4,11 @@ import com.deep.WIMB.model.Route;
 import com.deep.WIMB.repository.RouteRepository;
 import com.deep.WIMB.service.RouteExcelLoader;
 import lombok.RequiredArgsConstructor;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -18,7 +22,11 @@ import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/routes")
@@ -58,8 +66,7 @@ public class AdminRouteController {
             @RequestParam("routeCode") String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers,
-            @RequestParam(value = "departureTimes", required = false) String departureTimes
+            @RequestParam(value = "busNumbers", required = false) String busNumbers
     ) {
         String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -103,7 +110,9 @@ public class AdminRouteController {
             route.setFileData(fileBytes);
             route.setUploadedAt(LocalDateTime.now());
             route.setBusNumbers(parseCommaList(busNumbers));
-            route.setDepartureTimes(parseCommaList(departureTimes));
+            // Departure times are managed exclusively from the Schedule tab
+            // now (manual add-one-row form or bulk file) — not here, to avoid
+            // scattering the same data across multiple input surfaces.
 
             // Best-effort disk copy too — harmless if it works, and if this
             // container's disk gets wiped on the next restart, it doesn't
@@ -278,8 +287,10 @@ public class AdminRouteController {
         }
     }
 
-    // Bulk alternative to the per-route "departureTimes" field: upload one
-    // sheet covering many routes' timetables at once. Same semantics as the
+    // Bulk alternative to the manual add-one-row form below: upload one
+    // sheet covering many routes' timetables at once. Columns are route_code,
+    // route_name (informational only — not written back, just makes the
+    // sheet self-describing), and departure_time. Same semantics as the
     // bus-roster bulk upload above — full replace per route_code mentioned,
     // routes not in the file are untouched.
     @PostMapping("/departures/upload")
@@ -311,7 +322,10 @@ public class AdminRouteController {
                 if (row == null) continue;
 
                 String code = formatter.formatCellValue(row.getCell(0)).trim().toUpperCase(Locale.ROOT);
-                String time = formatter.formatCellValue(row.getCell(1)).trim();
+                // Column 1 (route_name) is intentionally not read here — it's
+                // just for the admin's own readability in the sheet. The
+                // authoritative name still comes from the Routes tab.
+                String time = formatter.formatCellValue(row.getCell(2)).trim();
 
                 if (code.isEmpty() || time.isEmpty()) continue;
                 timesByRoute.computeIfAbsent(code, k -> new ArrayList<>()).add(time);
@@ -322,7 +336,7 @@ public class AdminRouteController {
 
         if (timesByRoute.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "No valid rows found — expected columns: route_code, departure_time"
+                    "error", "No valid rows found — expected columns: route_code, route_name, departure_time"
             ));
         }
 
@@ -357,22 +371,25 @@ public class AdminRouteController {
 
             Row header = sheet.createRow(0);
             header.createCell(0).setCellValue("route_code");
-            header.createCell(1).setCellValue("departure_time");
+            header.createCell(1).setCellValue("route_name");
+            header.createCell(2).setCellValue("departure_time");
 
             String[][] examples = {
-                    {"APD_FLK", "06:00"},
-                    {"APD_FLK", "09:30"},
-                    {"APD_FLK", "14:15"},
-                    {"APD_SLG", "07:45"}
+                    {"APD_FLK", "Alipurduar -> Falakata", "06:00"},
+                    {"APD_FLK", "Alipurduar -> Falakata", "09:30"},
+                    {"APD_FLK", "Alipurduar -> Falakata", "14:15"},
+                    {"APD_SLG", "Alipurduar -> Siliguri", "07:45"}
             };
             for (int i = 0; i < examples.length; i++) {
                 Row row = sheet.createRow(i + 1);
                 row.createCell(0).setCellValue(examples[i][0]);
                 row.createCell(1).setCellValue(examples[i][1]);
+                row.createCell(2).setCellValue(examples[i][2]);
             }
 
             sheet.setColumnWidth(0, 4000);
-            sheet.setColumnWidth(1, 4000);
+            sheet.setColumnWidth(1, 7000);
+            sheet.setColumnWidth(2, 4000);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
@@ -383,6 +400,41 @@ public class AdminRouteController {
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(out.toByteArray());
         }
+    }
+
+    // Manual, one-at-a-time counterpart to the bulk upload above — appends a
+    // single departure time to an existing route (skips it if already
+    // present) rather than replacing the whole list, since that's the more
+    // intuitive behavior for adding one entry at a time from a form.
+    @PostMapping("/departures/add")
+    public ResponseEntity<?> addDepartureTime(
+            @RequestParam("routeCode") String routeCode,
+            @RequestParam("departureTime") String departureTime
+    ) {
+        String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
+        String time = departureTime == null ? "" : departureTime.trim();
+
+        if (code.isEmpty() || time.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Route code and departure time are both required"));
+        }
+
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+
+        List<String> times = new ArrayList<>(route.getDepartureTimes() == null ? List.of() : route.getDepartureTimes());
+        if (!times.contains(time)) {
+            times.add(time);
+        }
+        route.setDepartureTimes(times);
+        routeRepository.save(route);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Added " + time + " to " + code);
+        response.put("routeName", route.getRouteName());
+        response.put("departureTimes", times);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{routeCode}")
@@ -420,8 +472,7 @@ public class AdminRouteController {
             @PathVariable String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers,
-            @RequestParam(value = "departureTimes", required = false) String departureTimes
+            @RequestParam(value = "busNumbers", required = false) String busNumbers
     ) {
         String code = routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -436,14 +487,13 @@ public class AdminRouteController {
         }
 
         route.setRouteName(name);
-        // busNumbers/departureTimes are only touched when actually submitted,
-        // so callers that don't know about these fields yet (e.g. an old
-        // cached admin page) can't accidentally wipe existing data.
+        // busNumbers is only touched when the field was actually submitted,
+        // so callers that don't know about this feature yet (e.g. an old
+        // cached admin page) can't accidentally wipe an existing roster.
+        // Departure times aren't touched here at all — they're managed
+        // exclusively from the Schedule tab now.
         if (busNumbers != null) {
             route.setBusNumbers(parseCommaList(busNumbers));
-        }
-        if (departureTimes != null) {
-            route.setDepartureTimes(parseCommaList(departureTimes));
         }
 
         // File is optional here — only touch it if the admin actually chose one
