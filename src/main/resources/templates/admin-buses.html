@@ -732,12 +732,41 @@
                 </div>
 
                 <input type="file" id="departureFileInput" accept=".xlsx,.xls,.xlsm" class="file-input" style="margin-top:10px;"/>
+
+                <div style="display:flex; gap:16px; align-items:center; margin:8px 0 10px; font-size:12.5px; color:var(--text-muted);">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="departureMode" value="replace" checked/> Replace existing timetable
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <input type="radio" name="departureMode" value="merge"/> Merge into existing
+                    </label>
+                </div>
+
                 <button onclick="uploadDepartureTimesFile()" class="upload-btn">Upload Timetable File</button>
                 <div id="departureUploadStatus" class="upload-status"></div>
             </div>
         </div>
 
-        <!-- Current schedule (read-only view, sourced from the Routes list) -->
+        <!-- Most recent timetable file, kept server-side so it can be pulled back down -->
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">&#128194;</div>
+                <div>
+                    <div class="panel-title">Last uploaded timetable file</div>
+                    <div class="panel-sub" id="lastDepartureFileSub">Loading...</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <div id="lastDepartureFileBox" style="font-size:13px; color:var(--text-muted);">Loading...</div>
+                <button id="downloadLastDepartureBtn" onclick="downloadLastDepartureFile()"
+                        class="upload-btn" style="margin-top:10px; display:none;">&#11015; Download this file</button>
+                <a href="/admin/routes/departures/template" class="template-link" style="display:inline-block; margin-top:10px;">
+                    &#11015; Or download the blank example template
+                </a>
+            </div>
+        </div>
+
+        <!-- Current schedule — editable per row (Update replaces a route's timetable, Delete clears it) -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
                 <div class="panel-icon">📋</div>
@@ -749,9 +778,9 @@
             <div class="panel-card-body">
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
-                        <thead><tr><th>Route code</th><th>Route name</th><th>Buses</th><th>Departures</th></tr></thead>
+                        <thead><tr><th>Route code</th><th>Route name</th><th>Buses</th><th>Departures</th><th>Actions</th></tr></thead>
                         <tbody id="busRosterTableBody">
-                        <tr><td colspan="4" class="table-empty">Loading...</td></tr>
+                        <tr><td colspan="5" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1104,8 +1133,11 @@
         statusEl.textContent = "Uploading...";
         statusEl.style.color = "var(--text-muted)";
 
+        const mode = document.querySelector('input[name="departureMode"]:checked');
+
         const formData = new FormData();
         formData.append("file", fileInput.files[0]);
+        formData.append("mode", mode ? mode.value : "replace");
         formData.append("_csrf", document.getElementById("csrfToken").value);
 
         try {
@@ -1127,6 +1159,7 @@
             fileInput.value = "";
             loadRouteTable();
             loadBusRosterTable();
+            loadLastDepartureFile();
         } catch (err) {
             console.error(err);
             statusEl.textContent = "Upload failed: " + err.message;
@@ -1138,6 +1171,15 @@
 
     /* ── SCHEDULE (reads the same /admin/routes data as the Routes tab) ── */
     let scheduleRoutesCache = []; // populated below, reused by the manual add-entry lookup
+
+    // Escapes text before it goes into innerHTML / an inline handler, so a
+    // route name containing a quote or angle bracket can't break the markup
+    // (the Routes tab's inline .replace(/'/g,...) approach misses those).
+    function esc(value) {
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
 
     async function loadBusRosterTable() {
         const tbody = document.getElementById("busRosterTableBody");
@@ -1155,31 +1197,169 @@
                 : `No routes have a registered roster or timetable yet`;
 
             if (!routes.length) {
-                tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No routes registered yet — add one in the Routes tab first</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No routes registered yet \u2014 add one in the Routes tab first</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = routes.map(r => {
+                const hasTimes = !!(r.departureTimes && r.departureTimes.length);
                 const buses = (r.busNumbers && r.busNumbers.length)
-                    ? r.busNumbers.join(", ")
-                    : `<span style="color:var(--text-faint);">— none registered —</span>`;
-                const departures = (r.departureTimes && r.departureTimes.length)
-                    ? r.departureTimes.join(", ")
-                    : `<span style="color:var(--text-faint);">— none registered —</span>`;
+                    ? esc(r.busNumbers.join(", "))
+                    : `<span style="color:var(--text-faint);">\u2014 none registered \u2014</span>`;
+                const departures = hasTimes
+                    ? esc(r.departureTimes.join(", "))
+                    : `<span style="color:var(--text-faint);">\u2014 none registered \u2014</span>`;
                 return `
-        <tr>
-          <td class="code-cell">${r.routeCode}</td>
-          <td>${r.routeName}</td>
+        <tr id="schedRow-${esc(r.routeCode)}">
+          <td class="code-cell">${esc(r.routeCode)}</td>
+          <td>${esc(r.routeName)}</td>
           <td style="font-size:12.5px; color:var(--text-muted);">${buses}</td>
           <td style="font-size:12.5px; color:var(--text-muted);">${departures}</td>
+          <td style="white-space:nowrap;">
+            <button class="row-update-btn" onclick="startEditSchedule('${esc(r.routeCode)}')">Update</button>
+            <button class="row-delete-btn" onclick="deleteSchedule('${esc(r.routeCode)}')" ${hasTimes ? "" : "disabled style=\'opacity:.45; cursor:not-allowed;\'"}>Delete</button>
+          </td>
         </tr>`;
             }).join("");
         } catch (err) {
             console.error("Failed to load schedule:", err);
             countSub.textContent = "Failed to load";
-            tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="table-empty" style="color:#ef4444;">Failed to load</td></tr>`;
         }
     }
+
+    /* Inline row editor for a single route's timetable \u2014 same interaction
+       pattern as the Routes tab's Update button, but scoped to departure
+       times only. Bus numbers stay editable from the Routes tab. */
+    function startEditSchedule(routeCode) {
+        const row = document.getElementById(`schedRow-${routeCode}`);
+        if (!row) return;
+
+        const route = scheduleRoutesCache.find(r => r.routeCode === routeCode);
+        const current = route && route.departureTimes ? route.departureTimes.join(", ") : "";
+
+        row.innerHTML = `
+      <td class="code-cell">${esc(routeCode)}</td>
+      <td colspan="3">
+        <input type="text" id="schedEdit-${esc(routeCode)}" value="${esc(current)}"
+               class="file-input" style="border-style:solid; margin-bottom:6px;"
+               placeholder="Departure times, comma-separated \u2014 e.g. 06:00, 09:30, 14:15"/>
+        <div style="font-size:11px; color:var(--text-faint);">
+          This replaces the whole timetable for this route. Leave it empty to clear it.
+        </div>
+        <div id="schedEditStatus-${esc(routeCode)}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
+      </td>
+      <td style="white-space:nowrap; vertical-align:top;">
+        <button class="row-update-btn" onclick="saveScheduleEdit('${esc(routeCode)}')">Save</button>
+        <button class="row-delete-btn" onclick="loadBusRosterTable()">Cancel</button>
+      </td>
+    `;
+
+        const input = document.getElementById(`schedEdit-${routeCode}`);
+        if (input) input.focus();
+    }
+
+    async function saveScheduleEdit(routeCode) {
+        const input = document.getElementById(`schedEdit-${routeCode}`);
+        const statusEl = document.getElementById(`schedEditStatus-${routeCode}`);
+        if (!input) return;
+
+        statusEl.textContent = "Saving...";
+        statusEl.style.color = "var(--text-muted)";
+
+        const formData = new FormData();
+        formData.append("departureTimes", input.value.trim());
+        formData.append("_csrf", document.getElementById("csrfToken").value);
+
+        try {
+            const res = await fetch(`/admin/routes/${encodeURIComponent(routeCode)}/departures`, {
+                method: "PUT",
+                body: formData
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                statusEl.textContent = data.error || "Update failed";
+                statusEl.style.color = "#ef4444";
+                return;
+            }
+
+            loadRouteTable();
+            loadBusRosterTable();
+        } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Update failed: " + err.message;
+            statusEl.style.color = "#ef4444";
+        }
+    }
+
+    async function deleteSchedule(routeCode) {
+        if (!confirm(`Clear the whole timetable for "${routeCode}"?\n\nThe route, its stops and its bus roster are kept \u2014 only the departure times are removed.`)) {
+            return;
+        }
+
+        try {
+            const csrfToken = document.getElementById("csrfToken").value;
+            const res = await fetch(
+                `/admin/routes/${encodeURIComponent(routeCode)}/departures?_csrf=${encodeURIComponent(csrfToken)}`,
+                { method: "DELETE" }
+            );
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Delete failed");
+                return;
+            }
+
+            loadRouteTable();
+            loadBusRosterTable();
+        } catch (err) {
+            console.error(err);
+            alert("Delete failed: " + err.message);
+        }
+    }
+
+    /* ── LAST UPLOADED TIMETABLE FILE ── */
+    async function loadLastDepartureFile() {
+        const box = document.getElementById("lastDepartureFileBox");
+        const sub = document.getElementById("lastDepartureFileSub");
+        const btn = document.getElementById("downloadLastDepartureBtn");
+
+        try {
+            const res = await fetch("/admin/routes/departures/latest");
+            const data = await res.json();
+
+            if (!data.exists) {
+                sub.textContent = "Nothing uploaded yet";
+                box.innerHTML = `<span style="color:var(--text-faint);">No timetable file has been uploaded yet \u2014 once you upload one above, it'll be kept here so you can download it again.</span>`;
+                btn.style.display = "none";
+                return;
+            }
+
+            const when = data.uploadedAt ? new Date(data.uploadedAt).toLocaleString() : "unknown time";
+            const sizeKb = data.sizeBytes ? (data.sizeBytes / 1024).toFixed(1) + " KB" : "";
+
+            sub.textContent = "Uploaded " + when;
+            box.innerHTML = `
+        <div style="font-weight:700; color:var(--text-primary);">${esc(data.fileName)}</div>
+        <div style="margin-top:4px;">${esc(when)}${sizeKb ? " \u00b7 " + esc(sizeKb) : ""}${data.rowCount ? " \u00b7 " + data.rowCount + " row(s) read" : ""}</div>
+        ${data.summary ? `<div style="margin-top:4px;">${esc(data.summary)}</div>` : ""}`;
+            btn.style.display = "";
+        } catch (err) {
+            console.error("Failed to load last timetable file:", err);
+            sub.textContent = "Failed to load";
+            box.innerHTML = `<span style="color:#ef4444;">Could not load the last uploaded file</span>`;
+            btn.style.display = "none";
+        }
+    }
+
+    function downloadLastDepartureFile() {
+        window.location.href = "/admin/routes/departures/latest/file";
+    }
+
+    loadLastDepartureFile();
 
     function lookupScheduleRouteName() {
         const codeInput = document.getElementById("scheduleRouteCodeInput");
@@ -1237,8 +1417,10 @@
                 return;
             }
 
-            statusEl.textContent = `✅ Added ${departureTime} to ${data.routeName}`;
-            statusEl.style.color = "#059669";
+            statusEl.textContent = data.added
+                ? `✅ ${data.message} (${data.routeName})`
+                : `⚠️ ${data.message}`;
+            statusEl.style.color = data.added ? "#059669" : "#d97706";
             timeInput.value = "";
             loadRouteTable();
             loadBusRosterTable();
