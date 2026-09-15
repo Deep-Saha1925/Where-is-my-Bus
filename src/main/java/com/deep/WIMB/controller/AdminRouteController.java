@@ -137,6 +137,35 @@ public class AdminRouteController {
         }
     }
 
+    /** Downloads the exact Excel file currently loaded for a route — lets an
+     *  admin verify what stops a route actually contains, which is otherwise
+     *  invisible once the file has been uploaded (only the parsed stop COUNT
+     *  shows in the table, not the stop names or the raw file). */
+    @GetMapping("/{routeCode}/file")
+    public ResponseEntity<?> downloadRouteFile(@PathVariable String routeCode) {
+        String code = routeCode.trim().toUpperCase(Locale.ROOT);
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+        if (route.getFileData() == null) {
+            return ResponseEntity.status(404).body(Map.of("error",
+                    "No file stored for \"" + code + "\" \u2014 it may only exist on local disk from before the database migration."));
+        }
+
+        String extension = route.getFilePath() != null && route.getFilePath().toLowerCase(Locale.ROOT).endsWith(".xls")
+                ? ".xls" : ".xlsx";
+        String contentType = extension.equals(".xls")
+                ? "application/vnd.ms-excel"
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + code + extension)
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(route.getFileData());
+    }
+
     @GetMapping("/template")
     public ResponseEntity<byte[]> downloadTemplate() throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
