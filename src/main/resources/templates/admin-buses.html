@@ -595,6 +595,22 @@
                 <label class="brand-label-sm">Excel file</label>
                 <input type="file" id="routeFileInput" accept=".xlsx,.xls,.xlsm" class="file-input"/>
 
+                <div style="display:flex; gap:10px; margin-top:10px; margin-bottom:2px;">
+                    <div style="flex:1;">
+                        <label class="brand-label-sm">Source depot</label>
+                        <input type="text" id="routeSourceDepotInput" class="file-input" style="border-style:solid;" placeholder="e.g. ALIPURDUAR"/>
+                    </div>
+                    <div style="flex:1;">
+                        <label class="brand-label-sm">Destination depot</label>
+                        <input type="text" id="routeDestDepotInput" class="file-input" style="border-style:solid;" placeholder="e.g. COOCHBEHAR"/>
+                    </div>
+                </div>
+                <div style="font-size:11px; color:var(--text-faint); margin-top:2px; margin-bottom:10px;">
+                    Which way THIS route runs. Matters most when you register a route for each direction on the
+                    same road (e.g. APD_COB and COB_APD) — the depot search uses this, not the stop order in
+                    your Excel file, to tell them apart. Leave blank to guess from the file's first/last stop.
+                </div>
+
                 <label class="brand-label-sm">Bus numbers (optional)</label>
                 <input type="text" id="routeBusesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
                        placeholder="e.g. WB-23A-1245, WB-23A-1290"/>
@@ -624,9 +640,9 @@
             <div class="panel-card-body">
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
-                        <thead><tr><th>Code</th><th>Name</th><th>Stops</th><th>Buses</th><th>Departures</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Code</th><th>Name</th><th>Direction</th><th>Stops</th><th>Buses</th><th>Departures</th><th>Actions</th></tr></thead>
                         <tbody id="routeTableBody">
-                        <tr><td colspan="6" class="table-empty">Loading...</td></tr>
+                        <tr><td colspan="7" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -879,31 +895,37 @@
     loadDepotTable();
 
     /* ── ROUTES ── */
+    let routesCache = [];
+
     async function loadRouteTable() {
         const tbody = document.getElementById("routeTableBody");
         const countSub = document.getElementById("routeCountSub");
         try {
             const res = await fetch("/admin/routes");
-            const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, departureTimes, ... }]
+            const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, departureTimes, sourceDepot, destinationDepot, ... }]
+            routesCache = routes;
 
             countSub.textContent = routes.length
                 ? `${routes.length} route${routes.length > 1 ? "s" : ""} registered`
                 : "No routes registered yet";
 
             if (!routes.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="table-empty">No routes added yet — use the form above</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No routes added yet — use the form above</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = routes.map(r => {
-                const buses = (r.busNumbers && r.busNumbers.length) ? r.busNumbers.join(", ") : "—";
-                const busesAttr = (r.busNumbers || []).join(", ").replace(/'/g, "\\'");
+                const buses = (r.busNumbers && r.busNumbers.length) ? esc(r.busNumbers.join(", ")) : "—";
                 // Departures are read-only here — managed from the 🚐 Schedule tab.
-                const departures = (r.departureTimes && r.departureTimes.length) ? r.departureTimes.join(", ") : "—";
+                const departures = (r.departureTimes && r.departureTimes.length) ? esc(r.departureTimes.join(", ")) : "—";
+                const direction = (r.sourceDepot && r.destinationDepot)
+                    ? `${esc(r.sourceDepot)} &rarr; ${esc(r.destinationDepot)}`
+                    : `<span style="color:#d97706;" title="No direction set — this route won't be direction-filtered in the depot search">&#9888; not set</span>`;
                 return `
-        <tr id="routeRow-${r.routeCode}">
-          <td class="code-cell">${r.routeCode}</td>
-          <td>${r.routeName}</td>
+        <tr id="routeRow-${esc(r.routeCode)}">
+          <td class="code-cell">${esc(r.routeCode)}</td>
+          <td>${esc(r.routeName)}</td>
+          <td style="font-size:12.5px; white-space:nowrap;">${direction}</td>
           <td>${r.stopCount}</td>
           <td style="font-size:12.5px; color:var(--text-muted); max-width:200px;">${buses}</td>
           <td style="font-size:12.5px; color:var(--text-muted); max-width:180px;">${departures}</td>
@@ -911,39 +933,51 @@
             <a href="/admin/routes/${encodeURIComponent(r.routeCode)}/file" class="row-update-btn"
                style="display:inline-block; text-decoration:none; margin-bottom:4px;"
                title="Download the Excel file currently loaded for this route">&#11015; File</a>
-            <button class="row-update-btn"
-                    onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}', '${busesAttr}')">Update</button>
-            <button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button>
+            <button class="row-update-btn" onclick="startEditRoute('${esc(r.routeCode)}')">Update</button>
+            <button class="row-delete-btn" onclick="deleteRoute('${esc(r.routeCode)}')">Delete</button>
           </td>
         </tr>`;
             }).join("");
         } catch (err) {
             console.error("Failed to load routes:", err);
             countSub.textContent = "Failed to load";
-            tbody.innerHTML = `<tr><td colspan="6" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="table-empty" style="color:#ef4444;">Failed to load routes</td></tr>`;
         }
     }
 
-    function startEditRoute(routeCode, currentName, currentBuses) {
+    function startEditRoute(routeCode) {
         const row = document.getElementById(`routeRow-${routeCode}`);
-        if (!row) return;
+        const r = routesCache.find(x => x.routeCode === routeCode);
+        if (!row || !r) return;
+
+        const currentBuses = (r.busNumbers || []).join(", ");
 
         row.innerHTML = `
-      <td class="code-cell">${routeCode}</td>
-      <td colspan="4">
-        <input type="text" id="editName-${routeCode}" value="${currentName.replace(/"/g, "&quot;")}"
+      <td class="code-cell">${esc(routeCode)}</td>
+      <td colspan="5">
+        <input type="text" id="editName-${esc(routeCode)}" value="${esc(r.routeName)}"
                class="file-input" style="border-style:solid; margin-bottom:6px;" placeholder="Route name"/>
-        <input type="text" id="editBuses-${routeCode}" value="${(currentBuses || "").replace(/"/g, "&quot;")}"
+        <div style="display:flex; gap:8px; margin-bottom:6px;">
+          <input type="text" id="editSource-${esc(routeCode)}" value="${esc(r.sourceDepot || '')}"
+                 class="file-input" style="border-style:solid; flex:1;" placeholder="Source depot, e.g. ALIPURDUAR"/>
+          <input type="text" id="editDest-${esc(routeCode)}" value="${esc(r.destinationDepot || '')}"
+                 class="file-input" style="border-style:solid; flex:1;" placeholder="Destination depot, e.g. COOCHBEHAR"/>
+        </div>
+        <div style="font-size:11px; color:var(--text-faint); margin-bottom:6px;">
+          This is which way THIS route runs, used by the depot search to tell a there-route apart from its
+          back-route on the same road. It's independent of stop order in the Excel file.
+        </div>
+        <input type="text" id="editBuses-${esc(routeCode)}" value="${esc(currentBuses)}"
                class="file-input" style="border-style:solid; margin-bottom:6px;"
                placeholder="Bus numbers, comma-separated (optional)"/>
-        <input type="file" id="editFile-${routeCode}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
+        <input type="file" id="editFile-${esc(routeCode)}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
         <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">
           Leave the file blank to keep the current stops. Departure times are edited in the 🚐 Schedule tab.
         </div>
-        <div id="editStatus-${routeCode}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
+        <div id="editStatus-${esc(routeCode)}" style="font-size:12px; min-height:16px; margin-top:4px;"></div>
       </td>
       <td style="white-space:nowrap; vertical-align:top;">
-        <button class="row-update-btn" onclick="saveRouteEdit('${routeCode}')">Save</button>
+        <button class="row-update-btn" onclick="saveRouteEdit('${esc(routeCode)}')">Save</button>
         <button class="row-delete-btn" onclick="loadRouteTable()">Cancel</button>
       </td>
     `;
@@ -951,6 +985,8 @@
 
     async function saveRouteEdit(routeCode) {
         const nameInput = document.getElementById(`editName-${routeCode}`);
+        const sourceInput = document.getElementById(`editSource-${routeCode}`);
+        const destInput = document.getElementById(`editDest-${routeCode}`);
         const busesInput = document.getElementById(`editBuses-${routeCode}`);
         const fileInput = document.getElementById(`editFile-${routeCode}`);
         const statusEl = document.getElementById(`editStatus-${routeCode}`);
@@ -968,6 +1004,8 @@
         const formData = new FormData();
         formData.append("routeName", routeName);
         formData.append("busNumbers", busesInput.value.trim());
+        formData.append("sourceDepot", sourceInput.value.trim());
+        formData.append("destinationDepot", destInput.value.trim());
         if (fileInput.files.length) {
             formData.append("file", fileInput.files[0]);
         }
@@ -1026,6 +1064,8 @@
         const nameInput = document.getElementById("routeNameInput");
         const fileInput = document.getElementById("routeFileInput");
         const busesInput = document.getElementById("routeBusesInput");
+        const sourceDepotInput = document.getElementById("routeSourceDepotInput");
+        const destDepotInput = document.getElementById("routeDestDepotInput");
         const statusEl = document.getElementById("routeUploadStatus");
 
         const routeCode = codeInput.value.trim();
@@ -1050,6 +1090,8 @@
         formData.append("routeName", routeName);
         formData.append("file", fileInput.files[0]);
         formData.append("busNumbers", busesInput.value.trim());
+        formData.append("sourceDepot", sourceDepotInput.value.trim());
+        formData.append("destinationDepot", destDepotInput.value.trim());
         formData.append("_csrf", document.getElementById("csrfToken").value);
 
         try {
@@ -1066,12 +1108,16 @@
                 return;
             }
 
-            statusEl.textContent = `✅ ${data.message} (${data.stopCount} stops)`;
-            statusEl.style.color = "#059669";
+            statusEl.textContent = data.warning
+                ? `✅ ${data.message} (${data.stopCount} stops) — ⚠️ ${data.warning}`
+                : `✅ ${data.message} (${data.stopCount} stops): ${data.sourceDepot} → ${data.destinationDepot}`;
+            statusEl.style.color = data.warning ? "#d97706" : "#059669";
             codeInput.value = "";
             nameInput.value = "";
             fileInput.value = "";
             busesInput.value = "";
+            sourceDepotInput.value = "";
+            destDepotInput.value = "";
             loadRouteTable();
         } catch (err) {
             console.error(err);
