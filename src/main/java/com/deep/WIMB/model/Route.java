@@ -26,6 +26,20 @@ public class Route {
     @Column(nullable = false)
     private String routeName;   // e.g. "Alipurduar ⇄ Falakata" — shown to admin/drivers
 
+    // Which depot this specific route serves as its starting point and
+    // ending point, e.g. "ALIPURDUAR" -> "COOCHBEHAR". This is admin-entered
+    // and deliberately NOT inferred from row order in the route's Excel
+    // sheet: two routes covering the same physical road (one for each
+    // direction of travel) commonly list their stops in the exact same
+    // order, since the corridor itself doesn't change — only which way the
+    // bus is running does. Without an explicit field for that, the depot
+    // search has no reliable way to tell a route's "there" service apart
+    // from its "back" service, and either shows both for every search or
+    // (worse) only ever matches whichever direction happens to match the
+    // sheet's row order, no matter which route the admin meant it for.
+    private String sourceDepot;
+    private String destinationDepot;
+
     @Column(nullable = false)
     private String filePath;    // legacy/informational only — kept for display, no longer read from
 
