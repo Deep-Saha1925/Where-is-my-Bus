@@ -63,7 +63,9 @@ public class AdminRouteController {
             @RequestParam("routeCode") String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers
+            @RequestParam(value = "busNumbers", required = false) String busNumbers,
+            @RequestParam(value = "sourceDepot", required = false) String sourceDepot,
+            @RequestParam(value = "destinationDepot", required = false) String destinationDepot
     ) {
         String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -125,13 +127,34 @@ public class AdminRouteController {
             routeExcelLoader.loadRouteFromDisk(route);
             route.setStopCount(routeExcelLoader.getStopCount(code));
 
+            // Direction is what the admin says it is, never what row order in
+            // the sheet happens to look like — two routes covering the same
+            // physical road commonly list stops in the exact same order, so
+            // row order can't tell "the there service" apart from "the back
+            // service". If left blank, fall back to the sheet's own first and
+            // last stop purely as a starting guess the admin can correct.
+            String resolvedSource = sourceDepot == null || sourceDepot.isBlank()
+                    ? routeExcelLoader.getFirstStopName(code) : sourceDepot.trim();
+            String resolvedDestination = destinationDepot == null || destinationDepot.isBlank()
+                    ? routeExcelLoader.getLastStopName(code) : destinationDepot.trim();
+            route.setSourceDepot(resolvedSource);
+            route.setDestinationDepot(resolvedDestination);
+
             routeRepository.save(route);
 
-            return ResponseEntity.ok(Map.of(
-                    "message", "Route added successfully",
-                    "routeCode", code,
-                    "stopCount", route.getStopCount()
-            ));
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("message", "Route added successfully");
+            response.put("routeCode", code);
+            response.put("stopCount", route.getStopCount());
+            response.put("sourceDepot", resolvedSource);
+            response.put("destinationDepot", resolvedDestination);
+            if (sourceDepot == null || sourceDepot.isBlank() || destinationDepot == null || destinationDepot.isBlank()) {
+                response.put("warning", "Source/destination depot weren't provided, so they were guessed from the "
+                        + "file's first and last stop (\"" + resolvedSource + "\" \u2192 \"" + resolvedDestination
+                        + "\"). Please confirm this is correct using Update, especially if another route "
+                        + "covers the same road in the opposite direction.");
+            }
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Upload failed: " + e.getMessage()));
         }
@@ -815,7 +838,9 @@ public class AdminRouteController {
             @PathVariable String routeCode,
             @RequestParam("routeName") String routeName,
             @RequestParam(value = "file", required = false) MultipartFile file,
-            @RequestParam(value = "busNumbers", required = false) String busNumbers
+            @RequestParam(value = "busNumbers", required = false) String busNumbers,
+            @RequestParam(value = "sourceDepot", required = false) String sourceDepot,
+            @RequestParam(value = "destinationDepot", required = false) String destinationDepot
     ) {
         String code = routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -830,6 +855,15 @@ public class AdminRouteController {
         }
 
         route.setRouteName(name);
+        // Same "only touch what was actually submitted" rule as busNumbers
+        // below — an old cached admin page that doesn't send these fields
+        // shouldn't be able to blank out a route's direction.
+        if (sourceDepot != null) {
+            route.setSourceDepot(sourceDepot.isBlank() ? null : sourceDepot.trim());
+        }
+        if (destinationDepot != null) {
+            route.setDestinationDepot(destinationDepot.isBlank() ? null : destinationDepot.trim());
+        }
         // busNumbers is only touched when the field was actually submitted,
         // so callers that don't know about this feature yet (e.g. an old
         // cached admin page) can't accidentally wipe an existing roster.
