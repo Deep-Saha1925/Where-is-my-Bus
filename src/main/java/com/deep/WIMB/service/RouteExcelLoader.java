@@ -22,6 +22,7 @@ import java.util.*;
 public class RouteExcelLoader {
 
     private final RouteRepository routeRepository;
+    private final DriverAccessService driverAccessService;
 
     // Keyed by route code. "DEMO_ROUTES" is the original legacy single route —
     // still used by today's passenger/driver flow until that's migrated (stage 3).
@@ -76,6 +77,7 @@ public class RouteExcelLoader {
         for (Route route : routeRepository.findAll()) {
             try {
                 loadRouteFromDisk(route);
+                backfillDirectionIfMissing(route);
             } catch (Exception e) {
                 // A route that fails to load here is invisible to every search
                 // and every driver for the rest of the process's life, so this
@@ -85,6 +87,111 @@ public class RouteExcelLoader {
                         + "until its Excel file is fixed and re-uploaded. Reason: " + e.getMessage());
             }
         }
+    }
+
+    /**
+     * Fills in sourceDepot/destinationDepot for a route that doesn't have
+     * them yet, by reading the route's NAME rather than its stop order.
+     *
+     * This matters because a route's stop order can't reliably tell you its
+     * direction (see findRoutesBetweenDepots for why), but the admin's own
+     * naming convention already does: a route named "Alipurduar_CoochBehar"
+     * or "Alipurduar \u2192 Cooch Behar" or "Alipurduar to Cooch Behar" was
+     * clearly created to mean "runs from Alipurduar to Cooch Behar" -- that's
+     * exactly the metadata the depot search needs, just sitting in a
+     * different field than expected. This lets every already-registered
+     * route pick up the right direction automatically, with nothing to
+     * re-enter by hand, as long as its name follows that pattern.
+     *
+     * Only ever fills in what's currently blank; never overwrites a value
+     * the admin has already set (deliberately or via the Update form).
+     */
+    private void backfillDirectionIfMissing(Route route) {
+        boolean hasSource = route.getSourceDepot() != null && !route.getSourceDepot().isBlank();
+        boolean hasDest = route.getDestinationDepot() != null && !route.getDestinationDepot().isBlank();
+        if (hasSource && hasDest) return;
+
+        String[] guess = deriveDepotsFromRouteName(route.getRouteName());
+        if (guess == null) {
+            System.out.println("Route " + route.getRouteCode() + " (\"" + route.getRouteName()
+                    + "\") has no direction set and none could be guessed from its name "
+                    + "-- set it manually via Update in the Routes tab.");
+            return;
+        }
+
+        if (!hasSource) route.setSourceDepot(guess[0]);
+        if (!hasDest) route.setDestinationDepot(guess[1]);
+        routeRepository.save(route);
+        System.out.println("Route " + route.getRouteCode() + " (\"" + route.getRouteName()
+                + "\") direction auto-set from its name: " + guess[0] + " -> " + guess[1]);
+    }
+
+    /**
+     * Splits a route name on common separators and matches each half against
+     * the registered depot list, so "Alipurduar_CoochBehar",
+     * "Alipurduar \u2192 Cooch Behar", "Alipurduar-CoochBehar" and
+     * "Alipurduar to Cooch Behar" are all recognised.
+     *
+     * @return [sourceDepot, destinationDepot] using the depot list's own
+     *         spelling, or null if the name couldn't be confidently split
+     *         into two distinct, recognisable depots.
+     */
+    private String[] deriveDepotsFromRouteName(String routeName) {
+        if (routeName == null || routeName.isBlank()) return null;
+
+        String[] parts = routeName.split("_|\u2194|\u21C4|\u2192|->|\\bto\\b|/", 2);
+        if (parts.length != 2) return null;
+
+        List<String> depotNames = driverAccessService.getDepotNames();
+        String source = matchDepotName(parts[0], depotNames);
+        String destination = matchDepotName(parts[1], depotNames);
+
+        if (source == null || destination == null) return null;
+        if (normalizeName(source).equals(normalizeName(destination))) return null;
+
+        return new String[]{source, destination};
+    }
+
+    /** Finds the registered depot name whose normalized form best matches
+     *  (exactly, then by containment) the given fragment of a route name. */
+    private String matchDepotName(String fragment, List<String> depotNames) {
+        String key = normalizeName(fragment);
+        if (key.isEmpty()) return null;
+
+        for (String depot : depotNames) {
+            if (normalizeName(depot).equals(key)) return depot;
+        }
+        if (key.length() < MIN_PARTIAL_MATCH_LENGTH) return null;
+        for (String depot : depotNames) {
+            String depotKey = normalizeName(depot);
+            if (depotKey.length() >= MIN_PARTIAL_MATCH_LENGTH && (depotKey.contains(key) || key.contains(depotKey))) {
+                return depot;
+            }
+        }
+        return null;
+    }
+
+    /** Re-runs the name-based direction guess for every route that's still
+     *  missing it, on demand -- lets an admin apply this to already-loaded
+     *  routes immediately, without waiting for (or forcing) a restart. */
+    public Map<String, String> backfillAllMissingDirections() {
+        Map<String, String> results = new LinkedHashMap<>();
+        for (Route route : routeRepository.findAll()) {
+            boolean hasSource = route.getSourceDepot() != null && !route.getSourceDepot().isBlank();
+            boolean hasDest = route.getDestinationDepot() != null && !route.getDestinationDepot().isBlank();
+            if (hasSource && hasDest) continue;
+
+            String[] guess = deriveDepotsFromRouteName(route.getRouteName());
+            if (guess == null) {
+                results.put(route.getRouteCode(), "could not guess from name \"" + route.getRouteName() + "\"");
+                continue;
+            }
+            if (!hasSource) route.setSourceDepot(guess[0]);
+            if (!hasDest) route.setDestinationDepot(guess[1]);
+            routeRepository.save(route);
+            results.put(route.getRouteCode(), "set to " + guess[0] + " -> " + guess[1]);
+        }
+        return results;
     }
 
     /** (Re)loads a single route into the cache — from its stored DB bytes if
