@@ -154,11 +154,12 @@ public class RouteExcelLoader {
     }
 
     public int getStopOrderByName(String routeCode, String stopName) {
-        return getFullRoute(routeCode).stream()
-                .filter(s -> s.getStopName().equalsIgnoreCase(stopName))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Stop not found: " + stopName))
-                .getStopOrder();
+        List<RouteStop> fullRoute = getFullRoute(routeCode);
+        int idx = findStopIndex(fullRoute, stopName);
+        if (idx == -1) {
+            throw new RuntimeException("Stop not found on route " + routeCode + ": " + stopName);
+        }
+        return fullRoute.get(idx).getStopOrder();
     }
 
     public List<RouteStop> getRouteBetween(String routeCode, String source, String destination) {
@@ -173,6 +174,8 @@ public class RouteExcelLoader {
      */
     public List<DepotRouteMatch> findRoutesBetweenDepots(String source, String destination) {
         List<DepotRouteMatch> matches = new ArrayList<>();
+        System.out.println("Depot search: \"" + source + "\" -> \"" + destination
+                + "\" across " + routeCache.size() + " loaded route(s): " + routeCache.keySet());
 
         for (Map.Entry<String, List<RouteStop>> entry : routeCache.entrySet()) {
             String routeCode = entry.getKey();
@@ -182,7 +185,13 @@ public class RouteExcelLoader {
             try {
                 segment = sliceBetween(fullRoute, source, destination);
             } catch (RuntimeException notFound) {
-                continue; // this route doesn't touch both depots — skip it
+                // Log the reason rather than failing silently. When a depot
+                // search comes back empty it's almost always because the
+                // depot name and the route's stop names are spelled
+                // differently, and without this line there's nothing
+                // anywhere to tell you that.
+                System.out.println("Depot search: route " + routeCode + " skipped — " + notFound.getMessage());
+                continue;
             }
 
             String routeName;
@@ -208,6 +217,10 @@ public class RouteExcelLoader {
             ));
         }
 
+        if (matches.isEmpty()) {
+            System.out.println("Depot search: no route connects \"" + source + "\" and \"" + destination
+                    + "\". Check that both names appear as stop_name values in a route's Excel sheet.");
+        }
         return matches;
     }
 
@@ -236,15 +249,83 @@ public class RouteExcelLoader {
         return stops;
     }
 
-    private List<RouteStop> sliceBetween(List<RouteStop> fullRoute, String source, String destination) {
-        int sourceIdx = -1, destIdx = -1;
-        for (int i = 0; i < fullRoute.size(); i++) {
-            String stopName = fullRoute.get(i).getStopName();
-            if (stopName.equalsIgnoreCase(source)) sourceIdx = i;
-            if (stopName.equalsIgnoreCase(destination)) destIdx = i;
+    /**
+     * Collapses a place name down to a comparison key: lowercase, letters and
+     * digits only, everything else dropped.
+     *
+     * This exists because the two names being compared come from two
+     * completely separate spreadsheets that nobody ever reconciled. Depot
+     * names come from depot-codes.xlsx and are typed like "COOCHBEHAR";
+     * stop names come from each route's own sheet and are typed like
+     * "Cooch Behar". equalsIgnoreCase handles the capitals but not the
+     * space, so every depot search against a two-word town silently found
+     * nothing. Normalising both sides makes "COOCHBEHAR", "Cooch Behar",
+     * "CoochBehar" and "cooch-behar" all the same key.
+     */
+    private static String normalizeName(String name) {
+        if (name == null) return "";
+        StringBuilder key = new StringBuilder(name.length());
+        for (char c : name.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) key.append(Character.toLowerCase(c));
         }
+        return key.toString();
+    }
+
+    /** Shortest normalized length before partial matching is allowed. Below
+     *  this, a containment check is more likely to produce a wrong match than
+     *  a right one (e.g. a depot called "OLD" inside "GOLDEN MARKET"). */
+    private static final int MIN_PARTIAL_MATCH_LENGTH = 5;
+
+    /**
+     * Locates a stop by name within a route, tolerantly. Tries an exact
+     * normalized match across every stop first, and only if nothing matched
+     * falls back to partial matching — so a depot named "COOCHBEHAR" still
+     * resolves against a stop written as "Cooch Behar Bus Terminus". The
+     * shortest candidate wins the fallback, since that's the closest match.
+     *
+     * @return the index into fullRoute, or -1 if the name isn't on this route.
+     */
+    private int findStopIndex(List<RouteStop> fullRoute, String wanted) {
+        String key = normalizeName(wanted);
+        if (key.isEmpty()) return -1;
+
+        for (int i = 0; i < fullRoute.size(); i++) {
+            if (normalizeName(fullRoute.get(i).getStopName()).equals(key)) return i;
+        }
+
+        if (key.length() < MIN_PARTIAL_MATCH_LENGTH) return -1;
+
+        int best = -1;
+        int bestLength = Integer.MAX_VALUE;
+        for (int i = 0; i < fullRoute.size(); i++) {
+            String candidate = normalizeName(fullRoute.get(i).getStopName());
+            if (candidate.length() < MIN_PARTIAL_MATCH_LENGTH) continue;
+
+            if (candidate.contains(key) || key.contains(candidate)) {
+                if (candidate.length() < bestLength) {
+                    best = i;
+                    bestLength = candidate.length();
+                }
+            }
+        }
+        return best;
+    }
+
+    private List<RouteStop> sliceBetween(List<RouteStop> fullRoute, String source, String destination) {
+        int sourceIdx = findStopIndex(fullRoute, source);
+        int destIdx   = findStopIndex(fullRoute, destination);
+
         if (sourceIdx == -1 || destIdx == -1) {
-            throw new RuntimeException("Invalid source or destination");
+            // Name the side that actually failed — "Invalid source or
+            // destination" gave no clue which of the two was the problem,
+            // or what this route does contain.
+            String missing = sourceIdx == -1
+                    ? (destIdx == -1 ? "\"" + source + "\" and \"" + destination + "\"" : "\"" + source + "\"")
+                    : "\"" + destination + "\"";
+            throw new RuntimeException("Stop not on this route: " + missing);
+        }
+        if (sourceIdx == destIdx) {
+            throw new RuntimeException("Source and destination resolve to the same stop");
         }
 
         List<RouteStop> segment;
