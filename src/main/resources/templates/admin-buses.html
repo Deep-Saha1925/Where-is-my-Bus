@@ -638,6 +638,12 @@
                 </div>
             </div>
             <div class="panel-card-body">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                    <button onclick="backfillDirections()" class="upload-btn" style="width:auto; padding:8px 16px;">
+                        🧭 Guess missing directions from route names
+                    </button>
+                    <span id="backfillStatus" style="font-size:12.5px; color:var(--text-muted);"></span>
+                </div>
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
                         <thead><tr><th>Code</th><th>Name</th><th>Direction</th><th>Stops</th><th>Buses</th><th>Departures</th><th>Actions</th></tr></thead>
@@ -895,6 +901,35 @@
     loadDepotTable();
 
     /* ── ROUTES ── */
+    async function backfillDirections() {
+        const statusEl = document.getElementById("backfillStatus");
+        statusEl.textContent = "Guessing...";
+        statusEl.style.color = "var(--text-muted)";
+
+        try {
+            const res = await fetch("/admin/routes/backfill-directions", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "_csrf=" + encodeURIComponent(document.getElementById("csrfToken").value)
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                statusEl.textContent = data.error || "Failed";
+                statusEl.style.color = "#ef4444";
+                return;
+            }
+
+            statusEl.textContent = data.message;
+            statusEl.style.color = "#059669";
+            loadRouteTable();
+        } catch (err) {
+            console.error(err);
+            statusEl.textContent = "Failed: " + err.message;
+            statusEl.style.color = "#ef4444";
+        }
+    }
+
     let routesCache = [];
 
     async function loadRouteTable() {
