@@ -45,7 +45,8 @@ public class RouteExcelLoader {
         try (Workbook wb = WorkbookFactory.create(is)) {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(legacyRouteKey, stops);
-            System.out.println("Loaded legacy route " + legacyRouteKey + " with " + stops.size() + " stops");
+            System.out.println("Loaded legacy route " + legacyRouteKey + " with " + stops.size()
+                    + " stops: " + stopNamesOf(stops));
         }
     }
 
@@ -76,7 +77,12 @@ public class RouteExcelLoader {
             try {
                 loadRouteFromDisk(route);
             } catch (Exception e) {
-                System.err.println("Failed to load route " + route.getRouteCode() + ": " + e.getMessage());
+                // A route that fails to load here is invisible to every search
+                // and every driver for the rest of the process's life, so this
+                // deserves more than a one-line message with no context.
+                System.err.println("FAILED to load route " + route.getRouteCode()
+                        + " (" + route.getRouteName() + ") — it will NOT appear in any search "
+                        + "until its Excel file is fixed and re-uploaded. Reason: " + e.getMessage());
             }
         }
     }
@@ -117,7 +123,8 @@ public class RouteExcelLoader {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(route.getRouteCode(), stops);
             System.out.println("Loaded route " + route.getRouteCode()
-                    + " (" + route.getRouteName() + ") with " + stops.size() + " stops");
+                    + " (" + route.getRouteName() + ") with " + stops.size() + " stops: "
+                    + stopNamesOf(stops));
         }
         // Every admin-added/updated route needs to surface its stops on the
         // passenger search page too, not just the legacy route — otherwise
@@ -190,7 +197,8 @@ public class RouteExcelLoader {
                 // depot name and the route's stop names are spelled
                 // differently, and without this line there's nothing
                 // anywhere to tell you that.
-                System.out.println("Depot search: route " + routeCode + " skipped — " + notFound.getMessage());
+                System.out.println("Depot search: route " + routeCode + " skipped — "
+                        + notFound.getMessage() + ". This route's stops are: " + stopNamesOf(fullRoute));
                 continue;
             }
 
@@ -224,26 +232,98 @@ public class RouteExcelLoader {
         return matches;
     }
 
+    /**
+     * Reads a number out of a cell regardless of how Excel stored it.
+     *
+     * getNumericCellValue() throws outright on a text cell, and a latitude
+     * typed as "26.4799" (or pasted with a stray space, or imported as text)
+     * is stored as a STRING. That single throw used to escape all the way out
+     * of parseWorkbook and abort the whole route load, which is why one badly
+     * typed cell made an entire route disappear from the system.
+     *
+     * @return the value, or null if the cell is blank or genuinely unparseable.
+     */
+    private Double readNumeric(Cell cell, DataFormatter formatter) {
+        if (cell == null) return null;
+
+        CellType type = cell.getCellType() == CellType.FORMULA
+                ? cell.getCachedFormulaResultType()
+                : cell.getCellType();
+
+        if (type == CellType.NUMERIC) {
+            return cell.getNumericCellValue();
+        }
+
+        String text = formatter.formatCellValue(cell)
+                .replace('\u00A0', ' ')
+                .replace(',', '.')
+                .trim();
+        if (text.isEmpty()) return null;
+
+        try {
+            return Double.parseDouble(text);
+        } catch (NumberFormatException notANumber) {
+            return null;
+        }
+    }
+
+    /** Text of a cell, whatever its underlying type, with invisible junk removed. */
+    private String readText(Cell cell, DataFormatter formatter) {
+        if (cell == null) return "";
+        return formatter.formatCellValue(cell)
+                .replace('\u00A0', ' ')
+                .replace('\u200B', ' ')
+                .replace('\uFEFF', ' ')
+                .trim();
+    }
+
+    /**
+     * Parses a route sheet into stops. A row is only usable if it has a stop
+     * name plus a latitude and longitude — those three are what the route is
+     * actually built from. stop_order, distance_km and slack_min are filled
+     * in with sensible defaults when missing, rather than disqualifying the
+     * row, since a missing slack value is not a reason to lose a stop.
+     *
+     * A row that can't be used is skipped with a reason; the rest of the
+     * sheet still loads.
+     */
     private List<RouteStop> parseWorkbook(Workbook wb) {
         Sheet sheet = wb.getSheetAt(0);
+        DataFormatter formatter = new DataFormatter();
         List<RouteStop> stops = new ArrayList<>();
 
-        for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+        for (int i = sheet.getFirstRowNum() + 1; i <= sheet.getLastRowNum(); i++) {
             Row r = sheet.getRow(i);
             if (r == null) continue;
 
-            if (isAnyCellMissing(r, 0, 1, 2, 3, 4, 5)) {
-                System.out.println("Skipping row " + i + " due to missing cells");
+            String name = readText(r.getCell(1), formatter);
+            Double latitude = readNumeric(r.getCell(2), formatter);
+            Double longitude = readNumeric(r.getCell(3), formatter);
+
+            if (name.isEmpty() && latitude == null && longitude == null) {
+                continue; // blank spacer row — not worth a warning
+            }
+            if (name.isEmpty()) {
+                System.out.println("  Skipping row " + (i + 1) + ": no stop_name");
+                continue;
+            }
+            if (latitude == null || longitude == null) {
+                System.out.println("  Skipping row " + (i + 1) + " (\"" + name
+                        + "\"): latitude/longitude missing or not a number");
                 continue;
             }
 
+            Double order = readNumeric(r.getCell(0), formatter);
+            Double distance = readNumeric(r.getCell(4), formatter);
+            Double slack = readNumeric(r.getCell(5), formatter);
+
             RouteStop stop = new RouteStop();
-            stop.setStopOrder((int) r.getCell(0).getNumericCellValue());
-            stop.setStopName(r.getCell(1).getStringCellValue().trim());
-            stop.setLatitude(r.getCell(2).getNumericCellValue());
-            stop.setLongitude(r.getCell(3).getNumericCellValue());
-            stop.setDistanceFromStartKm(r.getCell(4).getNumericCellValue());
-            stop.setSlackTimeMin((int) r.getCell(5).getNumericCellValue());
+            stop.setStopOrder(order == null ? stops.size() + 1 : (int) order.doubleValue());
+            stop.setStopName(name);
+            stop.setLatitude(latitude);
+            stop.setLongitude(longitude);
+            stop.setDistanceFromStartKm(distance == null ? 0.0 : distance);
+            stop.setSlackTimeMin(slack == null ? 0 : (int) slack.doubleValue());
             stops.add(stop);
         }
         return stops;
@@ -381,6 +461,14 @@ public class RouteExcelLoader {
      *  mutate the returned segment's distances without corrupting the
      *  shared routeCache entries every other caller reads from. Fixes a
      *  latent bug where sliceBetween used to rewrite cached stops in place. */
+    /** Comma-joined stop names, for log messages that need to show what a
+     *  route actually contains rather than just how many stops it has. */
+    private String stopNamesOf(List<RouteStop> stops) {
+        List<String> names = new ArrayList<>(stops.size());
+        for (RouteStop stop : stops) names.add(stop.getStopName());
+        return String.join(", ", names);
+    }
+
     private List<RouteStop> copyStops(List<RouteStop> source) {
         List<RouteStop> copies = new ArrayList<>(source.size());
         for (RouteStop original : source) {
@@ -394,14 +482,6 @@ public class RouteExcelLoader {
             copies.add(copy);
         }
         return copies;
-    }
-
-    private boolean isAnyCellMissing(Row row, int... idxs) {
-        for (int idx : idxs) {
-            Cell c = row.getCell(idx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-            if (c == null) return true;
-        }
-        return false;
     }
 
     public void removeRoute(String routeCode) {
