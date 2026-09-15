@@ -160,6 +160,21 @@ public class RouteExcelLoader {
         return route;
     }
 
+    /** First stop name in this route's own sheet, or "" if not loaded/empty.
+     *  Used only as an initial guess for a route's source depot when the
+     *  admin hasn't stated one explicitly — never as the actual direction
+     *  signal for matching (see findRoutesBetweenDepots for why). */
+    public String getFirstStopName(String routeCode) {
+        List<RouteStop> stops = routeCache.get(routeCode);
+        return (stops == null || stops.isEmpty()) ? "" : stops.get(0).getStopName();
+    }
+
+    /** Last stop name in this route's own sheet — see getFirstStopName. */
+    public String getLastStopName(String routeCode) {
+        List<RouteStop> stops = routeCache.get(routeCode);
+        return (stops == null || stops.isEmpty()) ? "" : stops.get(stops.size() - 1).getStopName();
+    }
+
     public int getStopOrderByName(String routeCode, String stopName) {
         List<RouteStop> fullRoute = getFullRoute(routeCode);
         int idx = findStopIndex(fullRoute, stopName);
@@ -188,6 +203,30 @@ public class RouteExcelLoader {
             String routeCode = entry.getKey();
             List<RouteStop> fullRoute = entry.getValue();
 
+            Route route = routeCode.equals(legacyRouteKey)
+                    ? null // the legacy demo route has no DB row/metadata at all
+                    : routeRepository.findByRouteCode(routeCode).orElse(null);
+            if (route == null && !routeCode.equals(legacyRouteKey)) continue; // shouldn't happen, but stay safe
+
+            // Direction is decided by the admin-entered sourceDepot/destinationDepot
+            // fields, NOT by row order in the route's Excel sheet. Two routes
+            // covering the same physical road commonly list their stops in
+            // the exact same order (the corridor doesn't change, only which
+            // way the bus runs does) -- so row order can't tell "the A->B
+            // service" apart from "the B->A service" on that same road. The
+            // legacy demo route predates this field and has none, so it's
+            // left bidirectional, matching either way as it always has.
+            if (route != null && route.getSourceDepot() != null && !route.getSourceDepot().isBlank()) {
+                boolean forwardMatch = normalizeName(route.getSourceDepot()).equals(normalizeName(source))
+                        && normalizeName(route.getDestinationDepot()).equals(normalizeName(destination));
+                if (!forwardMatch) {
+                    System.out.println("Depot search: route " + routeCode + " skipped — registered as \""
+                            + route.getSourceDepot() + " -> " + route.getDestinationDepot()
+                            + "\", which doesn't match this search");
+                    continue;
+                }
+            }
+
             int sourceIdx = findStopIndex(fullRoute, source);
             int destIdx = findStopIndex(fullRoute, destination);
 
@@ -208,26 +247,14 @@ public class RouteExcelLoader {
                 continue; // source and destination resolve to the same stop on this route
             }
 
-            // Only match this route if its OWN stop order genuinely runs
-            // source -> destination. sliceBetween happily reverses a segment
-            // when asked for the opposite direction, which is exactly right
-            // for a driver picking stops on their own route -- but for the
-            // passenger-facing depot search it caused a route registered as
-            // "COB_APD" (Cooch Behar -> Alipurduar) to also match a search
-            // for "Alipurduar -> Cooch Behar", surfacing that route's own
-            // departure times as if they applied to the reverse trip. A
-            // route's registered timetable describes departures from ITS
-            // first stop, so it should only appear for searches going that
-            // same way; the paired reverse route (if one exists) is what
-            // answers the other direction.
-            if (sourceIdx > destIdx) {
-                System.out.println("Depot search: route " + routeCode + " skipped — runs "
-                        + fullRoute.get(0).getStopName() + " -> " + fullRoute.get(fullRoute.size() - 1).getStopName()
-                        + ", which is the reverse of this search");
-                continue;
-            }
-
-            List<RouteStop> segment = copyStops(fullRoute.subList(sourceIdx, destIdx + 1));
+            // Slicing itself stays direction-agnostic: it just needs to find
+            // both stops and hand back the segment between them, in the order
+            // the passenger asked for, regardless of which way they happen to
+            // sit in the underlying sheet. The direction FILTER above is what
+            // decides whether this route was even allowed to reach this point.
+            List<RouteStop> segment = sourceIdx < destIdx
+                    ? copyStops(fullRoute.subList(sourceIdx, destIdx + 1))
+                    : reversedCopy(fullRoute.subList(destIdx, sourceIdx + 1));
             double baseDistance = segment.get(0).getDistanceFromStartKm();
             for (RouteStop stop : segment) {
                 stop.setDistanceFromStartKm(Math.abs(stop.getDistanceFromStartKm() - baseDistance));
@@ -236,13 +263,11 @@ public class RouteExcelLoader {
             String routeName;
             List<String> busNumbers;
             List<String> departureTimes;
-            if (routeCode.equals(legacyRouteKey)) {
+            if (route == null) {
                 routeName = "Alipurduar \u21C4 Falakata (default route)";
                 busNumbers = Collections.emptyList();
                 departureTimes = Collections.emptyList();
             } else {
-                Route route = routeRepository.findByRouteCode(routeCode).orElse(null);
-                if (route == null) continue; // shouldn't happen, but stay safe
                 routeName = route.getRouteName();
                 busNumbers = route.getBusNumbers() == null ? Collections.emptyList() : route.getBusNumbers();
                 departureTimes = route.getDepartureTimes() == null ? Collections.emptyList() : route.getDepartureTimes();
@@ -498,6 +523,14 @@ public class RouteExcelLoader {
         List<String> names = new ArrayList<>(stops.size());
         for (RouteStop stop : stops) names.add(stop.getStopName());
         return String.join(", ", names);
+    }
+
+    /** Deep-copies a sub-list in reverse order — used when a route's stored
+     *  stop order runs the opposite way from what the passenger asked for. */
+    private List<RouteStop> reversedCopy(List<RouteStop> source) {
+        List<RouteStop> copies = copyStops(source);
+        Collections.reverse(copies);
+        return copies;
     }
 
     private List<RouteStop> copyStops(List<RouteStop> source) {
