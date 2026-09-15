@@ -188,18 +188,49 @@ public class RouteExcelLoader {
             String routeCode = entry.getKey();
             List<RouteStop> fullRoute = entry.getValue();
 
-            List<RouteStop> segment;
-            try {
-                segment = sliceBetween(fullRoute, source, destination);
-            } catch (RuntimeException notFound) {
+            int sourceIdx = findStopIndex(fullRoute, source);
+            int destIdx = findStopIndex(fullRoute, destination);
+
+            if (sourceIdx == -1 || destIdx == -1) {
                 // Log the reason rather than failing silently. When a depot
                 // search comes back empty it's almost always because the
                 // depot name and the route's stop names are spelled
                 // differently, and without this line there's nothing
                 // anywhere to tell you that.
-                System.out.println("Depot search: route " + routeCode + " skipped — "
-                        + notFound.getMessage() + ". This route's stops are: " + stopNamesOf(fullRoute));
+                String missing = sourceIdx == -1
+                        ? (destIdx == -1 ? "\"" + source + "\" and \"" + destination + "\"" : "\"" + source + "\"")
+                        : "\"" + destination + "\"";
+                System.out.println("Depot search: route " + routeCode + " skipped — stop not on this route: "
+                        + missing + ". This route's stops are: " + stopNamesOf(fullRoute));
                 continue;
+            }
+            if (sourceIdx == destIdx) {
+                continue; // source and destination resolve to the same stop on this route
+            }
+
+            // Only match this route if its OWN stop order genuinely runs
+            // source -> destination. sliceBetween happily reverses a segment
+            // when asked for the opposite direction, which is exactly right
+            // for a driver picking stops on their own route -- but for the
+            // passenger-facing depot search it caused a route registered as
+            // "COB_APD" (Cooch Behar -> Alipurduar) to also match a search
+            // for "Alipurduar -> Cooch Behar", surfacing that route's own
+            // departure times as if they applied to the reverse trip. A
+            // route's registered timetable describes departures from ITS
+            // first stop, so it should only appear for searches going that
+            // same way; the paired reverse route (if one exists) is what
+            // answers the other direction.
+            if (sourceIdx > destIdx) {
+                System.out.println("Depot search: route " + routeCode + " skipped — runs "
+                        + fullRoute.get(0).getStopName() + " -> " + fullRoute.get(fullRoute.size() - 1).getStopName()
+                        + ", which is the reverse of this search");
+                continue;
+            }
+
+            List<RouteStop> segment = copyStops(fullRoute.subList(sourceIdx, destIdx + 1));
+            double baseDistance = segment.get(0).getDistanceFromStartKm();
+            for (RouteStop stop : segment) {
+                stop.setDistanceFromStartKm(Math.abs(stop.getDistanceFromStartKm() - baseDistance));
             }
 
             String routeName;
