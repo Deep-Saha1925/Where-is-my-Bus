@@ -908,6 +908,9 @@
           <td style="font-size:12.5px; color:var(--text-muted); max-width:200px;">${buses}</td>
           <td style="font-size:12.5px; color:var(--text-muted); max-width:180px;">${departures}</td>
           <td style="white-space:nowrap;">
+            <a href="/admin/routes/${encodeURIComponent(r.routeCode)}/file" class="row-update-btn"
+               style="display:inline-block; text-decoration:none; margin-bottom:4px;"
+               title="Download the Excel file currently loaded for this route">&#11015; File</a>
             <button class="row-update-btn"
                     onclick="startEditRoute('${r.routeCode}', '${r.routeName.replace(/'/g, "\\'")}', '${busesAttr}')">Update</button>
             <button class="row-delete-btn" onclick="deleteRoute('${r.routeCode}')">Delete</button>
