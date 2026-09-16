@@ -138,11 +138,19 @@ public class RideService {
             String userSource, String userDestination) {
 
         List<Ride> activeRides = rideRepository.findByStatus(RideStatus.ACTIVE);
+        System.out.println("Live search: \"" + userSource + "\" -> \"" + userDestination
+                + "\" against " + activeRides.size() + " active ride(s)");
 
-        return activeRides.stream()
+        List<ActiveRideResponse> matches = activeRides.stream()
                 .map(ride -> resolveActiveRide(ride, userSource, userDestination))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+
+        if (matches.isEmpty() && !activeRides.isEmpty()) {
+            System.out.println("Live search: none of the " + activeRides.size()
+                    + " active ride(s) matched — see the skip reasons logged above for why each was excluded");
+        }
+        return matches;
     }
 
     /**
@@ -164,7 +172,8 @@ public class RideService {
         try {
             fullRoute = routeExcelLoader.getFullRoute(routeCode);
         } catch (RuntimeException e) {
-            System.err.println("Ride " + ride.getId() + " — route " + routeCode + " not loaded. Skipping.");
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ") skipped — route " + routeCode + " isn't loaded: " + e.getMessage());
             return null;
         }
 
@@ -176,6 +185,8 @@ public class RideService {
         } catch (RuntimeException e) {
             // This ride's route doesn't have these stop names at all —
             // it's simply not a candidate for this search, not an error.
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ", route " + routeCode + ") skipped — " + e.getMessage());
             return null;
         }
 
@@ -196,26 +207,53 @@ public class RideService {
                 busDestOrder = routeExcelLoader.getStopOrderByName(routeCode, busDestination);
             }
         } catch (RuntimeException e) {
-            System.err.println("Bus dest stop not found on route " + routeCode + ": " + busDestination);
+            System.out.println("Live search: ride " + ride.getId() + " — its own destination \""
+                    + busDestination + "\" (from routeKey \"" + rideRouteKey + "\") isn't a recognised stop on route "
+                    + routeCode + ": " + e.getMessage());
         }
 
         // bus destination order must be >= passenger destination order (forward)
         //      or bus destination order must be <= passenger destination order (backward)
         if (busDestOrder != -1) {
-            if (isForward && busDestOrder < destOrder) return null;
-            if (!isForward && busDestOrder > destOrder) return null;
+            if (isForward && busDestOrder < destOrder) {
+                System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                        + ") skipped — it terminates before the passenger's destination (bus ends at stop "
+                        + busDestOrder + ", passenger wants stop " + destOrder + ")");
+                return null;
+            }
+            if (!isForward && busDestOrder > destOrder) {
+                System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                        + ") skipped — it terminates before the passenger's destination (bus ends at stop "
+                        + busDestOrder + ", passenger wants stop " + destOrder + ", reverse direction)");
+                return null;
+            }
         }
 
         Location lastLoc = getLatestLocation(ride.getId());
-        if (lastLoc == null) return null;
+        if (lastLoc == null) {
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ") skipped — no location has been recorded for it yet (checked Redis and MySQL)");
+            return null;
+        }
 
         int busOrder = findStopOrder(fullRoute, lastLoc);
-        if (busOrder == -1) return null;
+        if (busOrder == -1) {
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ") skipped — its last known location (" + lastLoc.getLatitude() + ", " + lastLoc.getLongitude()
+                    + ") isn't within " + NEAREST_STOP_MAX_KM + " km of any stop on route " + routeCode
+                    + " (see the distance logged just above, if any)");
+            return null;
+        }
 
         // Forward: bus hasn't passed passenger source yet
         // Backward: bus hasn't passed passenger source yet (in reverse direction)
         boolean allowed = isForward ? busOrder <= sourceOrder : busOrder >= sourceOrder;
-        if (!allowed) return null;
+        if (!allowed) {
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ") skipped — it has already passed the passenger's boarding stop (bus is at stop " + busOrder
+                    + ", passenger's stop is " + sourceOrder + ", direction " + (isForward ? "forward" : "reverse") + ")");
+            return null;
+        }
 
         RouteStop busStop = fullRoute.stream()
                 .filter(s -> s.getStopOrder() == busOrder)
@@ -224,7 +262,12 @@ public class RideService {
                 .filter(s -> s.getStopOrder() == sourceOrder)
                 .findFirst().orElse(null);
 
-        if (busStop == null || sourceStop == null) return null;
+        if (busStop == null || sourceStop == null) {
+            System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                    + ") skipped — couldn't resolve stop order " + busOrder + " and/or " + sourceOrder
+                    + " back to an actual stop on route " + routeCode + " (data inconsistency)");
+            return null;
+        }
 
         double remainingDistance = Math.abs(
                 sourceStop.getDistanceFromStartKm() - busStop.getDistanceFromStartKm());
@@ -264,6 +307,17 @@ public class RideService {
     }
 
     // ================= HELPER: Find nearest stop =================
+    // How close the bus's GPS fix needs to be to a stop to count as "at" it.
+    // This was 1.0 km, which is tight enough that a rural route with stops
+    // several kilometres apart (very plausible for a Falakata<->Alipurduar
+    // corridor) could have its bus sitting exactly between two stops for
+    // most of the journey, matching neither — findStopOrder would return -1
+    // the whole time and the bus would never appear in ANY search, for no
+    // reason visible anywhere except by reading this exact line of code.
+    // 3 km gives real inter-stop gaps room without starting to blur
+    // adjacent stops together on a normal urban route.
+    private static final double NEAREST_STOP_MAX_KM = 3.0;
+
     private int findStopOrder(List<RouteStop> fullRoute, Location lastLoc) {
         if (lastLoc == null || fullRoute == null || fullRoute.isEmpty()) return -1;
 
@@ -281,7 +335,14 @@ public class RideService {
             }
         }
 
-        return (nearest != null && minDistance <= 1.0) ? nearest.getStopOrder() : -1;
+        if (nearest == null) return -1;
+        if (minDistance > NEAREST_STOP_MAX_KM) {
+            System.out.println("Live search: nearest stop to (" + lat + ", " + lon + ") is \""
+                    + nearest.getStopName() + "\" but it's " + String.format("%.2f", minDistance)
+                    + " km away, past the " + NEAREST_STOP_MAX_KM + " km matching radius");
+            return -1;
+        }
+        return nearest.getStopOrder();
     }
 
     // ================= HELPER: Haversine =================
