@@ -106,7 +106,13 @@ public class RideService {
         loc.setLatitude(request.getLatitude());
         loc.setLongitude(request.getLongitude());
         loc.setTimestamp(LocalDateTime.now());
-        redisLocationService.saveLocationToRedis(loc);
+        // Same Redis-down fallback as LocationService.addLocation — without
+        // this, a ride starting while Redis is unreachable had its very
+        // first location vanish with nothing to show for it anywhere.
+        boolean savedToRedis = redisLocationService.saveLocationToRedis(loc);
+        if (!savedToRedis) {
+            locationRepository.save(loc);
+        }
 
         return ride;
     }
