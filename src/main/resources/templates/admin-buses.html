@@ -516,6 +516,22 @@
             </div>
         </div>
 
+        <!-- Most recent depot-codes file, kept in the database so it survives redeploys -->
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">📁</div>
+                <div>
+                    <div class="panel-title">Last uploaded depot-codes file</div>
+                    <div class="panel-sub" id="lastDepotFileSub">Loading...</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <div id="lastDepotFileBox" style="font-size:13px; color:var(--text-muted);">Loading...</div>
+                <button id="downloadLastDepotBtn" onclick="downloadLastDepotFile()"
+                        class="upload-btn" style="margin-top:10px; display:none;">⬇ Download this file</button>
+            </div>
+        </div>
+
         <!-- Current codes -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
@@ -891,6 +907,7 @@
             statusEl.style.color = "#059669";
             input.value = "";
             loadDepotTable();
+            loadLastDepotFile();
         } catch (err) {
             console.error(err);
             statusEl.textContent = "Upload failed: " + err.message;
@@ -898,7 +915,45 @@
         }
     }
 
+    /* ── LAST UPLOADED DEPOT-CODES FILE ── */
+    async function loadLastDepotFile() {
+        const box = document.getElementById("lastDepotFileBox");
+        const sub = document.getElementById("lastDepotFileSub");
+        const btn = document.getElementById("downloadLastDepotBtn");
+
+        try {
+            const res = await fetch("/admin/depots/latest");
+            const data = await res.json();
+
+            if (!data.exists) {
+                sub.textContent = "Nothing uploaded yet";
+                box.innerHTML = `<span style="color:var(--text-faint);">No depot-codes file has been uploaded yet.</span>`;
+                btn.style.display = "none";
+                return;
+            }
+
+            const when = data.uploadedAt ? new Date(data.uploadedAt).toLocaleString() : "unknown time";
+            const sizeKb = data.sizeBytes ? (data.sizeBytes / 1024).toFixed(1) + " KB" : "";
+
+            sub.textContent = "Uploaded " + when;
+            box.innerHTML = `
+        <div style="font-weight:700; color:var(--text-primary);">${esc(data.fileName)}</div>
+        <div style="margin-top:4px;">${esc(when)}${sizeKb ? " · " + esc(sizeKb) : ""} · ${data.depotCount} depot(s)</div>`;
+            btn.style.display = "";
+        } catch (err) {
+            console.error("Failed to load last depot-codes file:", err);
+            sub.textContent = "Failed to load";
+            box.innerHTML = `<span style="color:#ef4444;">Could not load the last uploaded file</span>`;
+            btn.style.display = "none";
+        }
+    }
+
+    function downloadLastDepotFile() {
+        window.location.href = "/admin/depots/latest/file";
+    }
+
     loadDepotTable();
+    loadLastDepotFile();
 
     /* ── ROUTES ── */
     async function backfillDirections() {
