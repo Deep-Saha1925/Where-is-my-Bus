@@ -25,6 +25,7 @@ public class AdminUpload {
 
     /** Logical slot, e.g. "departures". Unique — one stored file per kind. */
     public static final String KIND_DEPARTURES = "departures";
+    public static final String KIND_DEPOT_CODES = "depot-codes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
