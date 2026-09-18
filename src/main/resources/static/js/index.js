@@ -2,6 +2,7 @@ const MAX_RECENT = 5;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadStops();
+    loadDepots();
     renderRecentChips();
     loadQuickResults();
 
@@ -10,6 +11,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     document.getElementById("destination").addEventListener("keydown", e => {
         if (e.key === "Enter") searchBuses();
+    });
+    document.getElementById("depotSource").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchDepotRoutes();
+    });
+    document.getElementById("depotDestination").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchDepotRoutes();
     });
 });
 
@@ -21,19 +28,34 @@ function loadStops() {
         .then(r => r.json())
         .then(data => {
             allStops = (data.stops || []).map(s => s.toUpperCase());
-            setupStopAutocomplete("source", "sourceDropdown");
-            setupStopAutocomplete("destination", "destinationDropdown");
+            setupStopAutocomplete("source", "sourceDropdown", allStops);
+            setupStopAutocomplete("destination", "destinationDropdown", allStops);
         })
         .catch(err => console.error("Error loading stops:", err));
+}
+
+/* ─── DEPOTS (static, non-live "search by depot" tab) ───────────── */
+let allDepots = [];
+
+function loadDepots() {
+    fetch("/api/driver/depots")
+        .then(r => r.json())
+        .then(data => {
+            allDepots = (data || []).map(s => s.toUpperCase());
+            setupStopAutocomplete("depotSource", "depotSourceDropdown", allDepots);
+            setupStopAutocomplete("depotDestination", "depotDestinationDropdown", allDepots);
+        })
+        .catch(err => console.error("Error loading depots:", err));
 }
 
 /* ─── CUSTOM DROPDOWN AUTOCOMPLETE ──────────────────────────────────
    Replaces the native <datalist> popup with a styled dropdown that
    matches the app's design, supports keyboard navigation, and lets
    the user click a stop to select it. */
-function setupStopAutocomplete(inputId, dropdownId) {
+function setupStopAutocomplete(inputId, dropdownId, list) {
     const input    = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
+    const options  = list || [];
     let activeIndex = -1;
     let currentMatches = [];
 
@@ -47,7 +69,7 @@ function setupStopAutocomplete(inputId, dropdownId) {
     }
 
     function renderDropdown(query) {
-        currentMatches = allStops.filter(s => s.includes(query.toUpperCase()));
+        currentMatches = options.filter(s => s.includes(query.toUpperCase()));
         activeIndex = -1;
 
         if (!query.trim()) {
@@ -381,4 +403,142 @@ function swapStops() {
     const temp = src.value;
     src.value  = dest.value;
     dest.value = temp;
+}
+
+function swapDepots() {
+    const src  = document.getElementById("depotSource");
+    const dest = document.getElementById("depotDestination");
+    const temp = src.value;
+    src.value  = dest.value;
+    dest.value = temp;
+}
+
+/* ─── SEARCH TABS: Live Buses vs Depot Routes ───────────────────── */
+function switchSearchTab(tab) {
+    const isLive = tab === "live";
+
+    document.getElementById("liveSearchPanel").style.display  = isLive ? "" : "none";
+    document.getElementById("depotSearchPanel").style.display = isLive ? "none" : "";
+    document.getElementById("tabBtnLive").classList.toggle("active", isLive);
+    document.getElementById("tabBtnDepot").classList.toggle("active", !isLive);
+
+    if (isLive) {
+        document.getElementById("depotResultsSection").style.display = "none";
+        renderRecentChips();
+        loadQuickResults();
+    } else {
+        document.getElementById("recentSection").style.display  = "none";
+        document.getElementById("quickResults").style.display   = "none";
+        document.getElementById("resultsHeader").style.display   = "none";
+        document.getElementById("noResults").style.display       = "none";
+        document.getElementById("busList").innerHTML             = "";
+    }
+}
+
+/* ─── DEPOT-TO-DEPOT SEARCH (static — not live GPS) ─────────────── */
+/* Best-effort parser for admin-entered free-text times (e.g. "06:00",
+ * "6:00 AM") into minutes-since-midnight, purely for sorting the timetable
+ * chronologically. Unparseable entries just sort to the end. */
+function timeSortKey(t) {
+    if (!t) return Infinity;
+    const match = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)?$/);
+    if (!match) return Infinity;
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridiem = match[3] ? match[3].toUpperCase() : null;
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+}
+
+async function searchDepotRoutes() {
+    const source      = document.getElementById("depotSource").value.trim();
+    const destination  = document.getElementById("depotDestination").value.trim();
+
+    if (!source || !destination) {
+        alert("Please select both depots");
+        return;
+    }
+    if (source === destination) {
+        alert("Source and destination depots cannot be the same");
+        return;
+    }
+
+    const section        = document.getElementById("depotResultsSection");
+    const loading         = document.getElementById("depotLoading");
+    const noResults       = document.getElementById("depotNoResults");
+    const resultsHeader   = document.getElementById("depotResultsHeader");
+    const resultsCount    = document.getElementById("depotResultsCount");
+    const routeList       = document.getElementById("depotRouteList");
+
+    section.style.display       = "block";
+    routeList.innerHTML         = "";
+    noResults.style.display     = "none";
+    resultsHeader.style.display = "none";
+    loading.style.display       = "block";
+
+    try {
+        const res = await fetch(
+            `/api/routes/by-depots?source=${encodeURIComponent(source)}&destination=${encodeURIComponent(destination)}`
+        );
+        const matches = await res.json();
+
+        loading.style.display = "none";
+
+        if (!matches.length) {
+            noResults.style.display = "block";
+            return;
+        }
+
+        // Flatten route matches into one timetable row per scheduled
+        // departure time — same idea as a train timetable: one row per
+        // service, not one card per route. Routes with no departure times
+        // registered yet fall back to a single "no timetable" row (using
+        // the bus roster as soft context if one exists).
+        const rows = [];
+        matches.forEach(m => {
+            if (m.departureTimes && m.departureTimes.length) {
+                m.departureTimes.forEach(time => rows.push({ ...m, time }));
+            } else {
+                rows.push({ ...m, time: null });
+            }
+        });
+        rows.sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
+
+        resultsHeader.style.display = "flex";
+        resultsCount.textContent    = `${rows.length} departure${rows.length > 1 ? "s" : ""} found`;
+
+        routeList.innerHTML = rows.map((r, i) => {
+            if (r.time) {
+                return `
+                  <div class="depot-route-card timetable-row" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
+                    <div class="timetable-time">${r.time}</div>
+                    <div class="timetable-info">
+                      <div class="timetable-route-name">${r.routeName}</div>
+                      <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; ${r.stopsBetween} stop${r.stopsBetween > 1 ? "s" : ""} &middot; ${r.distanceKm.toFixed(1)} km</div>
+                    </div>
+                  </div>
+                `;
+            }
+
+            const busNote = (r.busNumbers && r.busNumbers.length)
+                ? `Buses: ${r.busNumbers.join(", ")}`
+                : "buses run periodically";
+
+            return `
+              <div class="depot-route-card timetable-row timetable-row--fallback" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
+                <div class="timetable-time"><i class="fa-solid fa-clock"></i></div>
+                <div class="timetable-info">
+                  <div class="timetable-route-name">${r.routeName}</div>
+                  <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; no fixed timetable registered yet &middot; ${busNote}</div>
+                </div>
+              </div>
+            `;
+        }).join("");
+
+    } catch (err) {
+        loading.style.display = "none";
+        alert("Failed to fetch routes");
+        console.error(err);
+    }
 }

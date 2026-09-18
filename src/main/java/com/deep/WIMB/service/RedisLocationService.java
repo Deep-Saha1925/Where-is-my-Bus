@@ -28,22 +28,52 @@ public class RedisLocationService {
 
     private static final String REDIS_KEY = "location:ride:";
 
-    public void saveLocationToRedis(Location location){
+    /**
+     * Pushes a location onto this ride's Redis list.
+     *
+     * @return true if it was actually saved to Redis, false if Redis
+     *         couldn't be reached or the write otherwise failed. Previously
+     *         this only caught JsonProcessingException, so a genuine Redis
+     *         connection failure (RedisConnectionFailureException etc.) was
+     *         never caught here at all — it propagated straight out of
+     *         addLocation()/startRide() as an unhandled 500, AND (this is
+     *         the part that actually broke live tracking) there was nothing
+     *         downstream to notice the write never happened. A driver's
+     *         location updates would keep "succeeding" from the app's point
+     *         of view while Redis was down, with literally nothing being
+     *         stored anywhere — so every live bus vanished from every
+     *         passenger search until Redis came back, with no error visible
+     *         to anyone except this server's own logs.
+     */
+    public boolean saveLocationToRedis(Location location){
         try{
             String key = REDIS_KEY + location.getRide().getId();
             String json = objectMapper.writeValueAsString(location);
 
             redisTemplate.opsForList().rightPush(key, json);
             log.info("Saved location to Redis | key={}", key);
+            return true;
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize location: {}", e.getMessage());
+            return false;
+        } catch (Exception redisUnavailable) {
+            log.error("Redis unavailable, could not save location for ride {}: {}",
+                    location.getRide().getId(), redisUnavailable.getMessage());
+            return false;
         }
     }
 
     public List<Location> getLocationsFromRedis(Long rideId){
         String key = REDIS_KEY + rideId;
-        List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
         List<Location> locations = new ArrayList<>();
+        List<String> jsonList;
+
+        try {
+            jsonList = redisTemplate.opsForList().range(key, 0, -1);
+        } catch (Exception redisUnavailable) {
+            log.error("Redis unavailable, could not read locations for ride {}: {}", rideId, redisUnavailable.getMessage());
+            return locations; // empty — caller falls back to whatever's in MySQL
+        }
 
         if(jsonList == null) return locations;
 
@@ -59,9 +89,16 @@ public class RedisLocationService {
     }
 
     public void clearLocationsFromRedis(Long rideId){
-        String key = REDIS_KEY + rideId;
-        redisTemplate.delete(key);
-        log.info("Cleared Redis key={}", key);
+        try {
+            String key = REDIS_KEY + rideId;
+            redisTemplate.delete(key);
+            log.info("Cleared Redis key={}", key);
+        } catch (Exception redisUnavailable) {
+            // Nothing to clear if Redis is unreachable — the flush this
+            // follows already handled getting the data into MySQL (or
+            // fell back gracefully if it couldn't), so this is safe to skip.
+            log.error("Redis unavailable, could not clear locations for ride {}: {}", rideId, redisUnavailable.getMessage());
+        }
     }
 
     public Set<String> getAllLocationKeys() {
@@ -85,8 +122,14 @@ public class RedisLocationService {
 
     public Location getLastLocationFromRedis(Long rideId) {
         String key = REDIS_KEY + rideId;
-        // rightPop index -1 = last element (most recent)
-        String json = redisTemplate.opsForList().index(key, -1);
+        String json;
+        try {
+            // rightPop index -1 = last element (most recent)
+            json = redisTemplate.opsForList().index(key, -1);
+        } catch (Exception redisUnavailable) {
+            log.error("Redis unavailable, could not read last location for ride {}: {}", rideId, redisUnavailable.getMessage());
+            return null; // caller falls back to MySQL
+        }
         if (json == null) return null;
         try {
             return objectMapper.readValue(json, Location.class);

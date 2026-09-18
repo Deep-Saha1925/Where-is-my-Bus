@@ -6,6 +6,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -24,6 +26,20 @@ public class Route {
     @Column(nullable = false)
     private String routeName;   // e.g. "Alipurduar ⇄ Falakata" — shown to admin/drivers
 
+    // Which depot this specific route serves as its starting point and
+    // ending point, e.g. "ALIPURDUAR" -> "COOCHBEHAR". This is admin-entered
+    // and deliberately NOT inferred from row order in the route's Excel
+    // sheet: two routes covering the same physical road (one for each
+    // direction of travel) commonly list their stops in the exact same
+    // order, since the corridor itself doesn't change — only which way the
+    // bus is running does. Without an explicit field for that, the depot
+    // search has no reliable way to tell a route's "there" service apart
+    // from its "back" service, and either shows both for every search or
+    // (worse) only ever matches whichever direction happens to match the
+    // sheet's row order, no matter which route the admin meant it for.
+    private String sourceDepot;
+    private String destinationDepot;
+
     @Column(nullable = false)
     private String filePath;    // legacy/informational only — kept for display, no longer read from
 
@@ -32,10 +48,6 @@ public class Route {
     // container's local disk, this survives every restart and redeploy,
     // since it lives in the (persistent, hosted) database along with
     // everything else about the route.
-    // Note: intentionally NOT @Lob. On Hibernate 6 + Postgres, @Lob on a
-    // byte[] defaults to the Large Object (oid/bigint) strategy, which
-    // doesn't match a "bytea" column and causes an insert-time type
-    // mismatch. @JdbcTypeCode(VARBINARY) maps this correctly to bytea.
     @JdbcTypeCode(SqlTypes.VARBINARY)
     @Column(nullable = true, columnDefinition = "bytea")
     private byte[] fileData;
@@ -43,4 +55,26 @@ public class Route {
     private int stopCount;
 
     private LocalDateTime uploadedAt;
+
+    // Optional, admin-entered list of bus numbers that run this route.
+    // This is purely static/informational — completely separate from the
+    // live Ride mechanism above. It exists so the "search buses between
+    // depots" feature can answer "does a service exist here" even when
+    // nothing is live right now. Buses can (and do) rotate day to day, so
+    // this list is a best-effort roster, not a guarantee of what's running.
+    @ElementCollection
+    @CollectionTable(name = "route_buses", joinColumns = @JoinColumn(name = "route_id"))
+    @Column(name = "bus_number")
+    private List<String> busNumbers = new ArrayList<>();
+
+    // Optional, admin-entered scheduled departure times for this route (e.g.
+    // "06:00", "09:30"), stored as plain strings — no fixed schedule ID, no
+    // per-day rules, no live-status blending. Every entry is assumed to run
+    // daily. This powers the depot-to-depot timetable search: one result row
+    // per departure time, same idea as a train timetable but deliberately
+    // simpler.
+    @ElementCollection
+    @CollectionTable(name = "route_departures", joinColumns = @JoinColumn(name = "route_id"))
+    @Column(name = "departure_time")
+    private List<String> departureTimes = new ArrayList<>();
 }

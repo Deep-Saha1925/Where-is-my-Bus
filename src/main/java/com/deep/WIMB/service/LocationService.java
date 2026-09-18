@@ -19,6 +19,15 @@ public class LocationService {
     private final RideRepository rideRepository;
     private final RedisLocationService redisLocationService;
 
+    /**
+     * Records a driver's location update. Tries Redis first (it's the hot
+     * path reads use), but if Redis can't be reached, saves straight to
+     * Postgres instead of losing the update entirely. Without this
+     * fallback, a Redis outage meant every location update silently
+     * vanished — nothing in Redis, nothing in Postgres either — which is
+     * why buses disappeared from every passenger search during the outage
+     * with no error visible anywhere except the server's own logs.
+     */
     public Location addLocation(Long rideId, double lat, double lng) {
 
         Ride ride = rideRepository.findById(rideId)
@@ -34,7 +43,10 @@ public class LocationService {
         location.setLongitude(lng);
         location.setTimestamp(LocalDateTime.now());
 
-        redisLocationService.saveLocationToRedis(location);
+        boolean savedToRedis = redisLocationService.saveLocationToRedis(location);
+        if (!savedToRedis) {
+            locationRepository.save(location);
+        }
         return location;
     }
 

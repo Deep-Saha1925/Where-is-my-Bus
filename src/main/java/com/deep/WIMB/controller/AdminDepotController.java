@@ -1,11 +1,11 @@
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.model.AdminUpload;
 import com.deep.WIMB.service.DriverAccessService;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.nio.file.Files;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,9 +24,6 @@ import java.util.Map;
 public class AdminDepotController {
 
     private final DriverAccessService driverAccessService;
-
-    @Value("${wimb.depot.file.path}")
-    private String depotFilePath;
 
     private static final List<String> ALLOWED_EXTENSIONS = List.of(".xlsx", ".xls", ".xlsm");
 
@@ -53,11 +49,10 @@ public class AdminDepotController {
         }
 
         try {
-            File dest = new File(depotFilePath);
-            dest.getParentFile().mkdirs();
-            Files.write(dest.toPath(), file.getBytes());
-
-            driverAccessService.reload();
+            // Stored in Postgres, not local disk — see DriverAccessService
+            // for why: a redeploy wipes local disk, and this file used to
+            // silently disappear every time until this change.
+            driverAccessService.replace(file.getBytes(), filename, file.getContentType());
 
             return ResponseEntity.ok(Map.of(
                     "message", "Depot codes updated successfully",
@@ -66,6 +61,46 @@ public class AdminDepotController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Upload failed: " + e.getMessage()));
         }
+    }
+
+    /** Metadata about the currently stored depot-codes file, for the "last
+     *  uploaded" panel — same idea as the Schedule tab's timetable file. */
+    @GetMapping("/latest")
+    public ResponseEntity<?> latestDepotUpload() {
+        AdminUpload stored = driverAccessService.getStoredFileMetadata();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        if (stored == null || stored.getFileData() == null) {
+            response.put("exists", false);
+            return ResponseEntity.ok(response);
+        }
+
+        response.put("exists", true);
+        response.put("fileName", stored.getFileName());
+        response.put("uploadedAt", stored.getUploadedAt());
+        response.put("sizeBytes", stored.getFileData().length);
+        response.put("depotCount", driverAccessService.getDepotNames().size());
+        return ResponseEntity.ok(response);
+    }
+
+    /** Downloads the exact bytes of the currently stored depot-codes file. */
+    @GetMapping("/latest/file")
+    public ResponseEntity<?> downloadLatestDepotFile() {
+        AdminUpload stored = driverAccessService.getStoredFileMetadata();
+
+        if (stored == null || stored.getFileData() == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "No depot codes file has been uploaded yet"));
+        }
+
+        String contentType = stored.getContentType() == null || stored.getContentType().isBlank()
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : stored.getContentType();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + stored.getFileName().replace("\"", "") + "\"")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(stored.getFileData());
     }
 
     // Generates a ready-to-edit example .xlsx for the admin to download,
