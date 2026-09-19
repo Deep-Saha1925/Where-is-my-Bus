@@ -94,7 +94,13 @@ function renderCards(rides) {
 /* ── LOAD (fetches + caches + renders) ── */
 async function loadActiveBuses() {
   try {
-    const res   = await fetch("/api/ride/active/all");
+    const res = await fetch("/api/ride/active/all");
+    if (!res.ok) {
+      // Surface the real problem instead of letting a non-array error body
+      // (e.g. Spring's default {"status":500,...} JSON) reach applyRides()
+      // and fail confusingly inside rides.map(...).
+      throw new Error(`Server returned ${res.status} for /api/ride/active/all`);
+    }
     const rides = await res.json();
     applyRides(rides);
   } catch (err) {
