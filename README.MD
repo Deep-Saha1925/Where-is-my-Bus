@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
 
 </div>
 
@@ -60,7 +60,7 @@
 - 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
 - ↩️ Resume active ride after refresh
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
-- 📡 Live location sent every GPS tick, protected by a per-bus driver token
+- 📡 Live location sent every GPS tick, protected by a per-bus driver token, pushed to passengers instantly over WebSocket
 
 </td>
 </tr>
@@ -71,7 +71,7 @@
 - 🔐 Secure login (Spring Security)
 - 📊 Live card grid of all active buses
 - 🔎 Search by bus number, source or destination
-- 🔄 Auto-refresh every 5 seconds
+- 📡 Live updates pushed via WebSocket the instant a ride starts, ends, or moves — 30s fallback poll only if the socket ever drops
 - 🏢 **Depot Codes tab** — upload an Excel file to add/update every depot's driver code, no restart needed
 - 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
@@ -88,6 +88,8 @@
 - 🔐 Admin auth via config file, no DB needed
 - 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
 - ⚡ Redis buffer for high-frequency GPS writes
+- 🧠 In-memory active-ride cache — driver token checks on the GPS hot path no longer hit Postgres at all (see [Active Ride Cache](#-active-ride-cache))
+- 📡 WebSocket push for live tracking — replaces the old 3s/5s polling, see [Live Updates](#-live-updates-websocket)
 - 🔄 Auto batch flush Redis → PostgreSQL every 60s
 - 🐳 Containerized with Docker, deployed on Render
 - 🗺️ Route file paths normalized at load time — Excel files registered on one OS (e.g. Windows during local dev) still resolve correctly in production on Linux
@@ -106,6 +108,7 @@
 | Java | 21 | Core language |
 | Spring Boot | 4.x | REST API framework |
 | Spring Security | 6.x | Admin authentication |
+| Spring WebSocket (STOMP) | — | Live push for GPS locations & active-ride list — see [Live Updates](#-live-updates-websocket) |
 | Thymeleaf | 3.x | Server-rendered views for `driver.html`, `admin.html`, `admin-buses.html` |
 | Apache POI | 5.x | Excel processing (routes **and** depot codes, via `WorkbookFactory` — accepts `.xlsx`, `.xls`, `.xlsm`) |
 | PostgreSQL (Neon, hosted) | 16+ | Persistent ride, location & route storage |
@@ -122,6 +125,7 @@
 | Tailwind CSS | Layout utilities & dark mode |
 | Google Fonts (Oswald, Inter, JetBrains Mono) | Brand type system — Oswald for headers/labels, Inter for body text, JetBrains Mono for IDs/codes/data |
 | Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting |
+| SockJS + stomp.js | WebSocket client for live bus tracking (loaded via cdnjs), with a graceful fallback poll if the connection ever drops |
 | Font Awesome | Icons (admin map view, header shortcuts, stop dropdown) |
 | Leaflet.js | Live map view of all active buses |
 
@@ -172,9 +176,12 @@
 │                                                         │
 │   DriverAuthController ─► DriverAccessService (depot codes)│
 │                        └─► DriverTokenService (Redis)    │
-│   RideController  ──►  RideService                       │
-│   LocationController ─► LocationService                 │
-│   RouteController ──►  RouteExcelLoader ─► Cache         │
+│   RideController  ──►  RideService  ──►  ActiveRideCache  │
+│   LocationController ─► LocationService ──► ActiveRideCache│
+│                        (in-memory rideId→busNumber, so    │
+│                        every GPS ping's auth check is 0   │
+│                        Postgres queries — see below)      │
+│   RouteController ──►  RouteExcelLoader ─► Cache           │
 │   AdminDepotController ─► DriverAccessService.reload()   │
 │   AdminRouteController ─► RouteRepository + RouteExcelLoader│
 │                              │                          │
@@ -194,10 +201,19 @@
 │                    │   POSTGRESQL   │  ← Ride, Location, │
 │                    │                │    Route, Bus      │
 │                    └────────────────┘                   │
-└────────────┬────────────────────────────────────────────┘
-             │
-             │ GET last-loc / active rides
-             ▼
+│                                                          │
+│   LocationService / RideService ──► SimpMessagingTemplate │
+│                                       │                  │
+│                                       ▼                  │
+│                        ┌─────────────────────────┐       │
+│                        │   WEBSOCKET (STOMP)    │       │
+│                        │  /topic/ride/{rideId}   │       │
+│                        │  /topic/activeRides     │       │
+│                        └─────────────────────────┘       │
+└────────────┬───────────────────────┬────────────────────┘
+             │                       │ live push (WS)
+             │ GET last-loc / active rides (fallback poll)
+             ▼                       ▼
 ┌────────────────────┐   ┌───────────────────────────────┐
 │   PASSENGER UI     │   │        EXCEL FILES            │
 │                    │   │                               │
@@ -260,6 +276,56 @@ driver:token:<uuid> →  Bus number this token was issued for (TTL ~12h, one shi
 - **Scheduled flush** — `LocationFlushScheduler` runs every 60 seconds, drains all Redis keys to the database
 - **Ride end flush** — When a ride is cancelled or a new ride starts for the same bus, remaining Redis data is immediately flushed so no location data is ever lost
 - **Token expiry** — driver tokens expire on their own after ~12 hours; no cleanup job needed
+
+---
+
+## 🧠 Active Ride Cache
+
+Redis solves the GPS *write* problem — but until recently, every single location update still cost **two full Postgres queries** before that write ever happened: one to check the driver's token belongs to the ride's bus, one more (redundantly) inside the save logic itself. On a driver sending a GPS tick every few seconds, across even a handful of concurrently active buses, that's enough load to start queueing behind the connection pool — the exact bottleneck Redis was supposed to prevent, just one step earlier in the request.
+
+`ActiveRideCache` closes that gap: a simple in-memory map of `rideId → busNumber` for every currently active ride, kept in sync when a ride starts, ends, or is cancelled, and rebuilt from the database on startup (so a restart doesn't strand an in-progress ride). Both `/api/location/update` and `/api/ride/location` now check this cache instead of querying Postgres — the driver-auth check on the hottest endpoint in the app now costs **zero** database queries.
+
+```
+GPS update arrives
+        ↓
+Check ActiveRideCache (in-memory, ~microseconds)
+        ↓
+Valid?  ──► write to Redis (see above) ──► push over WebSocket
+Invalid? ──► reject, no DB touched either way
+```
+
+> ⚠️ **Single-instance limitation, by design (for now):** this cache lives in one JVM's memory, which is correct for the app's current single-Render-instance deployment but will *not* stay correct across multiple instances — a ride started on instance A wouldn't be visible to instance B's cache. When the app moves to a VPS running more than one instance, this needs to move to Redis (same pattern as `DriverTokenService` already uses), so every instance shares the same view of which rides are active. Noted directly in the code (`ActiveRideCache.java`) as well, so it isn't a surprise later.
+
+---
+
+## 📡 Live Updates (WebSocket)
+
+Passenger and admin views used to **poll**: `track.html` hit `/api/location/last-loc/{rideId}` every 3 seconds per open tab, and `admin-buses.html` hit `/api/ride/active/all` every 5 seconds — load that scaled with how many people were *watching*, not with how many buses were actually moving. Ten passengers tracking the same bus meant ten requests every 3 seconds for data that usually hadn't changed at all.
+
+That's now a **push**, over a STOMP-over-WebSocket connection (via SockJS, so it degrades gracefully on networks that block raw WebSocket):
+
+```
+Driver sends a GPS update
+        ↓
+LocationService.addLocation()
+        ↓
+   ┌────────────────────┬───────────────────────┐
+   ▼                    ▼                       
+Redis (buffer)   /topic/ride/{rideId}  ← track.js subscribes
+                         
+Ride starts / ends
+        ↓
+/topic/activeRides  ← admin-buses.js + track.js's auto-select both subscribe
+```
+
+| Topic | Who subscribes | Payload |
+|---|---|---|
+| `/topic/ride/{rideId}` | `track.html`, for the one bus a passenger is watching | `{ rideId, latitude, longitude, timestamp }` |
+| `/topic/activeRides` | `admin-buses.html`'s bus grid; `track.html`'s auto-select-a-bus flow | The same list `/api/ride/active/all` returns |
+
+- **Handshake endpoint:** `/ws` (public, same access level as the other passenger/driver-facing tracking endpoints)
+- **Fallback polling kept as a safety net** — 20s on `track.html`, 30s on `admin-buses.html` — in case a socket silently dies (a flaky network, a proxy that kills idle connections). Still a 6–9x drop from the old intervals, and now insurance rather than the primary mechanism.
+- **Single-instance limitation:** the message broker (`registry.enableSimpleBroker`) is in-memory, same caveat as `ActiveRideCache` above — a message published on one instance won't reach a passenger connected to a different instance. Moving to multiple instances means swapping this for a real broker (e.g. Redis pub/sub relayed to STOMP, or RabbitMQ's STOMP plugin).
 
 ---
 
@@ -344,9 +410,7 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 `Ride` doesn't yet store *which route* it's actually on — that's the next piece of work. Practically, this means:
 - ✅ Starting a ride on any registered route (legacy or newly-added) works correctly — coordinates resolve against the right route.
 - ✅ GPS tracking (`/api/ride/location`) is entirely route-agnostic, so it's unaffected either way.
-- ⚠️ The passenger-facing live timeline (`track.html`) still resolves stop lookups without knowing which route a ride belongs to, so it can behave incorrectly for rides on anything other than the legacy route. Fixing this properly means giving `Ride`/`StartRideRequest` a real route reference instead of the current derived `"SOURCE_DESTINATION"` string — planned, not yet done.
-
----
+- ⚠️ The passenger-facing live timeline (`track.html`) still resolves stop lookups without knowing which route a ride belongs to, so it can behave incorrectly for rides on anything other than the legacy route. Fixing this properly means giving `Ride`/`StartRideRequest` a real route reference instead of the current derived `"SOURCE_DESTINATION"` string — planned, not yet done.---
 
 ## 🔐 Admin Security
 
@@ -367,6 +431,7 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/api/ride/active` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
 | `/api/driver/**` (verify, depots list) | 🌐 Everyone |
 | `/api/ride/start` `/api/ride/location` `/api/ride/cancel/**` | 🌐 Public route, 🔑 but requires a valid `X-Driver-Token` header — enforced in the controller, not by Spring Security |
+| `/ws/**` | 🌐 Everyone *(WebSocket handshake — same public tracking data as the REST endpoints above, just pushed instead of polled)* |
 | `/login.html` | 🌐 Everyone |
 | `/admin-buses.html` | 🔐 Admin only |
 | `/api/ride/active/all` | 🔐 Admin only *(also read by the driver's own "resume ride" check)* |
@@ -472,7 +537,36 @@ X-Driver-Token: a1b2c3d4-...
 ```http
 GET /api/location/last-loc/{rideId}
 ```
-> ⚡ Returns from Redis if ride is active, falls back to the database if not buffered.
+> ⚡ Returns from Redis if ride is active, falls back to the database if not buffered. Used as the initial snapshot and as a fallback poll — see the WebSocket topics below for how this data actually arrives moment-to-moment.
+
+</details>
+
+<details>
+<summary><b>📡 WebSocket (STOMP over SockJS)</b></summary>
+
+#### Connect
+```
+new SockJS("/ws")
+Stomp.over(socket)
+```
+Public endpoint, no auth required — same access level as the REST tracking endpoints.
+
+#### Subscribe — one bus's live location
+```
+/topic/ride/{rideId}
+```
+```json
+{ "rideId": 5, "latitude": 26.494, "longitude": 89.368, "timestamp": "2026-09-19T10:15:03" }
+```
+Published every time that ride's driver sends a GPS update.
+
+#### Subscribe — full active-bus list
+```
+/topic/activeRides
+```
+Same shape as `GET /api/ride/active/all`. Published whenever any ride starts or ends.
+
+See [Live Updates](#-live-updates-websocket) for the full picture, including the fallback-polling behavior.
 
 </details>
 
@@ -585,6 +679,7 @@ WIMB/
 │   ├── config/
 │   │   ├── SecurityConfig.java          # Spring Security rules
 │   │   ├── RedisConfig.java             # Redis template config
+│   │   ├── WebSocketConfig.java         # STOMP/SockJS endpoint + broker config
 │   │   └── CorsConfig.java
 │   ├── controller/
 │   │   ├── RideController.java
@@ -600,9 +695,10 @@ WIMB/
 │   ├── service/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
+│   │   ├── ActiveRideCache.java         # in-memory rideId→busNumber, avoids a DB hit per GPS ping
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
 │   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
-│   │   ├── DriverAccessService.java     # loads/reloads depot codes Excel
+│   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload)
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
 │   │   ├── DriverNotVerifiedException.java
@@ -612,17 +708,20 @@ WIMB/
 │   ├── model/
 │   │   ├── Ride.java
 │   │   ├── Bus.java
-│   │   ├── Route.java                   # routeCode, routeName, filePath, stopCount
-│   │   └── Location.java               # implements Serializable
+│   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount
+│   │   ├── AdminUpload.java             # DB-backed store for depot codes / bus rosters / timetables
+│   │   └── Location.java               # implements Serializable; ride is @JsonIgnore (see Active Ride Cache)
 │   ├── enums/
 │   │   └── RideStatus.java
 │   ├── repository/
 │   │   ├── RideRepository.java
 │   │   ├── BusRepository.java
-│   │   └── RouteRepository.java
+│   │   ├── RouteRepository.java
+│   │   └── AdminUploadRepository.java
 │   └── dto/
 │       ├── StartRideRequest.java
 │       ├── LocationUpdateRequest.java
+│       ├── LocationBroadcast.java       # lean {rideId, lat, lng, timestamp} payload for WebSocket pushes
 │       ├── ActiveRideResponse.java
 │       ├── RouteStop.java
 │       └── RouteSummary.java            # public-safe route listing (no file paths)
@@ -763,18 +862,19 @@ A multi-stage `Dockerfile`:
 
 ### Notes on the free tier
 - **Cold starts** — the service sleeps after ~15 minutes idle; the first request after a gap takes 30–50s to wake up
-- **Ephemeral filesystem** — any file written to disk at runtime (e.g. a route uploaded through the admin panel *after* the container started) does **not** survive a redeploy or restart, since the container filesystem resets to whatever's baked into the Docker image. The two files seeded into the image at build time (`data/depot-codes.xlsx`, `data/routes/*.xlsx`) always persist across restarts; anything uploaded live does not, until it's also committed into the image. Moving admin uploads to the database or object storage (e.g. S3-compatible storage) would remove this limitation — not yet done.
+- **Route & admin-upload files are DB-backed, not disk-backed** — route Excel files (`Route.fileData`) and other admin uploads (depot codes, bus rosters, timetables — via `AdminUpload`) are stored as `bytea` in Postgres and loaded from there, so they survive redeploys and restarts without needing anything baked into the Docker image. A copy is still written to the container's local disk on upload, but that's a best-effort debugging convenience only — the app never reads from it, so a wiped ephemeral filesystem (Render's free-tier default behavior) doesn't lose any data.
 
 ---
 
 ## 🚀 Future Enhancements
 
-- [ ] WebSocket live tracking (replace 3s polling)
+- [x] ~~WebSocket live tracking (replace 3s polling)~~ — done: STOMP over SockJS, see [Live Updates](#-live-updates-websocket)
 - [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for depot codes **and** routes
 - [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
 - [x] ~~Deploy to production~~ — done: Docker + Render, live at the link above
+- [x] ~~Move admin-uploaded files (routes, depot codes) off the container's ephemeral disk and into the database~~ — done: both are `bytea` columns in Postgres now, disk copies are best-effort only
 - [ ] Give `Ride` a real route reference, so `track.html` resolves correctly for any route, not just the legacy one
-- [ ] Move admin-uploaded files (routes, depot codes) off the container's ephemeral disk and into the database or object storage, so they survive redeploys automatically
+- [ ] Move `ActiveRideCache` and the WebSocket message broker from in-memory to Redis-backed, once the app runs more than one instance (see the caveats in [Active Ride Cache](#-active-ride-cache) and [Live Updates](#-live-updates-websocket))
 - [ ] Push notifications when bus is nearby
 - [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
 - [ ] Passenger seat booking
