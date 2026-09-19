@@ -1,11 +1,11 @@
 package com.deep.WIMB.service;
 
-import com.deep.WIMB.dto.LocationUpdateRequest;
+import com.deep.WIMB.dto.LocationBroadcast;
 import com.deep.WIMB.model.Location;
-import com.deep.WIMB.model.Ride;
 import com.deep.WIMB.repository.LocationRepository;
 import com.deep.WIMB.repository.RideRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -17,6 +17,7 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final RideRepository rideRepository;
     private final RedisLocationService redisLocationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Records a driver's location update. Tries Redis first (it's the hot
@@ -34,13 +35,16 @@ public class LocationService {
      * the single hottest endpoint in the app. getReferenceById gets a
      * lazy proxy carrying just the ID -- enough to set the foreign key on
      * Location -- without hitting the database at all.
+     *
+     * Also pushes the update to every passenger currently watching this
+     * ride over WebSocket (/topic/ride/{rideId}), so track.html updates the
+     * instant a real GPS fix arrives instead of waiting for its next poll.
      */
     public Location addLocation(Long rideId, double lat, double lng) {
 
-        Ride ride = rideRepository.getReferenceById(rideId);
-
         Location location = new Location();
-        location.setRide(ride);
+        location.setRide(rideRepository.getReferenceById(rideId));
+        location.setRideId(rideId);
         location.setLatitude(lat);
         location.setLongitude(lng);
         location.setTimestamp(LocalDateTime.now());
@@ -49,6 +53,12 @@ public class LocationService {
         if (!savedToRedis) {
             locationRepository.save(location);
         }
+
+        messagingTemplate.convertAndSend(
+                "/topic/ride/" + rideId,
+                new LocationBroadcast(rideId, lat, lng, location.getTimestamp())
+        );
+
         return location;
     }
 
