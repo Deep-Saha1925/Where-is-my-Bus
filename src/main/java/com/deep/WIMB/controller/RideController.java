@@ -6,6 +6,7 @@ import com.deep.WIMB.dto.StartRideRequest;
 import com.deep.WIMB.exception.DriverNotVerifiedException;
 import com.deep.WIMB.model.Location;
 import com.deep.WIMB.model.Ride;
+import com.deep.WIMB.service.ActiveRideCache;
 import com.deep.WIMB.service.DriverTokenService;
 import com.deep.WIMB.service.LocationService;
 import com.deep.WIMB.service.RideService;
@@ -22,6 +23,7 @@ public class RideController {
     private final RideService rideService;
     private final LocationService locationService;
     private final DriverTokenService driverTokenService;
+    private final ActiveRideCache activeRideCache;
 
     @GetMapping("/active")
     public List<ActiveRideResponse> getActiveRides(
@@ -49,13 +51,17 @@ public class RideController {
         return rideService.getAllActiveRides();
     }
 
+    // Same hot-path reasoning as LocationController#updateLocation (this is
+    // effectively a duplicate of that endpoint, kept for backward
+    // compatibility since driver.js calls this one) -- validated against
+    // the cache, not a DB lookup, since this fires every few seconds per
+    // active bus.
     @PostMapping("/location")
     public Location updateLocation(@RequestBody LocationUpdateRequest request,
                                    @RequestHeader(value = "X-Driver-Token", required = false) String driverToken) {
 
-        Ride ride = rideService.getRideById(request.getRideId());
         String tokenBus = driverTokenService.resolveBusNumber(driverToken);
-        if (ride == null || tokenBus == null || !tokenBus.equalsIgnoreCase(ride.getBus().getBusNumber())) {
+        if (tokenBus == null || !activeRideCache.isActiveForBus(request.getRideId(), tokenBus)) {
             throw new DriverNotVerifiedException("Driver not verified for this ride");
         }
 
