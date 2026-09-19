@@ -29,6 +29,7 @@ public class RideService {
     private final LocationRepository locationRepository;
     private final RouteExcelLoader routeExcelLoader;
     private final RedisLocationService redisLocationService;
+    private final ActiveRideCache activeRideCache;
 
     // ============ UPDATE RIDE REQUEST ================
     public StartRideRequest updateRequest(StartRideRequest request) {
@@ -91,6 +92,8 @@ public class RideService {
                     flushRideFromRedisToMySQL(r.getId());
                     r.setStatus(RideStatus.ENDED);
                     r.setEndTime(LocalDateTime.now());
+                    rideRepository.save(r);
+                    activeRideCache.remove(r.getId());
                 });
 
         Ride ride = new Ride();
@@ -100,6 +103,7 @@ public class RideService {
         ride.setStartTime(LocalDateTime.now());
         ride.setStatus(RideStatus.ACTIVE);
         ride = rideRepository.save(ride);
+        activeRideCache.put(ride.getId(), bus.getBusNumber());
 
         Location loc = new Location();
         loc.setRide(ride);
@@ -130,7 +134,9 @@ public class RideService {
         flushRideFromRedisToMySQL(rideId);
         ride.setStatus(RideStatus.ENDED);
         ride.setEndTime(LocalDateTime.now());
-        return rideRepository.save(ride);
+        Ride saved = rideRepository.save(ride);
+        activeRideCache.remove(rideId);
+        return saved;
     }
 
     // ================= CORE LOGIC =================
