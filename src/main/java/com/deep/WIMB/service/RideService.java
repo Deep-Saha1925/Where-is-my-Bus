@@ -12,6 +12,7 @@ import com.deep.WIMB.repository.LocationRepository;
 import com.deep.WIMB.repository.RideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,17 @@ public class RideService {
     private final RouteExcelLoader routeExcelLoader;
     private final RedisLocationService redisLocationService;
     private final ActiveRideCache activeRideCache;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    // Pushed to /topic/activeRides whenever a ride starts or ends, so
+    // admin-buses.html's bus grid and track.html's "auto select a bus on
+    // this route" flow update immediately instead of waiting for their next
+    // poll. Kept private/small: it just re-sends the same list
+    // getAllActiveRides() already computes for the REST endpoint of the
+    // same name, so there's exactly one place that builds this list.
+    private void broadcastActiveRides() {
+        messagingTemplate.convertAndSend("/topic/activeRides", getAllActiveRides());
+    }
 
     // ============ UPDATE RIDE REQUEST ================
     public StartRideRequest updateRequest(StartRideRequest request) {
@@ -107,6 +119,7 @@ public class RideService {
 
         Location loc = new Location();
         loc.setRide(ride);
+        loc.setRideId(ride.getId());
         loc.setLatitude(request.getLatitude());
         loc.setLongitude(request.getLongitude());
         loc.setTimestamp(LocalDateTime.now());
@@ -118,6 +131,7 @@ public class RideService {
             locationRepository.save(loc);
         }
 
+        broadcastActiveRides();
         return ride;
     }
 
@@ -136,6 +150,7 @@ public class RideService {
         ride.setEndTime(LocalDateTime.now());
         Ride saved = rideRepository.save(ride);
         activeRideCache.remove(rideId);
+        broadcastActiveRides();
         return saved;
     }
 
@@ -306,6 +321,15 @@ public class RideService {
     private void flushRideFromRedisToMySQL(Long rideId) {
         List<Location> locations = redisLocationService.getLocationsFromRedis(rideId);
         if (!locations.isEmpty()) {
+            // Location.ride is @JsonIgnore (see that field's comment for why),
+            // so every Location just deserialized from Redis JSON has ride ==
+            // null -- the FK has to be restored before these can be saved.
+            // getReferenceById is a proxy, not a fetch: this costs one query
+            // total for the whole batch (Hibernate needs the actual entity
+            // once to build the INSERT), not once per location.
+            var rideRef = rideRepository.getReferenceById(rideId);
+            locations.forEach(loc -> loc.setRide(rideRef));
+
             locationRepository.saveAll(locations);
             redisLocationService.clearLocationsFromRedis(rideId);
             log.info("Flushed {} locations for rideId={} to MySQL", locations.size(), rideId);
