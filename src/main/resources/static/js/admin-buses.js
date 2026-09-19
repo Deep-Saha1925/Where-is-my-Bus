@@ -96,23 +96,7 @@ async function loadActiveBuses() {
   try {
     const res   = await fetch("/api/ride/active/all");
     const rides = await res.json();
-
-    allRides = rides; // cache for search filtering
-
-    const uniqueRoutes = new Set(rides.map(r => r.routeKey)).size;
-    document.getElementById("statCount").textContent  = rides.length;
-    document.getElementById("statRoutes").textContent = uniqueRoutes;
-    document.getElementById("lastRefreshed").textContent =
-        "Last updated " + new Date().toLocaleTimeString();
-
-    // Only re-render if not currently searching
-    const query = document.getElementById("searchInput")?.value.trim();
-    if (query) {
-      filterBuses(); // re-apply filter on fresh data
-    } else {
-      renderCards(rides);
-    }
-
+    applyRides(rides);
   } catch (err) {
     console.error("Failed to load active rides:", err);
     document.getElementById("busGrid").innerHTML = `
@@ -124,10 +108,71 @@ async function loadActiveBuses() {
   }
 }
 
+/* ── APPLY RIDES (shared by the initial fetch, the WebSocket push, and the
+   fallback poll) ── */
+function applyRides(rides) {
+  allRides = rides; // cache for search filtering
+
+  const uniqueRoutes = new Set(rides.map(r => r.routeKey)).size;
+  document.getElementById("statCount").textContent  = rides.length;
+  document.getElementById("statRoutes").textContent = uniqueRoutes;
+  document.getElementById("lastRefreshed").textContent =
+      "Last updated " + new Date().toLocaleTimeString();
+
+  // Only re-render if not currently searching
+  const query = document.getElementById("searchInput")?.value.trim();
+  if (query) {
+    filterBuses(); // re-apply filter on fresh data
+  } else {
+    renderCards(rides);
+  }
+}
+
 function trackBus(routeKey, rideId, routeCode) {
   const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
   window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
 }
 
-loadActiveBuses();
-setInterval(loadActiveBuses, 5000);
+/* ── WEBSOCKET (live push, replaces 5s polling) ──
+   Same pattern as track.js — see that file's comments for why there's a
+   manual reconnect loop here instead of relying on the library. */
+let adminStompClient      = null;
+let adminWsReconnectTimer = null;
+
+function connectAdminWebSocket() {
+  try {
+    const socket = new SockJS("/ws");
+    adminStompClient = Stomp.over(socket);
+    adminStompClient.debug = null;
+
+    adminStompClient.connect({}, () => {
+      adminStompClient.subscribe("/topic/activeRides", (message) => {
+        try {
+          applyRides(JSON.parse(message.body));
+        } catch (err) {
+          console.error("Failed to parse active-rides push:", err);
+        }
+      });
+    }, scheduleAdminWsReconnect);
+
+    socket.onclose = scheduleAdminWsReconnect;
+  } catch (err) {
+    console.error("Admin WebSocket connect failed:", err);
+    scheduleAdminWsReconnect();
+  }
+}
+
+function scheduleAdminWsReconnect() {
+  if (adminWsReconnectTimer) return;
+  adminWsReconnectTimer = setTimeout(() => {
+    adminWsReconnectTimer = null;
+    connectAdminWebSocket();
+  }, 4000);
+}
+
+loadActiveBuses();       // initial snapshot, before the socket connects
+connectAdminWebSocket();
+
+// Safety net only, same reasoning as track.js — 30s instead of the old 5s,
+// since the WebSocket push is now what keeps this fresh in normal operation.
+setInterval(loadActiveBuses, 30000);

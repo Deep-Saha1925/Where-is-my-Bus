@@ -12,7 +12,11 @@ let routeStops     = [];
 let fullRouteStops = [];
 let busLocation    = null;
 let rideInfo       = null;
-let hasEnteredOnce = false; // only slide the rows in on the first render, not every 3s refresh
+let hasEnteredOnce = false; // only slide the rows in on the first render, not every WS/poll refresh
+
+let stompClient        = null;
+let wsSubscribedRideId = null;
+let wsReconnectTimer   = null;
 
 /* ─── INIT ─────────────────────────────────────────────────────── */
 if (routeKey) {
@@ -25,9 +29,68 @@ if (!rideId && routeKey) {
   autoSelectRide();
 } else if (rideId) {
   fetchRideInfo();
+  tick(); // one immediate fetch so the page isn't blank while the socket connects
 }
 
-setInterval(tick, 3000);
+connectWebSocket();
+
+// Safety net only — the WebSocket push is what normally keeps this fresh.
+// If the socket is ever silently stuck (a flaky network, a proxy that kills
+// idle connections), this still catches up within 20s instead of the page
+// going stale forever. This is the same endpoint the old 3s poll used, just
+// 6-7x less often, since it's now a fallback rather than the primary path.
+setInterval(tick, 20000);
+
+/* ─── WEBSOCKET (live push, replaces 3s polling) ──────────────────── */
+function connectWebSocket() {
+  try {
+    const socket = new SockJS("/ws");
+    stompClient = Stomp.over(socket);
+    stompClient.debug = null; // silence stomp.js's verbose console logging
+
+    stompClient.connect({}, () => {
+      if (rideId) subscribeToRide(rideId);
+    }, () => {
+      // onError — stomp.js has no built-in auto-reconnect, so retry by hand
+      scheduleWsReconnect();
+    });
+
+    socket.onclose = scheduleWsReconnect;
+  } catch (err) {
+    console.error("WebSocket connect failed:", err);
+    scheduleWsReconnect();
+  }
+}
+
+function scheduleWsReconnect() {
+  if (wsReconnectTimer) return; // already scheduled
+  wsReconnectTimer = setTimeout(() => {
+    wsReconnectTimer = null;
+    wsSubscribedRideId = null;
+    connectWebSocket();
+  }, 4000);
+}
+
+function subscribeToRide(id) {
+  if (!id) return;
+  if (!stompClient || !stompClient.connected) {
+    // autoSelectRide() can resolve a rideId before the socket has finished
+    // connecting -- retry briefly rather than dropping the subscription.
+    // The fallback 20s poll keeps the page correct in the meantime either way.
+    setTimeout(() => subscribeToRide(id), 500);
+    return;
+  }
+  if (wsSubscribedRideId === String(id)) return; // already subscribed to this ride
+
+  stompClient.subscribe(`/topic/ride/${id}`, (message) => {
+    try {
+      applyLocation(JSON.parse(message.body));
+    } catch (err) {
+      console.error("Failed to parse live location push:", err);
+    }
+  });
+  wsSubscribedRideId = String(id);
+}
 
 /* ─── LOAD ROUTE STOPS ──────────────────────────────────────────── */
 async function loadRoute(src, dest) {
@@ -84,6 +147,7 @@ async function autoSelectRide() {
       rideId = buses[0].rideId;
       await loadFullRoute();
       tick();
+      subscribeToRide(rideId);
     }
   } catch (err) {
     console.error("Auto-select failed:", err);
@@ -106,23 +170,28 @@ async function fetchRideInfo() {
   }
 }
 
-/* ─── TICK ──────────────────────────────────────────────────────── */
+/* ─── TICK (fallback poll — see the setInterval(tick, 20000) above) ──── */
 async function tick() {
   if (!rideId) return;
   try {
     const res = await fetch(`/api/location/last-loc/${rideId}`);
     if (!res.ok) return;
-    busLocation = await res.json();
-
-    document.getElementById("liveBadge").classList.remove("hidden");
-    document.getElementById("liveBadge").classList.add("flex");
-    document.getElementById("lastUpdated").innerText =
-        "Updated " + timeAgo(busLocation.timestamp);
-
-    renderTimeline();
+    applyLocation(await res.json());
   } catch (err) {
     console.error("Tick failed:", err);
   }
+}
+
+/* ─── APPLY LOCATION (shared by the WebSocket push and the fallback poll) */
+function applyLocation(loc) {
+  busLocation = loc;
+
+  document.getElementById("liveBadge").classList.remove("hidden");
+  document.getElementById("liveBadge").classList.add("flex");
+  document.getElementById("lastUpdated").innerText =
+      "Updated " + timeAgo(busLocation.timestamp);
+
+  renderTimeline();
 }
 
 /* ─── BUS POSITION (on full route) ─────────────────────────────── */
