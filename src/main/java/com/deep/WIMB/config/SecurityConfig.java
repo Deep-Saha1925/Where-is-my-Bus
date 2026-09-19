@@ -68,7 +68,12 @@ public class SecurityConfig {
                                 "/api/routes/**",
                                 "/api/ride/active/all",
                                 "/api/driver/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                // Live-tracking WebSocket handshake (SockJS). Same
+                                // public read-only data as /api/ride/active/all and
+                                // /api/location/** already serve, just pushed instead
+                                // of polled -- see WebSocketConfig.
+                                "/ws/**"
                         ).permitAll()
 
                         // ── Admin pages & APIs — login required ──
@@ -103,7 +108,8 @@ public class SecurityConfig {
                                 "/do-login",
                                 "/api/ride/**",
                                 "/api/location/**",
-                                "/api/driver/**"
+                                "/api/driver/**",
+                                "/ws/**"
                         )
                 );
 
