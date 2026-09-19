@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * Keeps the most recently uploaded admin spreadsheet around so it can be
  * downloaded again later. One row per {@link #kind} — each new upload of the
  * same kind overwrites the previous one, so this table never grows.
- *
+
  * Stored in Postgres rather than on disk for the same reason Route.fileData
  * is: the container's local disk doesn't survive a restart or redeploy.
  */
