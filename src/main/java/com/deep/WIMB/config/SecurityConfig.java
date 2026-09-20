@@ -68,7 +68,6 @@ public class SecurityConfig {
                                 "/api/routes/**",
                                 "/api/ride/active/all",
                                 "/api/driver/**",
-                                "/swagger-ui.html",
                                 // Live-tracking WebSocket handshake (SockJS). Same
                                 // public read-only data as /api/ride/active/all and
                                 // /api/location/** already serve, just pushed instead
@@ -79,7 +78,16 @@ public class SecurityConfig {
                         // ── Admin pages & APIs — login required ──
                         .requestMatchers(
                                 "/admin-buses.html",
-                                "/admin/**"
+                                "/admin/**",
+                                // API docs describe your whole API surface, including
+                                // admin-only endpoints -- gated the same way the admin
+                                // panel is rather than left public, now that this app
+                                // is headed for real users. See OpenApiConfig for the
+                                // page's title/description; visit /swagger-ui.html
+                                // after logging in at /login.html.
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).hasRole("ADMIN")
                         // ── Everything else requires login ──
                         .anyRequest().authenticated()
