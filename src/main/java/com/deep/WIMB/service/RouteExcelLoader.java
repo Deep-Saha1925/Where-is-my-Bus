@@ -592,6 +592,17 @@ public class RouteExcelLoader {
      * This is what the passenger search page's autocomplete reads, so any
      * route that's missing here is a route passengers can never search for.
      */
+    /** Sorted, de-duplicated stop names across every loaded route. */
+    public synchronized List<String> getAllStopNames() {
+        Set<String> stopNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (List<RouteStop> stops : routeCache.values()) {
+            for (RouteStop stop : stops) {
+                stopNames.add(stop.getStopName());
+            }
+        }
+        return new ArrayList<>(stopNames);
+    }
+
     private void updateStopsJson() {
         try {
             // TreeSet with case-insensitive ordering: de-dupes stop names that
