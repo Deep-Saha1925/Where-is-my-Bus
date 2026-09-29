@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("depotDestination").addEventListener("keydown", e => {
         if (e.key === "Enter") searchDepotRoutes();
     });
+    document.getElementById("busNumberSearch").addEventListener("keydown", e => {
+        if (e.key === "Enter") searchByBusNumber();
+    });
 });
 
 /* ─── STOPS ─────────────────────────────────────────────────────── */
@@ -274,7 +277,8 @@ async function loadQuickResults() {
     }
 }
 
-function renderBusCards(buses, routeKey) {
+function renderBusCards(buses, routeKey, opts = {}) {
+    const showEta = opts.showEta !== false;
     const busList       = document.getElementById("busList");
     const resultsHeader = document.getElementById("resultsHeader");
     const resultsCount  = document.getElementById("resultsCount");
@@ -292,6 +296,7 @@ function renderBusCards(buses, routeKey) {
             [src, dest] = [bus.routeKey.substring(0, i), bus.routeKey.substring(i + 1)];
         }
 
+        const cardKey = routeKey || bus.routeKey || "";
         const card = document.createElement("div");
         card.className        = "bus-card";
         card.style.animationDelay = `${i * 80}ms`;
@@ -310,9 +315,9 @@ function renderBusCards(buses, routeKey) {
           </div>
         </div>
         <div style="text-align:right;">
-          <div class="eta-badge">
+          ${showEta ? `<div class="eta-badge">
             ${calculateETAFromDistance(bus.remainingDistanceKm)}
-          </div>
+          </div>` : ""}
           <div style="font-size:11px; color:#10b981; margin-top:5px;
                       display:flex; align-items:center;
                       justify-content:flex-end; gap:4px;">
@@ -328,7 +333,7 @@ function renderBusCards(buses, routeKey) {
         <span class="route-dest">${dest}</span>
       </div>
 
-      <button class="track-btn" onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
+      <button class="track-btn" onclick="track('${cardKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
         <i class="fa-solid fa-location-dot"></i>
         Track Bus
       </button>
@@ -359,6 +364,7 @@ async function searchBuses() {
     const resultsHeader = document.getElementById("resultsHeader");
     const quickResults  = document.getElementById("quickResults");
 
+    setNoResultsText("No active buses", "No buses are currently running on this route");
     busList.innerHTML           = "";
     noResults.style.display     = "none";
     resultsHeader.style.display = "none";
@@ -420,23 +426,165 @@ function swapDepots() {
 
 /* ─── SEARCH TABS: Live Buses vs Depot Routes ───────────────────── */
 function switchSearchTab(tab) {
-    const isLive = tab === "live";
+    cancelBusSearch(); // a late bus-number response must not draw into another tab
+    const isLive  = tab === "live";
+    const isDepot = tab === "depot";
+    const isBus   = tab === "bus";
 
-    document.getElementById("liveSearchPanel").style.display  = isLive ? "" : "none";
-    document.getElementById("depotSearchPanel").style.display = isLive ? "none" : "";
+    document.getElementById("liveSearchPanel").style.display  = isLive  ? "" : "none";
+    document.getElementById("depotSearchPanel").style.display = isDepot ? "" : "none";
+    document.getElementById("busSearchPanel").style.display   = isBus   ? "" : "none";
     document.getElementById("tabBtnLive").classList.toggle("active", isLive);
-    document.getElementById("tabBtnDepot").classList.toggle("active", !isLive);
+    document.getElementById("tabBtnDepot").classList.toggle("active", isDepot);
+    document.getElementById("tabBtnBus").classList.toggle("active", isBus);
+
+    // Start every switch from a clean results area
+    document.getElementById("depotResultsSection").style.display = "none";
+    document.getElementById("recentSection").style.display       = "none";
+    document.getElementById("quickResults").style.display        = "none";
+    document.getElementById("resultsHeader").style.display       = "none";
+    document.getElementById("noResults").style.display           = "none";
+    document.getElementById("loading").style.display             = "none";
+    document.getElementById("busList").innerHTML                 = "";
+    setNoResultsText("No active buses", "No buses are currently running on this route");
 
     if (isLive) {
-        document.getElementById("depotResultsSection").style.display = "none";
         renderRecentChips();
         loadQuickResults();
-    } else {
-        document.getElementById("recentSection").style.display  = "none";
-        document.getElementById("quickResults").style.display   = "none";
-        document.getElementById("resultsHeader").style.display   = "none";
-        document.getElementById("noResults").style.display       = "none";
-        document.getElementById("busList").innerHTML             = "";
+    } else if (isBus) {
+        const input = document.getElementById("busNumberSearch");
+        if (input.value.trim()) searchByBusNumber();
+        else input.focus();
+    }
+}
+
+/* ─── SEARCH BY BUS NUMBER (live buses only) ─────────────────────── */
+// The server does the filtering (GET /api/ride/search, a DB query) and caches for a
+// few seconds. This side adds a tiny per-tab cache and makes sure only the LATEST
+// search can ever draw results, so old results never linger or reappear.
+const BUS_CACHE_TTL_MS = 15000;
+const busSearchCache   = new Map();   // normalised query -> { at, matches }
+let busSearchTimer = null;
+let busSearchSeq   = 0;               // bumps on every new search / tab switch
+let busSearchAbort = null;            // AbortController of the request in flight
+
+function setNoResultsText(title, sub) {
+    const t = document.getElementById("noResultsTitle");
+    const s = document.getElementById("noResultsSub");
+    if (t) t.textContent = title;
+    if (s) s.textContent = sub;
+}
+
+// Lower-case letters and digits only, so "wb 23a-1245" and "WB-23A-1245" are the same query
+function normalizeBusNumber(value) {
+    return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Invalidate anything still pending: the timer, the request in flight, and (via the
+// sequence number) any response that arrives late.
+function cancelBusSearch() {
+    clearTimeout(busSearchTimer);
+    busSearchSeq++;
+    if (busSearchAbort) {
+        busSearchAbort.abort();
+        busSearchAbort = null;
+    }
+}
+
+// Wipe the results area completely, so nothing from a previous search stays on screen
+function clearBusResults() {
+    document.getElementById("busList").innerHTML           = "";
+    document.getElementById("resultsHeader").style.display = "none";
+    document.getElementById("noResults").style.display     = "none";
+    document.getElementById("loading").style.display       = "none";
+    setNoResultsText("No active buses", "No buses are currently running on this route");
+}
+
+function getCachedBusSearch(query) {
+    const hit = busSearchCache.get(query);
+    if (!hit) return null;
+    if (Date.now() - hit.at > BUS_CACHE_TTL_MS) {
+        busSearchCache.delete(query);
+        return null;
+    }
+    return hit.matches;
+}
+
+function showBusResults(matches, raw) {
+    document.getElementById("loading").style.display = "none";
+    if (!matches.length) {
+        document.getElementById("busList").innerHTML = "";
+        setNoResultsText(
+            `No running bus found for "${raw}"`,
+            "The bus may not have started its ride yet. Check the number, or search by route instead."
+        );
+        document.getElementById("noResults").style.display = "block";
+        return;
+    }
+    renderBusCards(matches, null, { showEta: false });
+}
+
+// Search as the passenger types (short pause first so we don't call the server on every key)
+function onBusNumberInput() {
+    cancelBusSearch();
+    clearBusResults();                       // old results go immediately
+    const raw = document.getElementById("busNumberSearch").value.trim();
+    if (!normalizeBusNumber(raw)) return;
+
+    // Instant answer if we searched this very text a moment ago
+    const cached = getCachedBusSearch(normalizeBusNumber(raw));
+    if (cached) {
+        showBusResults(cached, raw);
+        return;
+    }
+
+    document.getElementById("loading").style.display = "block";
+    busSearchTimer = setTimeout(() => searchByBusNumber(true), 400);
+}
+
+async function searchByBusNumber(quiet = false) {
+    const raw   = document.getElementById("busNumberSearch").value.trim();
+    const query = normalizeBusNumber(raw);
+
+    if (!query) {
+        if (!quiet) alert("Please enter a bus number");
+        return;
+    }
+
+    cancelBusSearch();                       // drop any older search and its response
+    const mySeq = busSearchSeq;
+    clearBusResults();
+
+    const cached = getCachedBusSearch(query);
+    if (cached) {
+        showBusResults(cached, raw);
+        return;
+    }
+
+    document.getElementById("loading").style.display = "block";
+    const controller = new AbortController();
+    busSearchAbort = controller;
+
+    try {
+        const res = await fetch(
+            `/api/ride/search?busNumber=${encodeURIComponent(raw)}`,
+            { signal: controller.signal }
+        );
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        const matches = await res.json();
+
+        // A newer search (or a tab switch) started while we waited: draw nothing
+        if (mySeq !== busSearchSeq) return;
+
+        busSearchCache.set(query, { at: Date.now(), matches });
+        showBusResults(matches, raw);
+    } catch (err) {
+        if (err.name === "AbortError" || mySeq !== busSearchSeq) return;
+        document.getElementById("loading").style.display = "none";
+        console.error(err);
+        if (!quiet) alert("Failed to search for the bus");
+    } finally {
+        if (busSearchAbort === controller) busSearchAbort = null;
     }
 }
 
