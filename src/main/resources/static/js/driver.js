@@ -4,6 +4,7 @@ let rideWatchId = null;
 let currentPosition = null;
 let driverToken = null;
 let selectedRouteCode = null; // set once the driver picks a route in newRideSection
+let routeStopsCache = [];    // ordered stops of the selected route
 
 document.addEventListener("DOMContentLoaded", () => {
   loadRoutes();
@@ -94,45 +95,62 @@ async function loadRoutes() {
   }
 }
 
+// Fills a <select> with a placeholder + the given stops.
+function fillStopSelect(select, stops, placeholderText) {
+  select.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.textContent = placeholderText;
+  select.appendChild(placeholder);
+
+  stops.forEach(stop => {
+    const option = document.createElement("option");
+    const name = stop.stopName.trim().toUpperCase();
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  });
+}
+
 // Called when the driver picks a route — loads that route's stops into the
-// Start Location / Destination datalist and enables those fields.
+// Start Location / Destination dropdowns and enables them.
 async function onRouteChange() {
   const routeSelect = document.getElementById("routeCode");
-  const sourceInput = document.getElementById("source");
-  const destInput = document.getElementById("destination");
-  const datalist = document.getElementById("stopsList");
+  const sourceSelect = document.getElementById("source");
+  const destSelect = document.getElementById("destination");
 
   selectedRouteCode = routeSelect.value;
+  routeStopsCache = [];
 
   // Reset downstream fields whenever the route changes
-  sourceInput.value = "";
-  destInput.value = "";
-  sourceInput.disabled = true;
-  destInput.disabled = true;
-  sourceInput.placeholder = "Loading stops...";
-  destInput.placeholder = "Loading stops...";
-  datalist.innerHTML = "";
+  sourceSelect.disabled = true;
+  destSelect.disabled = true;
+  fillStopSelect(sourceSelect, [], selectedRouteCode ? "Loading stops..." : "Pick a route first");
+  fillStopSelect(destSelect, [], selectedRouteCode ? "Loading stops..." : "Pick a route first");
 
   if (!selectedRouteCode) return;
 
+  const requestedRoute = selectedRouteCode;
   try {
-    const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(selectedRouteCode)}`);
-    const stops = await safeJson(res); // full ordered stop list for this route
+    const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(requestedRoute)}`);
+    const stops = await safeJson(res);
+    if (!res.ok || !Array.isArray(stops)) {
+      throw new Error((stops && stops.error) || `Server error ${res.status}`);
+    }
+    // Ignore a stale response if the driver already switched to another route
+    if (requestedRoute !== selectedRouteCode) return;
 
-    stops.forEach(stop => {
-      const option = document.createElement("option");
-      option.value = stop.stopName.toUpperCase();
-      datalist.appendChild(option);
-    });
-
-    sourceInput.disabled = false;
-    destInput.disabled = false;
-    sourceInput.placeholder = "Type source stop";
-    destInput.placeholder = "Type destination stop";
+    routeStopsCache = stops;
+    fillStopSelect(sourceSelect, stops, stops.length ? "Select start stop" : "No stops on this route");
+    fillStopSelect(destSelect, stops, stops.length ? "Select destination stop" : "No stops on this route");
+    sourceSelect.disabled = stops.length === 0;
+    destSelect.disabled = stops.length === 0;
   } catch (err) {
     console.error("Failed to load stops for route:", err);
-    sourceInput.placeholder = "Could not load stops";
-    destInput.placeholder = "Could not load stops";
+    fillStopSelect(sourceSelect, [], "Could not load stops");
+    fillStopSelect(destSelect, [], "Could not load stops");
   }
 }
 
@@ -158,33 +176,16 @@ function initPreviewGPS() {
 }
 
 /* ------------------ GET COORDS FROM EXCEL ROUTE DATA ------------------ */
-// Fetches the route stops (scoped to the driver's selected route) and
-// returns lat/lng of the source stop by name
-async function getCoordsFromRoute(source, destination) {
-  try {
-    const routeParam = selectedRouteCode ? `&routeCode=${encodeURIComponent(selectedRouteCode)}` : "";
-    const res = await fetch(`/api/routes?source=${source}&destination=${destination}${routeParam}`);
-    if (!res.ok) throw new Error("Route fetch failed");
-
-    const stops = await safeJson(res);
-
-    // Find the stop whose name matches the source (case-insensitive)
-    const match = stops.find(
-        s => s.stopName.trim().toUpperCase() === source.trim().toUpperCase()
-    );
-
-    if (match) {
-      console.log(`Using Excel coords for "${match.stopName}":`, match.latitude, match.longitude);
-      return { latitude: match.latitude, longitude: match.longitude };
-    }
-
-    console.warn("Source stop not found in route Excel data:", source);
-    return null;
-
-  } catch (err) {
-    console.error("Failed to fetch route coords:", err);
-    return null;
+// Looks the source stop up in the already-loaded stops of the selected route.
+function getCoordsFromRoute(source) {
+  const match = routeStopsCache.find(
+      s => s.stopName.trim().toUpperCase() === source.trim().toUpperCase()
+  );
+  if (match) {
+    return { latitude: match.latitude, longitude: match.longitude };
   }
+  console.warn("Source stop not found in route data:", source);
+  return null;
 }
 
 /* ------------------ START RIDE ------------------ */
@@ -212,7 +213,7 @@ async function startRide() {
   statusEl.innerText = "Fetching start location...";
 
   // STEP 1: Try to get coords from Excel route data first
-  let coords = await getCoordsFromRoute(source, destination);
+  let coords = getCoordsFromRoute(source);
 
   // STEP 2: If Excel lookup failed, fall back to GPS
   if (!coords) {
@@ -255,6 +256,9 @@ async function startRide() {
         localStorage.removeItem("wimb_driver_token");
         localStorage.removeItem("wimb_driver_bus");
         driverToken = null;
+        // Session expired — send the driver back to re-verify with the depot code
+        document.getElementById("newRideSection").classList.add("hidden");
+        document.getElementById("busNumberSection").classList.remove("hidden");
       }
       const errText = await res.text();
       throw new Error(`Server error: ${errText}`);
@@ -304,6 +308,10 @@ function getPositionFromGPS() {
 /* ------------------ LIVE RIDE TRACKING (GPS after ride starts) ------------------ */
 function startRideTracking() {
   if (rideWatchId !== null) return;
+  if (!navigator.geolocation) {
+    alert("This device/browser does not support GPS, so live tracking cannot start.");
+    return;
+  }
 
   rideWatchId = navigator.geolocation.watchPosition(
       pos => {
@@ -353,6 +361,10 @@ async function stopRide() {
 
     rideId = null;
     currentPosition = null;
+
+    // Reset the new-ride form so the next ride starts clean
+    document.getElementById("routeCode").value = "";
+    onRouteChange();
 
     initPreviewGPS();
 
