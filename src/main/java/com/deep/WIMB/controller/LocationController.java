@@ -1,5 +1,6 @@
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.dto.LocationBroadcast;
 import com.deep.WIMB.dto.LocationUpdateRequest;
 import com.deep.WIMB.exception.DriverNotVerifiedException;
 import com.deep.WIMB.model.Location;
@@ -7,7 +8,9 @@ import com.deep.WIMB.service.ActiveRideCache;
 import com.deep.WIMB.service.DriverTokenService;
 import com.deep.WIMB.service.LocationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/location")
@@ -34,13 +37,19 @@ public class LocationController {
         return locationService.addLocation(
                 request.getRideId(),
                 request.getLatitude(),
-                request.getLongitude()
+                request.getLongitude(),
+                request.getAccuracy()
         );
     }
 
     // passenger fetches last known location
     @GetMapping("/last-loc/{rideId}")
-    public Location getLastLocation(@PathVariable Long rideId){
-        return locationService.getLastKnownLocation(rideId);
+    public LocationBroadcast getLastLocation(@PathVariable Long rideId){
+        LocationBroadcast last = locationService.getLastKnownBroadcast(rideId);
+        if (last == null) {
+            // No GPS fix yet -- a plain 404 instead of the old 500 + stack trace
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No location recorded yet");
+        }
+        return last;
     }
 }

@@ -6,10 +6,29 @@ let driverToken = null;
 let selectedRouteCode = null; // set once the driver picks a route in newRideSection
 let routeStopsCache = [];    // ordered stops of the selected route
 
+// ---- live location sending ----
+const SEND_MIN_INTERVAL_MS = 3000;   // never post more often than this (GPS can fire several times a second)
+const HEARTBEAT_MS         = 10000;  // re-send the last fix this often even if the bus hasn't moved
+let lastFix        = null;   // latest { latitude, longitude, accuracy } from the device
+let lastSentAt     = 0;
+let heartbeatTimer = null;
+let wakeLock       = null;
+let sendFailures   = 0;
+
 document.addEventListener("DOMContentLoaded", () => {
   loadRoutes();
   loadDepots();
   initPreviewGPS(); // still runs in background as fallback
+  resumeActiveRide(); // page refreshed mid-ride? pick tracking back up
+});
+
+// Coming back to the tab (unlocking the phone etc.): re-grab the wake lock
+// and push a fresh location straight away.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && rideId) {
+    requestWakeLock();
+    sendLocation(true);
+  }
 });
 
 /* ------------------ DEPOTS ------------------ */
@@ -281,6 +300,9 @@ async function startRide() {
     document.getElementById("activeBusNumber").innerText = busNumber;
     statusEl.innerText = `Ride Started ✅ (ID: ${rideId})`;
 
+    // Remember the ride so a page refresh / tab kill doesn't silently end tracking
+    localStorage.setItem("wimb_active_ride", JSON.stringify({ rideId, busNumber, source, destination }));
+
     startRideTracking();
 
   } catch (err) {
@@ -313,41 +335,169 @@ function startRideTracking() {
     return;
   }
 
+  requestWakeLock();
+
   rideWatchId = navigator.geolocation.watchPosition(
       pos => {
-        fetch("/api/ride/location", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Driver-Token": driverToken
-          },
-          body: JSON.stringify({
-            rideId,
-            latitude:  pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy:  pos.coords.accuracy
-          })
-        }).catch(err => console.error("Location update failed:", err));
+        lastFix = {
+          latitude:  pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy:  pos.coords.accuracy
+        };
+        sendLocation(false);
       },
-      err => console.error("Ride GPS error:", err.message),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      err => {
+        console.error("Ride GPS error:", err.message);
+        setTrackingStatus("⚠️ GPS problem: " + err.message + " — check location permission");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
   );
+
+  // Heartbeat: watchPosition only fires when the position changes, so a bus
+  // waiting at a stop (or a laptop on a desk) would go silent and look
+  // "offline" to passengers. Re-send the last known fix regularly.
+  heartbeatTimer = setInterval(() => sendLocation(true), HEARTBEAT_MS);
+}
+
+function stopRideTracking() {
+  if (rideWatchId !== null) {
+    navigator.geolocation.clearWatch(rideWatchId);
+    rideWatchId = null;
+  }
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  releaseWakeLock();
+  lastFix = null;
+  lastSentAt = 0;
+  sendFailures = 0;
+}
+
+async function sendLocation(isHeartbeat) {
+  if (!rideId || !lastFix || !driverToken) return;
+
+  const now = Date.now();
+  // Throttle real GPS bursts; heartbeats only fire if nothing was sent recently.
+  if (now - lastSentAt < (isHeartbeat ? HEARTBEAT_MS - 1000 : SEND_MIN_INTERVAL_MS)) return;
+  lastSentAt = now;
+
+  try {
+    const res = await fetch("/api/ride/location", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Driver-Token": driverToken
+      },
+      body: JSON.stringify({
+        rideId,
+        latitude:  lastFix.latitude,
+        longitude: lastFix.longitude,
+        accuracy:  lastFix.accuracy
+      })
+    });
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        setTrackingStatus("❌ Session expired or ride ended — passengers can't see you. Stop the ride and start again.");
+      } else {
+        setTrackingStatus(`⚠️ Server error ${res.status} while sending location — retrying`);
+      }
+      sendFailures++;
+      return;
+    }
+
+    sendFailures = 0;
+    const t = new Date().toLocaleTimeString();
+    const acc = lastFix.accuracy != null ? ` (GPS ±${Math.round(lastFix.accuracy)} m)` : "";
+    setTrackingStatus(`📡 Sharing live location — last sent ${t}${acc}`);
+  } catch (err) {
+    sendFailures++;
+    console.error("Location update failed:", err);
+    setTrackingStatus("⚠️ No internet — location not reaching passengers, retrying…");
+  }
+}
+
+function setTrackingStatus(text) {
+  const el = document.getElementById("status");
+  if (el) el.innerText = text;
+}
+
+/* ------------------ SCREEN WAKE LOCK ------------------ */
+// Phones throttle GPS and pause the page when the screen turns off, which is
+// the most common reason a driver "stops updating". Keep the screen on.
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  } catch (err) {
+    console.warn("Wake lock unavailable:", err.message);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
+}
+
+/* ------------------ RESUME RIDE AFTER REFRESH ------------------ */
+async function resumeActiveRide() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("wimb_active_ride") || "null"); } catch (_) {}
+  const token = localStorage.getItem("wimb_driver_token");
+  if (!saved || !saved.rideId || !token) return;
+
+  try {
+    const res = await fetch("/api/ride/active/all");
+    const rides = await safeJson(res);
+    const stillActive = Array.isArray(rides) && rides.some(r => String(r.rideId) === String(saved.rideId));
+    if (!stillActive) {
+      localStorage.removeItem("wimb_active_ride");
+      return;
+    }
+
+    driverToken = token;
+    rideId = saved.rideId;
+
+    if (previewWatchId !== null) {
+      navigator.geolocation.clearWatch(previewWatchId);
+      previewWatchId = null;
+    }
+
+    document.getElementById("busNumberSection").classList.add("hidden");
+    document.getElementById("newRideSection").classList.add("hidden");
+    document.getElementById("activeRideSection").classList.remove("hidden");
+    document.getElementById("activeRouteKey").innerText = `${saved.source} → ${saved.destination}`;
+    document.getElementById("activeRideId").innerText = rideId;
+    document.getElementById("activeBusNumber").innerText = saved.busNumber;
+    setTrackingStatus(`Ride resumed ✅ (ID: ${rideId})`);
+
+    startRideTracking();
+  } catch (err) {
+    console.error("Could not resume ride:", err);
+  }
 }
 
 /* ------------------ STOP RIDE ------------------ */
 async function stopRide() {
   if (!rideId) return;
 
-  if (rideWatchId !== null) {
-    navigator.geolocation.clearWatch(rideWatchId);
-    rideWatchId = null;
-  }
-
   try {
-    await fetch(`/api/ride/cancel/${rideId}`, {
+    const cancelRes = await fetch(`/api/ride/cancel/${rideId}`, {
       method: "PUT",
       headers: { "X-Driver-Token": driverToken }
     });
+    if (!cancelRes.ok) {
+      // The ride is still running on the server — keep sharing location
+      throw new Error(`Server refused to end the ride (status ${cancelRes.status})`);
+    }
+
+    stopRideTracking();
+    localStorage.removeItem("wimb_active_ride");
 
     document.getElementById("status").innerText = "Ride Stopped ⛔";
     document.getElementById("stopBtn").classList.add("hidden");
