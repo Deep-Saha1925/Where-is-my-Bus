@@ -61,6 +61,7 @@ public class SecurityConfig {
                         // ── Public APIs (passengers & drivers need these) ──
                         .requestMatchers(
                                 "/api/ride/active",
+                                "/api/ride/search",
                                 "/api/ride/start",
                                 "/api/ride/location",
                                 "/api/ride/cancel/**",
