@@ -33,21 +33,14 @@ function showSection(name) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  loadRoutes();
-  loadDepots();
   initPreviewGPS(); // still runs in background as fallback
 
-  // Start on a neutral "Loading…" panel and only show a real screen once we
-  // know which one is right. Before, the bus-number form showed first and then
-  // jumped to the active-ride screen when the server check came back.
+  // Show a neutral "Loading…" panel until the depot / route lists are ready,
+  // then always start at the login step (bus number + depot code).
   showSection("loadingSection");
-  let resumed = false;
-  try {
-    resumed = await resumeActiveRide(); // page refreshed mid-ride? pick tracking back up
-  } catch (err) {
-    console.error("Startup check failed:", err);
-  }
-  if (!resumed && !rideId) showSection("busNumberSection");
+  const timeout = new Promise(resolve => setTimeout(resolve, 8000)); // never hang on a slow server
+  await Promise.race([Promise.allSettled([loadDepots(), loadRoutes()]), timeout]);
+  showSection("busNumberSection");
 });
 
 // Coming back to the tab (unlocking the phone etc.): re-grab the wake lock
@@ -328,7 +321,6 @@ async function startRide() {
 
     // Remember the ride so a page refresh / tab kill doesn't silently end tracking
     activeRouteCode = selectedRouteCode;
-    localStorage.setItem("wimb_active_ride", JSON.stringify({ rideId, busNumber, source, destination, routeCode: selectedRouteCode }));
 
     startRideTracking();
 
@@ -646,55 +638,6 @@ function releaseWakeLock() {
   }
 }
 
-/* ------------------ RESUME RIDE AFTER REFRESH ------------------ */
-async function resumeActiveRide() {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("wimb_active_ride") || "null"); } catch (_) {}
-  const token = localStorage.getItem("wimb_driver_token");
-  if (!saved || !saved.rideId || !token) return false;
-  if (rideId) return false; // a flow is already in progress
-
-  try {
-    // Don't leave the driver staring at "Loading…" if the server is slow
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    let res;
-    try {
-      res = await fetch("/api/ride/active/all", { signal: ctrl.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-    const rides = await safeJson(res);
-    const match = Array.isArray(rides) ? rides.find(r => String(r.rideId) === String(saved.rideId)) : null;
-    if (!match) {
-      localStorage.removeItem("wimb_active_ride");
-      return false;
-    }
-    activeRouteCode = match.routeCode || saved.routeCode || null;
-
-    if (rideId) return false; // driver moved on while we were checking
-    driverToken = token;
-    rideId = saved.rideId;
-
-    if (previewWatchId !== null) {
-      navigator.geolocation.clearWatch(previewWatchId);
-      previewWatchId = null;
-    }
-
-    showSection("activeRideSection");
-    document.getElementById("activeRouteKey").innerText = `${saved.source} → ${saved.destination}`;
-    document.getElementById("activeRideId").innerText = rideId;
-    document.getElementById("activeBusNumber").innerText = saved.busNumber;
-    setTrackingStatus(`Ride resumed ✅ (ID: ${rideId})`);
-
-    startRideTracking();
-    return true;
-  } catch (err) {
-    console.error("Could not resume ride:", err);
-    return false;
-  }
-}
-
 /* ------------------ STOP RIDE ------------------ */
 async function stopRide() {
   if (!rideId) return;
@@ -710,7 +653,6 @@ async function stopRide() {
     }
 
     stopRideTracking();
-    localStorage.removeItem("wimb_active_ride");
 
     document.getElementById("status").innerText = "Ride Stopped ⛔";
 
@@ -766,48 +708,40 @@ async function checkBus() {
   document.getElementById("status").innerText = "Checking...";
 
   try {
-    const storedToken = localStorage.getItem("wimb_driver_token");
-    const storedBus   = localStorage.getItem("wimb_driver_bus");
-
-    if (storedToken && storedBus && storedBus === busNumber.toUpperCase()) {
-      // Already verified earlier this shift — skip the depot code check
-      driverToken = storedToken;
-    } else {
-      if (!depotName) {
-        document.getElementById("status").innerText = "";
-        alert("Please select your depot");
-        return;
-      }
-      if (!code) {
-        document.getElementById("status").innerText = "";
-        alert("Please enter your depot code");
-        return;
-      }
-
-      const verifyRes = await fetch("/api/driver/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ depotName, code, busNumber })
-      });
-
-      if (!verifyRes.ok) {
-        document.getElementById("status").innerText = "";
-        // Try to read a real error message; fall back if the body isn't JSON
-        let msg = "Invalid depot or code";
-        try {
-          const errData = await safeJson(verifyRes);
-          msg = errData.error || msg;
-        } catch (_) { /* keep default msg */ }
-        alert(msg);
-        return;
-      }
-
-      const verifyData = await safeJson(verifyRes);
-      driverToken = verifyData.token;
-      localStorage.setItem("wimb_driver_token", driverToken);
-      localStorage.setItem("wimb_driver_bus", busNumber.toUpperCase());
-      localStorage.setItem("wimb_driver_depot", depotName);
+    if (!depotName) {
+      document.getElementById("status").innerText = "";
+      alert("Please select your depot");
+      return;
     }
+    if (!code) {
+      document.getElementById("status").innerText = "";
+      alert("Please enter your depot code");
+      return;
+    }
+
+    const verifyRes = await fetch("/api/driver/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ depotName, code, busNumber })
+    });
+
+    if (!verifyRes.ok) {
+      document.getElementById("status").innerText = "";
+      // Try to read a real error message; fall back if the body isn't JSON
+      let msg = "Invalid depot or code";
+      try {
+        const errData = await safeJson(verifyRes);
+        msg = errData.error || msg;
+      } catch (_) { /* keep default msg */ }
+      alert(msg);
+      return;
+    }
+
+    const verifyData = await safeJson(verifyRes);
+    driverToken = verifyData.token;
+    localStorage.setItem("wimb_driver_token", driverToken);
+    localStorage.setItem("wimb_driver_bus", busNumber.toUpperCase());
+    localStorage.setItem("wimb_driver_depot", depotName);
 
     // ── everything below is your original checkBus() logic, unchanged ──
     const res = await fetch("/api/ride/active/all");
