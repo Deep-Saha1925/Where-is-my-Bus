@@ -136,7 +136,7 @@ function applyRides(rides) {
 
 function trackBus(routeKey, rideId, routeCode) {
   const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
+  window.location.href = `/track.html?routeKey=${encodeURIComponent(routeKey)}&rideId=${rideId}${routeParam}`;
 }
 
 /* ── WEBSOCKET (live push, replaces 5s polling) ──
