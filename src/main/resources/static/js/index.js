@@ -386,7 +386,7 @@ async function searchBuses() {
 /* ─── HELPERS ────────────────────────────────────────────────────── */
 function track(routeKey, rideId, routeCode) {
     const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-    window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
+    window.location.href = `track.html?routeKey=${encodeURIComponent(routeKey)}&rideId=${rideId}${routeParam}`;
 }
 
 function calculateETAFromDistance(distanceKm) {
