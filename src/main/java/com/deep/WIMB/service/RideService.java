@@ -58,11 +58,11 @@ public class RideService {
         List<RouteStop> allRoute = routeExcelLoader.getFullRoute(routeCode);
 
         String routeKey = request.getRouteKey();
-        int separatorIdx = routeKey.indexOf("_");
-        if (separatorIdx == -1) {
+        String[] parts = routeExcelLoader.splitRouteKey(routeCode, routeKey);
+        if (parts == null) {
             throw new RuntimeException("Invalid routeKey format: " + routeKey);
         }
-        String src = routeKey.substring(0, separatorIdx).trim();
+        String src = parts[0];
 
         updatedRequest.setRouteCode(routeCode);
 
@@ -216,9 +216,9 @@ public class RideService {
         // Extract bus source & destination from routeKey
         String rideRouteKey = ride.getRouteKey();
         String busDestination = null;
-        if (rideRouteKey != null && rideRouteKey.contains("_")) {
-            int idx = rideRouteKey.indexOf("_");
-            busDestination = rideRouteKey.substring(idx + 1).trim();
+        String[] rideParts = routeExcelLoader.splitRouteKey(routeCode, rideRouteKey);
+        if (rideParts != null) {
+            busDestination = rideParts[1];
         }
 
         // Get bus destination stop order (on its own route)
@@ -393,6 +393,11 @@ public class RideService {
         dto.setBusNumber(ride.getBus().getBusNumber());
         dto.setRouteKey(ride.getRouteKey());
         dto.setRouteCode(routeExcelLoader.resolveRouteCode(ride.getRouteCode()));
+        String[] ends = routeExcelLoader.splitRouteKey(dto.getRouteCode(), ride.getRouteKey());
+        if (ends != null) {
+            dto.setSourceName(ends[0]);
+            dto.setDestinationName(ends[1]);
+        }
 
         Location latest = getLatestLocation(ride.getId());
         if (latest != null) {

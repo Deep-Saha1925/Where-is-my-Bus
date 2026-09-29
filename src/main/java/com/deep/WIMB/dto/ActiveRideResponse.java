@@ -10,6 +10,9 @@ public class ActiveRideResponse {
     private String busNumber;
     private String routeKey;
     private String routeCode;
+    // Correctly-split ends of routeKey (stop names may contain "_")
+    private String sourceName;
+    private String destinationName;
     private Double latitude;
     private Double longitude;
     private Double remainingDistanceKm;

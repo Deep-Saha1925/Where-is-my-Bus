@@ -60,6 +60,37 @@ public class RouteExcelLoader {
         return (routeCode == null || routeCode.isBlank()) ? legacyRouteKey : routeCode;
     }
 
+    /**
+     * Splits a "SOURCE_DESTINATION" route key into its two stop names.
+     * Stop names may themselves contain underscores (e.g. "My_seat", "OT_GATE"),
+     * so "MY_SEAT_WP" can't be split blindly at the first "_". We try every
+     * underscore and pick the split where BOTH halves are real stops on the
+     * route; if none matches we fall back to the first underscore.
+     * Returns {source, destination}, or null if the key has no underscore.
+     */
+    public String[] splitRouteKey(String routeCode, String routeKey) {
+        if (routeKey == null || routeKey.indexOf('_') == -1) return null;
+
+        Set<String> names = new HashSet<>();
+        try {
+            for (RouteStop s : getFullRoute(resolveRouteCode(routeCode))) {
+                names.add(s.getStopName().trim().toUpperCase());
+            }
+        } catch (RuntimeException ignored) {
+            // unknown route -> fall through to the first-underscore fallback
+        }
+
+        for (int i = routeKey.indexOf('_'); i != -1; i = routeKey.indexOf('_', i + 1)) {
+            String src = routeKey.substring(0, i).trim();
+            String dest = routeKey.substring(i + 1).trim();
+            if (names.contains(src.toUpperCase()) && names.contains(dest.toUpperCase())) {
+                return new String[]{src, dest};
+            }
+        }
+        int first = routeKey.indexOf('_');
+        return new String[]{routeKey.substring(0, first).trim(), routeKey.substring(first + 1).trim()};
+    }
+
     public int getStopOrderByName(String stopName) {
         return getStopOrderByName(legacyRouteKey, stopName);
     }
@@ -592,6 +623,17 @@ public class RouteExcelLoader {
      * This is what the passenger search page's autocomplete reads, so any
      * route that's missing here is a route passengers can never search for.
      */
+    /** Sorted, de-duplicated stop names across every loaded route. */
+    public synchronized List<String> getAllStopNames() {
+        Set<String> stopNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (List<RouteStop> stops : routeCache.values()) {
+            for (RouteStop stop : stops) {
+                stopNames.add(stop.getStopName());
+            }
+        }
+        return new ArrayList<>(stopNames);
+    }
+
     private void updateStopsJson() {
         try {
             // TreeSet with case-insensitive ordering: de-dupes stop names that

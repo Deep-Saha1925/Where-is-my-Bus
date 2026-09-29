@@ -285,7 +285,12 @@ function renderBusCards(buses, routeKey) {
 
     buses.forEach((bus, i) => {
         let src = "N/A", dest = "N/A";
-        if (bus.routeKey?.includes("_")) [src, dest] = bus.routeKey.split("_");
+        if (bus.sourceName && bus.destinationName) {
+            [src, dest] = [bus.sourceName, bus.destinationName];
+        } else if (bus.routeKey?.includes("_")) {
+            const i = bus.routeKey.indexOf("_");
+            [src, dest] = [bus.routeKey.substring(0, i), bus.routeKey.substring(i + 1)];
+        }
 
         const card = document.createElement("div");
         card.className        = "bus-card";
@@ -386,7 +391,7 @@ async function searchBuses() {
 /* ─── HELPERS ────────────────────────────────────────────────────── */
 function track(routeKey, rideId, routeCode) {
     const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-    window.location.href = `track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
+    window.location.href = `track.html?routeKey=${encodeURIComponent(routeKey)}&rideId=${rideId}${routeParam}`;
 }
 
 function calculateETAFromDistance(distanceKm) {

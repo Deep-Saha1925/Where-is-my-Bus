@@ -15,7 +15,7 @@ function filterBuses() {
   }
 
   const filtered = allRides.filter(ride => {
-    const [src, dest] = ride.routeKey ? ride.routeKey.split("_") : ["", ""];
+    const [src, dest] = rideEnds(ride, ["", ""]);
     return (
         ride.busNumber?.toLowerCase().includes(query) ||
         src.toLowerCase().includes(query) ||
@@ -52,8 +52,7 @@ function renderCards(rides) {
   }
 
   grid.innerHTML = rides.map((ride, i) => {
-    const [source, destination] = ride.routeKey
-        ? ride.routeKey.split("_") : ["—", "—"];
+    const [source, destination] = rideEnds(ride, ["—", "—"]);
 
     // Highlight matching text
     const query = document.getElementById("searchInput").value.trim().toLowerCase();
@@ -136,7 +135,7 @@ function applyRides(rides) {
 
 function trackBus(routeKey, rideId, routeCode) {
   const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-  window.location.href = `/track.html?routeKey=${routeKey}&rideId=${rideId}${routeParam}`;
+  window.location.href = `/track.html?routeKey=${encodeURIComponent(routeKey)}&rideId=${rideId}${routeParam}`;
 }
 
 /* ── WEBSOCKET (live push, replaces 5s polling) ──
@@ -182,3 +181,14 @@ connectAdminWebSocket();
 // Safety net only, same reasoning as track.js — 30s instead of the old 5s,
 // since the WebSocket push is now what keeps this fresh in normal operation.
 setInterval(loadActiveBuses, 30000);
+
+// Source/destination of a ride. Prefers the server-resolved names (stop names
+// can contain "_", so splitting routeKey here would cut them in the wrong place).
+function rideEnds(ride, fallback) {
+  if (ride.sourceName && ride.destinationName) return [ride.sourceName, ride.destinationName];
+  if (ride.routeKey && ride.routeKey.includes("_")) {
+    const i = ride.routeKey.indexOf("_");
+    return [ride.routeKey.substring(0, i), ride.routeKey.substring(i + 1)];
+  }
+  return fallback;
+}
