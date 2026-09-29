@@ -233,26 +233,24 @@
         </select>
 
         <label class="brand-label">Start Location</label>
-        <input
+        <select
                 id="source"
-                list="stopsList"
-                placeholder="Pick a route first"
-                class="brand-input mb-4"
+                class="brand-select mb-4"
                 disabled
                 required
-        />
+        >
+            <option value="" disabled selected>Pick a route first</option>
+        </select>
 
         <label class="brand-label">Destination</label>
-        <input
+        <select
                 id="destination"
-                list="stopsList"
-                placeholder="Pick a route first"
-                class="brand-input mb-5"
+                class="brand-select mb-5"
                 disabled
                 required
-        />
-
-        <datalist id="stopsList"></datalist>
+        >
+            <option value="" disabled selected>Pick a route first</option>
+        </select>
 
         <button id="startBtn" onclick="startRide()" class="brand-btn btn-teal">
             🚦 Start Ride
