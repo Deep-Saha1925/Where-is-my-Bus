@@ -24,7 +24,7 @@ let activeRouteCode = null;   // routeCode of the ride currently running
 /* ------------------ SCREEN SECTIONS ------------------ */
 // Exactly one step of the flow is visible at a time. Every transition goes
 // through here so two panels can never show together.
-const SECTION_IDS = ["busNumberSection", "resumeSection", "newRideSection", "activeRideSection"];
+const SECTION_IDS = ["loadingSection", "busNumberSection", "resumeSection", "newRideSection", "activeRideSection"];
 function showSection(name) {
   SECTION_IDS.forEach(id => {
     const el = document.getElementById(id);
@@ -32,11 +32,22 @@ function showSection(name) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   loadRoutes();
   loadDepots();
   initPreviewGPS(); // still runs in background as fallback
-  resumeActiveRide(); // page refreshed mid-ride? pick tracking back up
+
+  // Start on a neutral "Loading…" panel and only show a real screen once we
+  // know which one is right. Before, the bus-number form showed first and then
+  // jumped to the active-ride screen when the server check came back.
+  showSection("loadingSection");
+  let resumed = false;
+  try {
+    resumed = await resumeActiveRide(); // page refreshed mid-ride? pick tracking back up
+  } catch (err) {
+    console.error("Startup check failed:", err);
+  }
+  if (!resumed && !rideId) showSection("busNumberSection");
 });
 
 // Coming back to the tab (unlocking the phone etc.): re-grab the wake lock
@@ -640,20 +651,28 @@ async function resumeActiveRide() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("wimb_active_ride") || "null"); } catch (_) {}
   const token = localStorage.getItem("wimb_driver_token");
-  if (!saved || !saved.rideId || !token) return;
-  if (rideId) return; // a flow is already in progress
+  if (!saved || !saved.rideId || !token) return false;
+  if (rideId) return false; // a flow is already in progress
 
   try {
-    const res = await fetch("/api/ride/active/all");
+    // Don't leave the driver staring at "Loading…" if the server is slow
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    let res;
+    try {
+      res = await fetch("/api/ride/active/all", { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     const rides = await safeJson(res);
     const match = Array.isArray(rides) ? rides.find(r => String(r.rideId) === String(saved.rideId)) : null;
     if (!match) {
       localStorage.removeItem("wimb_active_ride");
-      return;
+      return false;
     }
     activeRouteCode = match.routeCode || saved.routeCode || null;
 
-    if (rideId) return; // driver moved on while we were checking
+    if (rideId) return false; // driver moved on while we were checking
     driverToken = token;
     rideId = saved.rideId;
 
@@ -669,8 +688,10 @@ async function resumeActiveRide() {
     setTrackingStatus(`Ride resumed ✅ (ID: ${rideId})`);
 
     startRideTracking();
+    return true;
   } catch (err) {
     console.error("Could not resume ride:", err);
+    return false;
   }
 }
 

@@ -152,8 +152,14 @@
         </div>
     </div>
 
+    <!-- Neutral placeholder shown until we know which screen is right (prevents screen flicker on load) -->
+    <div id="loadingSection" style="text-align:center; padding:36px 0; color:var(--text-muted); font-size:14px;">
+        <div class="animate-pulse" style="font-size:28px; margin-bottom:8px;">🚌</div>
+        Loading…
+    </div>
+
     <!-- STEP 1: Bus Number -->
-    <div id="busNumberSection">
+    <div id="busNumberSection" class="hidden">
         <label class="brand-label">Bus Number</label>
         <input
                 id="busNumber"
