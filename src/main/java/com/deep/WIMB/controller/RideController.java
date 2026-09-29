@@ -33,6 +33,13 @@ public class RideController {
         return rideService.getActiveRidesByRoute(source, destination);
     }
 
+    // Passenger "search by bus number": running buses whose number contains the text.
+    // Filtered in the database and cached briefly -- see RideService.
+    @GetMapping("/search")
+    public List<ActiveRideResponse> searchByBusNumber(@RequestParam String busNumber) {
+        return rideService.searchActiveRidesByBusNumber(busNumber);
+    }
+
     @PostMapping("/start")
     public Ride startRide(@RequestBody StartRideRequest request,
                           @RequestHeader(value = "X-Driver-Token", required = false) String driverToken) {
