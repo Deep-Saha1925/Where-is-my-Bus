@@ -12,6 +12,7 @@ import com.deep.WIMB.repository.LocationRepository;
 import com.deep.WIMB.repository.RideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class RideService {
     private final RouteExcelLoader routeExcelLoader;
     private final RedisLocationService redisLocationService;
     private final ActiveRideCache activeRideCache;
+    private final BusSearchCache busSearchCache;
     private final SimpMessagingTemplate messagingTemplate;
 
     // Pushed to /topic/activeRides whenever a ride starts or ends, so
@@ -40,6 +42,7 @@ public class RideService {
     // getAllActiveRides() already computes for the REST endpoint of the
     // same name, so there's exactly one place that builds this list.
     private void broadcastActiveRides() {
+        busSearchCache.clear(); // the set of running buses just changed -- drop cached bus-number searches
         messagingTemplate.convertAndSend("/topic/activeRides", getAllActiveRides());
     }
 
@@ -296,6 +299,45 @@ public class RideService {
         ActiveRideResponse dto = toDto(ride);
         dto.setRemainingDistanceKm(remainingDistance);
         return dto;
+    }
+
+    // ================= SEARCH ACTIVE RIDES BY BUS NUMBER =================
+    private static final int BUS_SEARCH_LIMIT = 20;
+    private static final int BUS_SEARCH_MAX_QUERY_LENGTH = 30;
+
+    /** Lower-case letters and digits only, so "WB-23A 1245" and "wb23a1245" compare equal. */
+    static String normalizeBusNumber(String value) {
+        if (value == null) return "";
+        String cleaned = value.toLowerCase().replaceAll("[^a-z0-9]", "");
+        return cleaned.length() > BUS_SEARCH_MAX_QUERY_LENGTH
+                ? cleaned.substring(0, BUS_SEARCH_MAX_QUERY_LENGTH)
+                : cleaned;
+    }
+
+    /**
+     * Running buses whose number contains the query. The filtering happens in the database
+     * (RideRepository#searchByBusNumber) and results are cached for a few seconds
+     * (BusSearchCache), so this stays cheap even when many passengers search at once.
+     * Exact matches are listed first.
+     */
+    public List<ActiveRideResponse> searchActiveRidesByBusNumber(String busNumber) {
+        String query = normalizeBusNumber(busNumber);
+        if (query.isEmpty()) return List.of();
+
+        List<ActiveRideResponse> cached = busSearchCache.get(query);
+        if (cached != null) return cached;
+
+        List<ActiveRideResponse> results = rideRepository
+                .searchByBusNumber(RideStatus.ACTIVE, query, PageRequest.of(0, BUS_SEARCH_LIMIT))
+                .stream()
+                .sorted(Comparator.comparingInt((Ride r) ->
+                                normalizeBusNumber(r.getBus().getBusNumber()).equals(query) ? 0 : 1)
+                        .thenComparing(r -> r.getBus().getBusNumber()))
+                .map(this::toDto)
+                .collect(Collectors.toList());
+
+        busSearchCache.put(query, results);
+        return results;
     }
 
     // ================= ALL ACTIVE RIDES =================
