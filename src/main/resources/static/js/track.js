@@ -18,19 +18,57 @@ let stompClient        = null;
 let wsSubscribedRideId = null;
 let wsReconnectTimer   = null;
 
-/* ─── INIT ─────────────────────────────────────────────────────── */
-if (routeKey) {
-  const [src, dest] = routeKey.split("_");
-  document.getElementById("routeTitle").innerText = `${src} → ${dest}`;
-  loadRoute(src, dest);
+/* ─── HELPERS ──────────────────────────────────────────────────── */
+// Split "SRC_DEST" on the FIRST underscore only (matches the backend), so a
+// stop name is never cut in the wrong place.
+function splitRouteKey(key) {
+  const idx = key ? key.indexOf("_") : -1;
+  if (idx === -1) return [key || "", ""];
+  return [key.substring(0, idx).trim(), key.substring(idx + 1).trim()];
 }
 
-if (!rideId && routeKey) {
-  autoSelectRide();
-} else if (rideId) {
-  fetchRideInfo();
-  tick(); // one immediate fetch so the page isn't blank while the socket connects
+// fetch + JSON that throws on HTTP errors instead of silently returning an
+// {error: "..."} object that later code treats as a list of stops.
+async function getJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { msg = (await res.json()).error || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  return res.json();
 }
+
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, c => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+/* ─── INIT ─────────────────────────────────────────────────────── */
+(async function init() {
+  if (routeKey) {
+    const [src, dest] = splitRouteKey(routeKey);
+    document.getElementById("routeTitle").innerText = `${src} → ${dest}`;
+  }
+
+  if (rideId) {
+    // Resolve the ride FIRST so we know its routeCode before asking for
+    // stops. Previously the stops were requested before this was known, so
+    // rides on any non-default route asked the default route for stops and
+    // got an error back -> the stop list never loaded.
+    await fetchRideInfo();
+    tick(); // one immediate fetch so the page isn't blank while the socket connects
+  }
+
+  if (routeKey) {
+    await loadRoute(...splitRouteKey(routeKey));
+  }
+
+  if (!rideId && routeKey) {
+    autoSelectRide();
+  }
+})();
 
 connectWebSocket();
 
@@ -94,40 +132,45 @@ function subscribeToRide(id) {
 
 /* ─── LOAD ROUTE STOPS ──────────────────────────────────────────── */
 async function loadRoute(src, dest) {
+  const container = document.getElementById("stopList");
   try {
     const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
-    const segRes = await fetch(
+    const stops = await getJson(
         `/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}${routeParam}`
     );
-    routeStops = await segRes.json();
+    routeStops = Array.isArray(stops) ? stops : [];
     if (rideId) await loadFullRoute();
     renderTimeline();
   } catch (err) {
     console.error("Failed to load route:", err);
+    container.innerHTML =
+        `<div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">` +
+        `Could not load stops (${escapeHtml(err.message)})</div>`;
   }
 }
 
 /* ─── LOAD FULL ROUTE ───────────────────────────────────────────── */
+// The bus's own journey (its start -> end stop), used to place the bus.
 async function loadFullRoute() {
   try {
-    const res   = await fetch("/api/ride/active/all");
-    const rides = await res.json();
-    const ride  = rides.find(r => String(r.rideId) === String(rideId));
-    if (!ride || !ride.routeKey) return;
+    if (!rideInfo || !rideInfo.routeKey) {
+      const rides = await getJson("/api/ride/active/all");
+      rideInfo = rides.find(r => String(r.rideId) === String(rideId)) || null;
+    }
+    const ride = rideInfo;
+    if (!ride || !ride.routeKey) { fullRouteStops = routeStops; return; }
 
-    rideInfo = ride;
     document.getElementById("busNumberDisplay").innerText = ride.busNumber || "—";
 
-    // Prefer the ride's own routeCode (authoritative — comes straight from
-    // the DB) over whatever was in the URL, in case the two ever disagree.
+    // The ride's own routeCode is authoritative (straight from the DB).
     if (ride.routeCode) routeCode = ride.routeCode;
     const routeParam = routeCode ? `&routeCode=${encodeURIComponent(routeCode)}` : "";
 
-    const [rideSrc, rideDest] = ride.routeKey.split("_");
-    const fullRes = await fetch(
+    const [rideSrc, rideDest] = splitRouteKey(ride.routeKey);
+    const stops = await getJson(
         `/api/routes?source=${encodeURIComponent(rideSrc)}&destination=${encodeURIComponent(rideDest)}${routeParam}`
     );
-    fullRouteStops = await fullRes.json();
+    fullRouteStops = Array.isArray(stops) ? stops : routeStops;
   } catch (err) {
     console.error("Failed to load full route:", err);
     fullRouteStops = routeStops;
@@ -137,15 +180,17 @@ async function loadFullRoute() {
 /* ─── AUTO SELECT RIDE ──────────────────────────────────────────── */
 async function autoSelectRide() {
   if (!routeKey) return;
-  const [src, dest] = routeKey.split("_");
+  const [src, dest] = splitRouteKey(routeKey);
   try {
-    const res   = await fetch(
+    const buses = await getJson(
         `/api/ride/active?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dest)}`
     );
-    const buses = await res.json();
     if (buses.length > 0) {
       rideId = buses[0].rideId;
-      await loadFullRoute();
+      rideInfo = buses[0];
+      if (buses[0].routeCode) routeCode = buses[0].routeCode;
+      document.getElementById("busNumberDisplay").innerText = buses[0].busNumber || "—";
+      await loadRoute(src, dest); // reload with the correct routeCode + full route
       tick();
       subscribeToRide(rideId);
     }
@@ -157,13 +202,11 @@ async function autoSelectRide() {
 /* ─── FETCH RIDE INFO ───────────────────────────────────────────── */
 async function fetchRideInfo() {
   try {
-    const res   = await fetch("/api/ride/active/all");
-    const rides = await res.json();
-    rideInfo    = rides.find(r => String(r.rideId) === String(rideId));
+    const rides = await getJson("/api/ride/active/all");
+    rideInfo = rides.find(r => String(r.rideId) === String(rideId)) || null;
     if (rideInfo) {
-      document.getElementById("busNumberDisplay").innerText =
-          rideInfo.busNumber || "—";
-      if (!fullRouteStops.length) await loadFullRoute();
+      document.getElementById("busNumberDisplay").innerText = rideInfo.busNumber || "—";
+      if (rideInfo.routeCode) routeCode = rideInfo.routeCode;
     }
   } catch (err) {
     console.error("Ride info failed:", err);
@@ -257,7 +300,7 @@ function renderTimeline() {
       ? displayStops[busPos.nearestIdx]?.distanceFromStartKm || 0
       : 0;
   const totalDist = displayStops[displayStops.length-1].distanceFromStartKm;
-  const progress  = !busPos ? 0 : Math.min(100, Math.round((busDistKm / totalDist) * 100));
+  const progress  = (!busPos || !totalDist) ? 0 : Math.min(100, Math.round((busDistKm / totalDist) * 100));
 
   document.getElementById("progressBar").style.width  = progress + "%";
   document.getElementById("progressPct").innerText    = progress + "%";
@@ -336,7 +379,7 @@ function renderTimeline() {
 
       <div style="flex:1; padding:14px 0 14px 14px;">
         <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
-          <span style="font-size:15px; font-weight:600; ${nameCl}">${stop.stopName}</span>
+          <span style="font-size:15px; font-weight:600; ${nameCl}">${escapeHtml(stop.stopName)}</span>
           ${markerHtml}
           ${badgeHtml}
         </div>
