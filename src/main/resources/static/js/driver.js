@@ -15,6 +15,12 @@ let heartbeatTimer = null;
 let wakeLock       = null;
 let sendFailures   = 0;
 
+// ---- simulated location (test panel) ----
+let locationMode   = "live";  // "live" | "sim"
+let simOverride    = null;    // {latitude, longitude} while simulating; real GPS is ignored then
+let simStops       = [];      // ordered stops of the active ride's route
+let activeRouteCode = null;   // routeCode of the ride currently running
+
 document.addEventListener("DOMContentLoaded", () => {
   loadRoutes();
   loadDepots();
@@ -301,7 +307,8 @@ async function startRide() {
     statusEl.innerText = `Ride Started ✅ (ID: ${rideId})`;
 
     // Remember the ride so a page refresh / tab kill doesn't silently end tracking
-    localStorage.setItem("wimb_active_ride", JSON.stringify({ rideId, busNumber, source, destination }));
+    activeRouteCode = selectedRouteCode;
+    localStorage.setItem("wimb_active_ride", JSON.stringify({ rideId, busNumber, source, destination, routeCode: selectedRouteCode }));
 
     startRideTracking();
 
@@ -339,6 +346,7 @@ function startRideTracking() {
 
   rideWatchId = navigator.geolocation.watchPosition(
       pos => {
+        if (simOverride) return; // simulating: ignore real GPS
         lastFix = {
           latitude:  pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -372,14 +380,18 @@ function stopRideTracking() {
   lastFix = null;
   lastSentAt = 0;
   sendFailures = 0;
+  simOverride = null;
+  simStops = [];
+  activeRouteCode = null;
+  setLocationMode("live");
 }
 
-async function sendLocation(isHeartbeat) {
+async function sendLocation(isHeartbeat, force = false) {
   if (!rideId || !lastFix || !driverToken) return;
 
   const now = Date.now();
   // Throttle real GPS bursts; heartbeats only fire if nothing was sent recently.
-  if (now - lastSentAt < (isHeartbeat ? HEARTBEAT_MS - 1000 : SEND_MIN_INTERVAL_MS)) return;
+  if (!force && now - lastSentAt < (isHeartbeat ? HEARTBEAT_MS - 1000 : SEND_MIN_INTERVAL_MS)) return;
   lastSentAt = now;
 
   try {
@@ -410,7 +422,9 @@ async function sendLocation(isHeartbeat) {
     sendFailures = 0;
     const t = new Date().toLocaleTimeString();
     const acc = lastFix.accuracy != null ? ` (GPS ±${Math.round(lastFix.accuracy)} m)` : "";
-    setTrackingStatus(`📡 Sharing live location — last sent ${t}${acc}`);
+    setTrackingStatus(simOverride
+        ? `🧪 Sending SIMULATED location — last sent ${t}`
+        : `📡 Sharing live location — last sent ${t}${acc}`);
   } catch (err) {
     sendFailures++;
     console.error("Location update failed:", err);
@@ -421,6 +435,104 @@ async function sendLocation(isHeartbeat) {
 function setTrackingStatus(text) {
   const el = document.getElementById("status");
   if (el) el.innerText = text;
+}
+
+/* ------------------ SIMULATE LOCATION (test panel) ------------------ */
+// Lets you test the whole passenger flow from a desk: choose where along the
+// route the bus "is" and that position is posted exactly like a real GPS fix.
+
+function setLocationMode(mode) {
+  locationMode = mode;
+  const tabLive = document.getElementById("tabLive");
+  const tabSim  = document.getElementById("tabSim");
+  const panel   = document.getElementById("simPanel");
+  if (!tabLive || !tabSim || !panel) return;
+
+  tabLive.classList.toggle("active", mode === "live");
+  tabSim.classList.toggle("active", mode === "sim");
+  panel.classList.toggle("hidden", mode !== "sim");
+
+  if (mode === "sim") {
+    loadSimStops().then(() => onSimChange(false));
+  } else if (simOverride) {
+    // Back to real GPS: drop the fake position so the next real fix takes over
+    simOverride = null;
+    lastFix = null;
+    setTrackingStatus("📡 Back on live GPS — waiting for the next fix…");
+  }
+}
+
+async function loadSimStops() {
+  const select = document.getElementById("simStop");
+  if (simStops.length) return;
+
+  // Right after starting a ride the stops are already loaded for the selected route
+  if (routeStopsCache.length && (!activeRouteCode || activeRouteCode === selectedRouteCode)) {
+    simStops = routeStopsCache;
+  } else if (activeRouteCode) {
+    try {
+      const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(activeRouteCode)}`);
+      const stops = await safeJson(res);
+      if (res.ok && Array.isArray(stops)) simStops = stops;
+    } catch (err) {
+      console.error("Simulate: could not load route stops:", err);
+    }
+  }
+
+  select.innerHTML = "";
+  if (!simStops.length) {
+    select.innerHTML = `<option value="" disabled selected>Could not load stops for this route</option>`;
+    return;
+  }
+  simStops.forEach((stop, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = `${i + 1}. ${stop.stopName.trim().toUpperCase()}`;
+    select.appendChild(opt);
+  });
+  select.value = "0";
+}
+
+// resetSlider = true when the stop dropdown changed (bus sits exactly on that stop)
+function onSimChange(resetSlider) {
+  if (!simStops.length) return;
+  const stopSel = document.getElementById("simStop");
+  const slider  = document.getElementById("simSlider");
+  const idx     = Math.max(0, parseInt(stopSel.value || "0", 10));
+  const from    = simStops[idx];
+  const to      = simStops[idx + 1] || null; // last stop has nothing after it
+
+  if (resetSlider) slider.value = 0;
+  slider.disabled = !to;
+  if (!to) slider.value = 0;
+
+  const t = to ? Number(slider.value) / 100 : 0;
+  const latitude  = to ? from.latitude  + (to.latitude  - from.latitude)  * t : from.latitude;
+  const longitude = to ? from.longitude + (to.longitude - from.longitude) * t : from.longitude;
+
+  document.getElementById("simFromLabel").innerText = from.stopName.trim().toUpperCase();
+  document.getElementById("simToLabel").innerText   = to ? to.stopName.trim().toUpperCase() : "(end of route)";
+  document.getElementById("simPctLabel").innerText  = `${Math.round(t * 100)}%`;
+  document.getElementById("simCoords").innerText    = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+  // From here on the simulated point replaces real GPS, incl. the 10 s heartbeat
+  simOverride = { latitude, longitude };
+  lastFix = { latitude, longitude, accuracy: 10 };
+  sendLocation(false, false); // normal throttle while dragging the slider
+}
+
+function simStep(delta) {
+  if (!simStops.length) return;
+  const stopSel = document.getElementById("simStop");
+  const next = Math.min(simStops.length - 1, Math.max(0, parseInt(stopSel.value || "0", 10) + delta));
+  stopSel.value = String(next);
+  onSimChange(true);
+  sendSimNow();
+}
+
+function sendSimNow() {
+  if (!simOverride) onSimChange(false);
+  sendLocation(false, true); // bypass throttle
 }
 
 /* ------------------ SCREEN WAKE LOCK ------------------ */
@@ -454,11 +566,12 @@ async function resumeActiveRide() {
   try {
     const res = await fetch("/api/ride/active/all");
     const rides = await safeJson(res);
-    const stillActive = Array.isArray(rides) && rides.some(r => String(r.rideId) === String(saved.rideId));
-    if (!stillActive) {
+    const match = Array.isArray(rides) ? rides.find(r => String(r.rideId) === String(saved.rideId)) : null;
+    if (!match) {
       localStorage.removeItem("wimb_active_ride");
       return;
     }
+    activeRouteCode = match.routeCode || saved.routeCode || null;
 
     driverToken = token;
     rideId = saved.rideId;
@@ -617,6 +730,7 @@ async function checkBus() {
       document.getElementById("activeBusNumber").innerText = busNumber;
 
       rideId = existing.rideId;
+      activeRouteCode = existing.routeCode || null;
 
       document.getElementById("busNumberSection").classList.add("hidden");
       document.getElementById("resumeSection").classList.remove("hidden");

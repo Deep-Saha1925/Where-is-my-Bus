@@ -116,6 +116,15 @@
         }
         .toggle-eye-btn:hover { color: var(--text-muted); }
 
+
+        /* ---- Simulate-location test panel ---- */
+        .tab-row { display:flex; gap:6px; background:var(--bg-page); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:12px; }
+        .tab-btn { flex:1; padding:9px 10px; border:none; border-radius:9px; background:transparent; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer; }
+        .tab-btn.active { background:var(--bg-card); color:var(--text-primary); box-shadow:0 1px 3px rgba(22,38,31,0.12); }
+        .sim-range { width:100%; accent-color:var(--accent); }
+        .sim-small { padding:9px; font-size:13px; }
+        .sim-badge { display:inline-block; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--accent-soft); color:#9a5a10; }
+
         @media (max-width: 400px) {
             .outer-wrap { padding: 14px !important; }
             .brand-card { padding: 22px 18px !important; border-radius: 16px; }
@@ -279,6 +288,42 @@
                 </div>
             </div>
         </div>
+        <!-- Tabs: real GPS vs. simulated position (for testing without driving) -->
+        <div class="tab-row">
+            <button type="button" id="tabLive" class="tab-btn active" onclick="setLocationMode('live')">📡 Live GPS</button>
+            <button type="button" id="tabSim" class="tab-btn" onclick="setLocationMode('sim')">🧪 Simulate location</button>
+        </div>
+
+        <div id="simPanel" class="hidden panel-amber mb-4" style="padding:14px;">
+            <p style="font-size:12.5px; color:var(--text-muted); margin:0 0 12px;">
+                Test mode: pick a stop, or slide toward the next one. This position is sent as the bus location and real GPS is ignored until you switch back to <b>Live GPS</b>.
+            </p>
+
+            <label class="brand-label">Bus is at / just after stop</label>
+            <select id="simStop" class="brand-select mb-3" onchange="onSimChange(true)">
+                <option value="" disabled selected>Loading stops...</option>
+            </select>
+
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted); margin-bottom:4px;">
+                <span id="simFromLabel">—</span>
+                <span id="simPctLabel" class="mono">0%</span>
+                <span id="simToLabel">—</span>
+            </div>
+            <input id="simSlider" type="range" min="0" max="100" value="0" step="1" class="sim-range mb-3" oninput="onSimChange(false)" />
+
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button type="button" class="brand-btn btn-ghost sim-small" onclick="simStep(-1)">⏮ Prev stop</button>
+                <button type="button" class="brand-btn btn-ghost sim-small" onclick="simStep(1)">Next stop ⏭</button>
+            </div>
+
+            <div class="info-row mb-3">
+                <span class="label">Sending</span>
+                <span class="value" id="simCoords" style="font-size:12px;">—</span>
+            </div>
+
+            <button type="button" class="brand-btn btn-amber" onclick="sendSimNow()">📍 Send this location now</button>
+        </div>
+
         <button id="stopBtn" onclick="stopRide()" class="brand-btn btn-danger">
             🛑 Stop Ride
         </button>
