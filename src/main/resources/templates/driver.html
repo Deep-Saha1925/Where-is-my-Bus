@@ -117,6 +117,13 @@
         .toggle-eye-btn:hover { color: var(--text-muted); }
 
 
+        /* ---- Current stop card ---- */
+        .pos-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+        .pos-title { font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-faint); display:flex; justify-content:space-between; align-items:center; }
+        .pos-main { font-family:'Oswald',sans-serif; font-weight:600; font-size:19px; color:var(--text-primary); margin:4px 0 2px; line-height:1.2; }
+        .pos-sub { font-size:12.5px; color:var(--text-muted); }
+        .pos-bar { height:6px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
+        .pos-bar > div { height:100%; width:0%; background:var(--line-done); border-radius:99px; transition:width .4s ease; }
         /* ---- Simulate-location test panel ---- */
         .tab-row { display:flex; gap:6px; background:var(--bg-page); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:12px; }
         .tab-btn { flex:1; padding:9px 10px; border:none; border-radius:9px; background:transparent; font-size:13px; font-weight:700; color:var(--text-muted); cursor:pointer; }
@@ -221,7 +228,7 @@
                 </div>
             </div>
             <button onclick="resumeRide()" class="brand-btn btn-amber mb-2">
-                ↩ Resume &amp; End This Ride
+                ↩ Resume This Ride
             </button>
             <button onclick="showNewRideForm()" class="brand-btn btn-ghost">
                 ＋ Start New Ride Instead
@@ -288,6 +295,14 @@
                 </div>
             </div>
         </div>
+        <!-- Where the bus is right now (live GPS or simulated) -->
+        <div class="pos-card" id="posCard">
+            <div class="pos-title"><span>Current stop position</span><span id="posMode" class="sim-badge">📡 Live</span></div>
+            <div class="pos-main" id="posMain">Waiting for location…</div>
+            <div class="pos-sub" id="posSub">—</div>
+            <div class="pos-bar"><div id="posBar"></div></div>
+        </div>
+
         <!-- Tabs: real GPS vs. simulated position (for testing without driving) -->
         <div class="tab-row">
             <button type="button" id="tabLive" class="tab-btn active" onclick="setLocationMode('live')">📡 Live GPS</button>

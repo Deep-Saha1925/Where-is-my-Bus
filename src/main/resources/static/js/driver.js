@@ -21,6 +21,17 @@ let simOverride    = null;    // {latitude, longitude} while simulating; real GP
 let simStops       = [];      // ordered stops of the active ride's route
 let activeRouteCode = null;   // routeCode of the ride currently running
 
+/* ------------------ SCREEN SECTIONS ------------------ */
+// Exactly one step of the flow is visible at a time. Every transition goes
+// through here so two panels can never show together.
+const SECTION_IDS = ["busNumberSection", "resumeSection", "newRideSection", "activeRideSection"];
+function showSection(name) {
+  SECTION_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", id !== name);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   loadRoutes();
   loadDepots();
@@ -282,8 +293,7 @@ async function startRide() {
         localStorage.removeItem("wimb_driver_bus");
         driverToken = null;
         // Session expired — send the driver back to re-verify with the depot code
-        document.getElementById("newRideSection").classList.add("hidden");
-        document.getElementById("busNumberSection").classList.remove("hidden");
+        showSection("busNumberSection");
       }
       const errText = await res.text();
       throw new Error(`Server error: ${errText}`);
@@ -299,8 +309,7 @@ async function startRide() {
     }
 
 
-    document.getElementById("newRideSection").classList.add("hidden");
-    document.getElementById("activeRideSection").classList.remove("hidden");
+    showSection("activeRideSection");
     document.getElementById("activeRouteKey").innerText = `${source} → ${destination}`;
     document.getElementById("activeRideId").innerText = rideId;
     document.getElementById("activeBusNumber").innerText = busNumber;
@@ -343,6 +352,8 @@ function startRideTracking() {
   }
 
   requestWakeLock();
+  updateCurrentStop();
+  loadSimStops().then(updateCurrentStop);
 
   rideWatchId = navigator.geolocation.watchPosition(
       pos => {
@@ -352,6 +363,7 @@ function startRideTracking() {
           longitude: pos.coords.longitude,
           accuracy:  pos.coords.accuracy
         };
+        updateCurrentStop();
         sendLocation(false);
       },
       err => {
@@ -383,7 +395,10 @@ function stopRideTracking() {
   simOverride = null;
   simStops = [];
   activeRouteCode = null;
+  const simSel = document.getElementById("simStop");
+  if (simSel) simSel.innerHTML = `<option value="" disabled selected>Loading stops...</option>`;
   setLocationMode("live");
+  updateCurrentStop();
 }
 
 async function sendLocation(isHeartbeat, force = false) {
@@ -459,38 +474,101 @@ function setLocationMode(mode) {
     simOverride = null;
     lastFix = null;
     setTrackingStatus("📡 Back on live GPS — waiting for the next fix…");
+    updateCurrentStop();
   }
 }
 
 async function loadSimStops() {
   const select = document.getElementById("simStop");
-  if (simStops.length) return;
-
-  // Right after starting a ride the stops are already loaded for the selected route
-  if (routeStopsCache.length && (!activeRouteCode || activeRouteCode === selectedRouteCode)) {
-    simStops = routeStopsCache;
-  } else if (activeRouteCode) {
-    try {
-      const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(activeRouteCode)}`);
-      const stops = await safeJson(res);
-      if (res.ok && Array.isArray(stops)) simStops = stops;
-    } catch (err) {
-      console.error("Simulate: could not load route stops:", err);
+  if (!simStops.length) {
+    // Right after starting a ride the stops are already loaded for the selected route
+    if (routeStopsCache.length && (!activeRouteCode || activeRouteCode === selectedRouteCode)) {
+      simStops = routeStopsCache;
+    } else if (activeRouteCode) {
+      try {
+        const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(activeRouteCode)}`);
+        const stops = await safeJson(res);
+        if (res.ok && Array.isArray(stops)) simStops = stops;
+      } catch (err) {
+        console.error("Could not load route stops:", err);
+      }
     }
   }
 
-  select.innerHTML = "";
-  if (!simStops.length) {
-    select.innerHTML = `<option value="" disabled selected>Could not load stops for this route</option>`;
+  if (select && select.options.length <= 1) {
+    select.innerHTML = "";
+    if (!simStops.length) {
+      select.innerHTML = `<option value="" disabled selected>Could not load stops for this route</option>`;
+    } else {
+      simStops.forEach((stop, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i);
+        opt.textContent = `${i + 1}. ${stop.stopName.trim().toUpperCase()}`;
+        select.appendChild(opt);
+      });
+      select.value = "0";
+    }
+  }
+}
+
+/* ------------------ CURRENT STOP DISPLAY ------------------ */
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Updates the "Current stop position" card. In sim mode it shows exactly what the
+// slider says; in live mode it works out the nearest stop from the GPS fix.
+function updateCurrentStop() {
+  const main = document.getElementById("posMain");
+  if (!main) return;
+  const sub = document.getElementById("posSub");
+  const bar = document.getElementById("posBar");
+  const badge = document.getElementById("posMode");
+  const n = simStops.length;
+
+  badge.innerText = simOverride ? "🧪 Simulated" : "📡 Live";
+
+  if (!n || !lastFix) {
+    main.innerText = n ? "Waiting for location…" : "Loading route…";
+    sub.innerText = "—";
+    bar.style.width = "0%";
     return;
   }
-  simStops.forEach((stop, i) => {
-    const opt = document.createElement("option");
-    opt.value = String(i);
-    opt.textContent = `${i + 1}. ${stop.stopName.trim().toUpperCase()}`;
-    select.appendChild(opt);
+
+  const name = s => s.stopName.trim().toUpperCase();
+
+  if (simOverride) {
+    const idx = Math.max(0, parseInt(document.getElementById("simStop").value || "0", 10));
+    const t = simStops[idx + 1] ? Number(document.getElementById("simSlider").value) / 100 : 0;
+    if (t === 0) {
+      main.innerText = `📍 At ${name(simStops[idx])}`;
+      sub.innerText = `Stop ${idx + 1} of ${n}` + (simStops[idx + 1] ? ` · next: ${name(simStops[idx + 1])}` : " · end of route");
+    } else if (t === 1) {
+      main.innerText = `📍 At ${name(simStops[idx + 1])}`;
+      sub.innerText = `Stop ${idx + 2} of ${n}`;
+    } else {
+      main.innerText = `🚌 ${name(simStops[idx])} → ${name(simStops[idx + 1])}`;
+      sub.innerText = `${Math.round(t * 100)}% of the way · stop ${idx + 1} of ${n}`;
+    }
+    bar.style.width = (n > 1 ? ((idx + t) / (n - 1)) * 100 : 100) + "%";
+    return;
+  }
+
+  // Live GPS: nearest stop on the route
+  let best = 0, bestD = Infinity;
+  simStops.forEach((s, i) => {
+    const d = distanceMeters(lastFix.latitude, lastFix.longitude, s.latitude, s.longitude);
+    if (d < bestD) { bestD = d; best = i; }
   });
-  select.value = "0";
+  const AT_STOP_M = 150;
+  const distText = bestD >= 1000 ? `${(bestD / 1000).toFixed(1)} km` : `${Math.round(bestD)} m`;
+  main.innerText = bestD <= AT_STOP_M ? `📍 At ${name(simStops[best])}` : `🚌 Near ${name(simStops[best])}`;
+  sub.innerText = `Stop ${best + 1} of ${n}` + (bestD <= AT_STOP_M ? "" : ` · ${distText} away`);
+  bar.style.width = (n > 1 ? (best / (n - 1)) * 100 : 100) + "%";
 }
 
 // resetSlider = true when the stop dropdown changed (bus sits exactly on that stop)
@@ -518,6 +596,7 @@ function onSimChange(resetSlider) {
   // From here on the simulated point replaces real GPS, incl. the 10 s heartbeat
   simOverride = { latitude, longitude };
   lastFix = { latitude, longitude, accuracy: 10 };
+  updateCurrentStop();
   sendLocation(false, false); // normal throttle while dragging the slider
 }
 
@@ -562,6 +641,7 @@ async function resumeActiveRide() {
   try { saved = JSON.parse(localStorage.getItem("wimb_active_ride") || "null"); } catch (_) {}
   const token = localStorage.getItem("wimb_driver_token");
   if (!saved || !saved.rideId || !token) return;
+  if (rideId) return; // a flow is already in progress
 
   try {
     const res = await fetch("/api/ride/active/all");
@@ -573,6 +653,7 @@ async function resumeActiveRide() {
     }
     activeRouteCode = match.routeCode || saved.routeCode || null;
 
+    if (rideId) return; // driver moved on while we were checking
     driverToken = token;
     rideId = saved.rideId;
 
@@ -581,9 +662,7 @@ async function resumeActiveRide() {
       previewWatchId = null;
     }
 
-    document.getElementById("busNumberSection").classList.add("hidden");
-    document.getElementById("newRideSection").classList.add("hidden");
-    document.getElementById("activeRideSection").classList.remove("hidden");
+    showSection("activeRideSection");
     document.getElementById("activeRouteKey").innerText = `${saved.source} → ${saved.destination}`;
     document.getElementById("activeRideId").innerText = rideId;
     document.getElementById("activeBusNumber").innerText = saved.busNumber;
@@ -613,12 +692,9 @@ async function stopRide() {
     localStorage.removeItem("wimb_active_ride");
 
     document.getElementById("status").innerText = "Ride Stopped ⛔";
-    document.getElementById("stopBtn").classList.add("hidden");
-    document.getElementById("startBtn").classList.remove("hidden");
 
     // Go back to bus number entry
-    document.getElementById("activeRideSection").classList.add("hidden");
-    document.getElementById("busNumberSection").classList.remove("hidden");
+    showSection("busNumberSection");
     document.getElementById("busNumber").value = "";
     document.getElementById("busNumber").disabled = false;
 
@@ -724,16 +800,14 @@ async function checkBus() {
     document.getElementById("status").innerText = "";
 
     if (existing) {
-      document.getElementById("savedRouteKey").innerText =
-          existing.routeKey.replace("_", " → ");
+      document.getElementById("savedRouteKey").innerText = routeLabel(existing);
       document.getElementById("savedRideId").innerText = existing.rideId;
       document.getElementById("activeBusNumber").innerText = busNumber;
 
       rideId = existing.rideId;
       activeRouteCode = existing.routeCode || null;
 
-      document.getElementById("busNumberSection").classList.add("hidden");
-      document.getElementById("resumeSection").classList.remove("hidden");
+      showSection("resumeSection");
     } else {
       showNewRideForm();
     }
@@ -745,13 +819,17 @@ async function checkBus() {
   }
 }
 
+function routeLabel(ride) {
+  if (ride.sourceName && ride.destinationName) return `${ride.sourceName} → ${ride.destinationName}`;
+  return (ride.routeKey || "").replace("_", " → ");
+}
+
 /* ------------------ RESUME RIDE ------------------ */
 function resumeRide() {
   // rideId already set in checkBus()
   const routeKey = document.getElementById("savedRouteKey").innerText;
 
-  document.getElementById("resumeSection").classList.add("hidden");
-  document.getElementById("activeRideSection").classList.remove("hidden");
+  showSection("activeRideSection");
   document.getElementById("activeRouteKey").innerText = routeKey;
   document.getElementById("activeRideId").innerText = rideId;
   document.getElementById("status").innerText = `Ride Resumed ✅`;
@@ -762,7 +840,5 @@ function resumeRide() {
 /* ------------------ SHOW NEW RIDE FORM ------------------ */
 function showNewRideForm() {
   rideId = null;
-  document.getElementById("busNumberSection").classList.add("hidden");
-  document.getElementById("resumeSection").classList.add("hidden");
-  document.getElementById("newRideSection").classList.remove("hidden");
+  showSection("newRideSection");
 }
