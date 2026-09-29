@@ -4,7 +4,9 @@ import com.deep.WIMB.dto.DepotRouteMatch;
 import com.deep.WIMB.dto.RouteStop;
 import com.deep.WIMB.dto.RouteSummary;
 import com.deep.WIMB.service.RouteExcelLoader;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -39,7 +41,11 @@ public class RouteController {
     @GetMapping("/list")
     public List<RouteSummary> listRoutes() {
         return loader.getAllRoutes().stream()
-                .map(r -> new RouteSummary(r.getRouteCode(), r.getRouteName(), r.getStopCount()))
+                // Live stop count from the loaded route, not the value saved at upload time
+                // (which goes stale when the route file is replaced or fails to load).
+                .map(r -> new RouteSummary(r.getRouteCode(), r.getRouteName(), loader.getStopCount(r.getRouteCode())))
+                // A route whose file failed to load has no stops — never offer it to drivers.
+                .filter(r -> r.getStopCount() > 0)
                 .toList();
     }
 
@@ -47,7 +53,11 @@ public class RouteController {
     // pickers once a driver has selected their route.
     @GetMapping("/stops")
     public List<RouteStop> getRouteStops(@RequestParam String routeCode) {
-        return loader.getFullRoute(routeCode);
+        try {
+            return loader.getFullRoute(routeCode);
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     // Static/non-live "does a service exist between these two depots" search.
