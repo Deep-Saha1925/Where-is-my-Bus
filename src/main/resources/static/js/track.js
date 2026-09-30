@@ -17,6 +17,7 @@ let hasEnteredOnce = false; // only slide the rows in on the first render, not e
 let stompClient        = null;
 let wsSubscribedRideId = null;
 let wsReconnectTimer   = null;
+let lastWsPushAt       = 0;   // when the last live push arrived (0 = never)
 
 /* ─── HELPERS ──────────────────────────────────────────────────── */
 // Split "SRC_DEST" into [source, destination]. Stop names can contain "_"
@@ -83,7 +84,18 @@ connectWebSocket();
 // idle connections), this still catches up within 20s instead of the page
 // going stale forever. This is the same endpoint the old 3s poll used, just
 // 6-7x less often, since it's now a fallback rather than the primary path.
-setInterval(tick, 20000);
+// Polls every 5s, but skips the request while WebSocket pushes are arriving
+// (the driver sends at least every ~10s), so a healthy socket costs nothing extra
+// while a silently broken one is noticed within seconds, not 20s.
+setInterval(() => {
+  if (Date.now() - lastWsPushAt < 15000) return;
+  tick();
+}, 5000);
+
+// Coming back to the tab (phones sleep background tabs and their sockets): catch up now.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") tick();
+});
 
 /* ─── WEBSOCKET (live push, replaces 3s polling) ──────────────────── */
 function connectWebSocket() {
@@ -93,13 +105,18 @@ function connectWebSocket() {
     stompClient.debug = null; // silence stomp.js's verbose console logging
 
     stompClient.connect({}, () => {
+      wsSubscribedRideId = null;   // a new connection has no subscriptions yet
       if (rideId) subscribeToRide(rideId);
     }, () => {
       // onError — stomp.js has no built-in auto-reconnect, so retry by hand
       scheduleWsReconnect();
     });
 
-    socket.onclose = scheduleWsReconnect;
+    const stompOnClose = socket.onclose;   // stomp.js installed its handler inside connect()
+    socket.onclose = (e) => {
+      if (stompOnClose) stompOnClose(e);
+      scheduleWsReconnect();
+    };
   } catch (err) {
     console.error("WebSocket connect failed:", err);
     scheduleWsReconnect();
@@ -128,6 +145,7 @@ function subscribeToRide(id) {
 
   stompClient.subscribe(`/topic/ride/${id}`, (message) => {
     try {
+      lastWsPushAt = Date.now();
       applyLocation(JSON.parse(message.body));
     } catch (err) {
       console.error("Failed to parse live location push:", err);
