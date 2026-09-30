@@ -8,12 +8,14 @@ let routeStopsCache = [];    // ordered stops of the selected route
 
 // ---- live location sending ----
 const SEND_MIN_INTERVAL_MS = 3000;   // never post more often than this (GPS can fire several times a second)
+const SIM_MIN_INTERVAL_MS  = 1000;    // simulated moves (slider / Next stop) may post this often
 const HEARTBEAT_MS         = 10000;  // re-send the last fix this often even if the bus hasn't moved
 let lastFix        = null;   // latest { latitude, longitude, accuracy } from the device
 let lastSentAt     = 0;
 let heartbeatTimer = null;
 let wakeLock       = null;
 let sendFailures   = 0;
+let trailingSendTimer = null;  // pending "send the newest position" after a throttled update
 
 // ---- simulated location (test panel) ----
 let locationMode   = "live";  // "live" | "sim"
@@ -395,6 +397,7 @@ function stopRideTracking() {
   lastFix = null;
   lastSentAt = 0;
   sendFailures = 0;
+  if (trailingSendTimer) { clearTimeout(trailingSendTimer); trailingSendTimer = null; }
   simOverride = null;
   simStops = [];
   activeRouteCode = null;
@@ -409,8 +412,24 @@ async function sendLocation(isHeartbeat, force = false) {
 
   const now = Date.now();
   // Throttle real GPS bursts; heartbeats only fire if nothing was sent recently.
-  if (!force && now - lastSentAt < (isHeartbeat ? HEARTBEAT_MS - 1000 : SEND_MIN_INTERVAL_MS)) return;
+  const minGap = isHeartbeat ? HEARTBEAT_MS - 1000
+                             : (simOverride ? SIM_MIN_INTERVAL_MS : SEND_MIN_INTERVAL_MS);
+  if (!force && now - lastSentAt < minGap) {
+    // Don't DROP the newest position -- previously a fix that arrived inside the
+    // throttle window was simply lost, and passengers only saw it after the next
+    // 10s heartbeat (or never, if the bus then stopped). Send it as soon as the
+    // window is over instead. Heartbeats don't need this, they repeat anyway.
+    if (!isHeartbeat && !trailingSendTimer) {
+      trailingSendTimer = setTimeout(() => {
+        trailingSendTimer = null;
+        sendLocation(false, true);   // sends whatever lastFix is *now*
+      }, Math.max(50, minGap - (now - lastSentAt)));
+    }
+    return;
+  }
   lastSentAt = now;
+
+  if (trailingSendTimer && force) { clearTimeout(trailingSendTimer); trailingSendTimer = null; }
 
   try {
     const res = await fetch("/api/ride/location", {
