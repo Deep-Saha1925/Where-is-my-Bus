@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
 
 </div>
 
@@ -43,6 +43,7 @@
 
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
+- 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
 - 📍 Live route timeline (like "Where is my Train")
@@ -55,12 +56,14 @@
 <td width="50%">
 
 ### 🚗 For Drivers
-- 🏢 Pick your depot + enter your depot's code (no personal login needed)
-- 🔐 Code verified once per shift, then remembered on that device
+- 🏢 Log in with your **bus number + depot + depot code** (no personal account needed) — asked every time the page is opened
+- ↩️ If that bus already has a running ride, an **"Active ride found"** screen offers *Resume This Ride* or *Start New Ride Instead*; resuming reopens the live ride screen with a **Stop Ride** button
+- ⏳ A neutral **Loading…** screen shows while depots/routes load, so the page never flashes the wrong step
 - 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
-- ↩️ Resume active ride after refresh
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
-- 📡 Live location sent every GPS tick, protected by a per-bus driver token, pushed to passengers instantly over WebSocket
+- 📍 **Current stop position** card on the ride screen — "At KOLKATA" / "Between A → B (40%)", stop *n* of *N*, progress bar, and a Live/Simulated badge
+- 🧪 **Simulate location** tab for testing without driving — see [Testing Without a Bus](#-testing-without-a-bus-simulate-location)
+- 📡 Live location sent on every GPS tick (never dropped — see below), protected by a per-bus driver token, pushed to passengers instantly over WebSocket
 
 </td>
 </tr>
@@ -90,6 +93,7 @@
 - ⚡ Redis buffer for high-frequency GPS writes
 - 🧠 In-memory active-ride cache — driver token checks on the GPS hot path no longer hit Postgres at all (see [Active Ride Cache](#-active-ride-cache))
 - 📡 WebSocket push for live tracking — replaces the old 3s/5s polling, see [Live Updates](#-live-updates-websocket)
+- 🔎 Bus-number search runs as a **database query** (not "load every ride, filter in the browser") with a short server cache and a per-tab cache, see [Search by Bus Number](#-search-by-bus-number)
 - 🔄 Auto batch flush Redis → PostgreSQL every 60s
 - 🐳 Containerized with Docker, deployed on Render
 - 🗺️ Route file paths normalized at load time — Excel files registered on one OS (e.g. Windows during local dev) still resolve correctly in production on Linux
@@ -177,6 +181,8 @@
 │   DriverAuthController ─► DriverAccessService (depot codes)│
 │                        └─► DriverTokenService (Redis)    │
 │   RideController  ──►  RideService  ──►  ActiveRideCache  │
+│        └─ GET /api/ride/search ─► RideRepository (DB query) │
+│                                   └─► BusSearchCache (5s)   │
 │   LocationController ─► LocationService ──► ActiveRideCache│
 │                        (in-memory rideId→busNumber, so    │
 │                        every GPS ping's auth check is 0   │
@@ -320,12 +326,73 @@ Ride starts / ends
 
 | Topic | Who subscribes | Payload |
 |---|---|---|
-| `/topic/ride/{rideId}` | `track.html`, for the one bus a passenger is watching | `{ rideId, latitude, longitude, timestamp }` |
+| `/topic/ride/{rideId}` | `track.html`, for the one bus a passenger is watching | `{ rideId, latitude, longitude, accuracy, timestamp }` — `timestamp` is an ISO-8601 instant ending in `Z` |
 | `/topic/activeRides` | `admin-buses.html`'s bus grid; `track.html`'s auto-select-a-bus flow | The same list `/api/ride/active/all` returns |
 
 - **Handshake endpoint:** `/ws` (public, same access level as the other passenger/driver-facing tracking endpoints)
-- **Fallback polling kept as a safety net** — 20s on `track.html`, 30s on `admin-buses.html` — in case a socket silently dies (a flaky network, a proxy that kills idle connections). Still a 6–9x drop from the old intervals, and now insurance rather than the primary mechanism.
+- **Fallback polling kept as a safety net** — in case a socket silently dies (a flaky network, a proxy that kills idle connections):
+  - `track.html` checks every **5s**, but *skips* the request while live pushes are arriving (anything newer than 15s). A healthy socket costs nothing extra; a broken one is noticed within seconds instead of the old 20s.
+  - Switching back to the tab (phones put background tabs and their sockets to sleep) fetches the latest position immediately.
+  - A dropped connection reconnects and re-subscribes automatically, keeping stomp.js's own disconnect handling intact.
+  - `admin-buses.html` still falls back to a 30s poll.
+- **Driver-side sends never drop the newest position.** `driver.js` posts at most once per 3s (once per 1s while simulating). A position arriving inside that window used to be discarded, so passengers only saw it at the next 10s heartbeat — or never, if the bus then stopped. It is now queued and sent as soon as the window ends, using whatever the *latest* position is by then.
 - **Single-instance limitation:** the message broker (`registry.enableSimpleBroker`) is in-memory, same caveat as `ActiveRideCache` above — a message published on one instance won't reach a passenger connected to a different instance. Moving to multiple instances means swapping this for a real broker (e.g. Redis pub/sub relayed to STOMP, or RabbitMQ's STOMP plugin).
+
+---
+
+## 🚌 Search by Bus Number
+
+Passengers can find a running bus directly by its number — the **Bus Number** tab on the home page (next to *Live Buses* and *Depot Routes*). Each result card shows the bus number, ride ID, source → destination and a Live badge, and **Track Bus** opens the normal tracking page for that ride. ETA is intentionally not shown on these cards: an ETA is measured to a passenger's boarding stop, and a bus-number search doesn't have one.
+
+### How it works
+
+```
+Passenger types "wb23a"                 (400ms pause after the last key)
+        ↓
+Per-tab cache hit (15s)?  ── yes ──► show instantly, no request
+        │ no
+        ▼
+GET /api/ride/search?busNumber=wb23a
+        ↓
+BusSearchCache hit (5s)?  ── yes ──► return cached list
+        │ no
+        ▼
+RideRepository.searchByBusNumber(ACTIVE, "wb23a", top 20)   ← one SQL query, bus joined in
+        ↓
+exact matches first, then alphabetical → cached → returned
+```
+
+- **Matching** ignores case, spaces, dashes, underscores, `/` and `.` on both sides, so `wb23a1245`, `WB 23A 1245` and `wb-23a-1245` all find `WB-23A-1245`. Partial numbers match anywhere in the number.
+- **The filtering happens in the database.** The old approach downloaded every active ride and filtered in the browser, which gets slower with every bus that starts running. The repository query only reads *active* rides whose bus number matches, joins the bus in the same query (no extra query per ride), and returns at most **20** rows.
+- **Two small caches, both with short lifetimes:**
+  - `BusSearchCache` (server) — 5s per query, max 500 entries, no extra dependency. It is **cleared whenever a ride starts or ends**, so a bus that just started or stopped never shows up stale.
+  - A per-tab cache in `index.js` — 15s per query, so retyping the same number is instant.
+- **Old results never linger.** Every new keystroke or search wipes the results area immediately, cancels the previous request (`AbortController`) and bumps a sequence number, so a slow earlier response can never draw over a newer search. Switching tabs cancels any pending bus search too.
+- Public endpoint, same access level as `/api/ride/active`.
+
+> ⚠️ `LIKE '%text%'` can't use a normal database index, so the speed-up comes from only reading active rides and capping the result count — which is small for this app. Single-instance caveat applies to `BusSearchCache` exactly as it does to `ActiveRideCache`.
+
+---
+
+## 🧪 Testing Without a Bus (Simulate Location)
+
+Real GPS on a laptop rarely fires, and even when it does it reports your desk, not a point on the route. The driver's ride screen therefore has two tabs:
+
+| Tab | What it does |
+|---|---|
+| **📡 Live GPS** | Normal behaviour — the browser's real GPS is sent as the bus location. |
+| **🧪 Simulate location** | Pick a stop from the route, or slide toward the next stop. That position is sent exactly like a real GPS fix, and real GPS is **ignored** until you switch back. |
+
+In the Simulate tab:
+- **Stop picker** — "bus is at / just after stop *n*" (all stops of the ride's route).
+- **Slider (0–100%)** — interpolates between that stop and the next one.
+- **⏮ Prev stop / Next stop ⏭** — jump to the neighbouring stop and send immediately.
+- **📍 Send this location now** — posts right away, bypassing the throttle.
+- The 10-second heartbeat keeps re-sending the simulated point so the bus doesn't look offline; switching back to **Live GPS** drops the fake position.
+
+The **Current stop position** card above the tabs reflects whichever mode is active: in Simulate it mirrors the picker/slider, in Live GPS it shows the nearest stop (within 150 m = "At …", otherwise "Near … · 1.2 km away").
+
+**Quick test:** start a ride on the driver page → open the Simulate tab → open `track.html` for that ride (or search the bus number) in another window → press *Next stop* — the bus should move on the passenger page within a couple of seconds.
 
 ---
 
@@ -335,10 +402,10 @@ Drivers don't get individual accounts. Instead, each **depot** (e.g. Alipurduar,
 
 ### How it works
 ```
-Driver opens driver.html
+Driver opens driver.html     ("Loading…" while depots/routes load)
         │
         ▼
-Picks their depot + enters that depot's code  ──►  POST /api/driver/verify
+Enters bus number + picks depot + enters that depot's code  ──►  POST /api/driver/verify
         │                                                  │
         │                                     DriverAccessService checks
         │                                     depot_name + code against
@@ -350,8 +417,15 @@ Picks their depot + enters that depot's code  ──►  POST /api/driver/verify
         │                                     ~12h TTL, tied to the bus
         │                                     number entered)
         ▼
-Token saved in the browser (localStorage) — remembered for the rest of
-the shift, so the code only needs to be entered once per device.
+Token saved in the browser (localStorage) for the ride actions that
+follow. Login is asked for again every time the page is opened — a
+refresh goes back to the login step, it does not skip it.
+        │
+        ▼
+Bus already has a running ride?
+   yes ► "Active ride found" ► Resume This Ride ► live ride screen ► Stop Ride
+         (or "Start New Ride Instead")
+   no  ► new-ride form (route, start, destination)
         │
         ▼
 Every ride action (start / location / cancel) sends the token in the
@@ -405,12 +479,11 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 - Admin-added routes are stored on disk at `wimb.route.dir` (default `data/routes/`), outside the build
 - The original `routes/route_APD_FLK.xlsx` still loads at startup exactly as before, under a fixed internal key — nothing that already worked was disturbed by adding this
 
-### ⚠️ Known current limitation
+### Rides know their route
 
-`Ride` doesn't yet store *which route* it's actually on — that's the next piece of work. Practically, this means:
-- ✅ Starting a ride on any registered route (legacy or newly-added) works correctly — coordinates resolve against the right route.
-- ✅ GPS tracking (`/api/ride/location`) is entirely route-agnostic, so it's unaffected either way.
-- ⚠️ The passenger-facing live timeline (`track.html`) still resolves stop lookups without knowing which route a ride belongs to, so it can behave incorrectly for rides on anything other than the legacy route. Fixing this properly means giving `Ride`/`StartRideRequest` a real route reference instead of the current derived `"SOURCE_DESTINATION"` string — planned, not yet done.---
+`Ride` stores the `routeCode` it actually runs on (set from the route the driver picked, and returned in `ActiveRideResponse`). `track.html` and the driver's Simulate tab use it to load the right stop list, so rides on admin-added routes resolve correctly, not just the legacy one. Rides started before this was stored (or with a blank code) fall back to the legacy route.
+
+---
 
 ## 🔐 Admin Security
 
@@ -428,13 +501,12 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | URL | Who can access |
 |---|:---:|
 | `/index.html` `/track.html` `/driver.html` | 🌐 Everyone |
-| `/api/ride/active` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
+| `/api/ride/active` `/api/ride/search` `/api/ride/active/all` `/api/location/**` `/api/routes/**` | 🌐 Everyone |
 | `/api/driver/**` (verify, depots list) | 🌐 Everyone |
 | `/api/ride/start` `/api/ride/location` `/api/ride/cancel/**` | 🌐 Public route, 🔑 but requires a valid `X-Driver-Token` header — enforced in the controller, not by Spring Security |
 | `/ws/**` | 🌐 Everyone *(WebSocket handshake — same public tracking data as the REST endpoints above, just pushed instead of polled)* |
 | `/login.html` | 🌐 Everyone |
 | `/admin-buses.html` | 🔐 Admin only |
-| `/api/ride/active/all` | 🔐 Admin only *(also read by the driver's own "resume ride" check)* |
 | `/admin/depots`, `/admin/depots/upload`, `/admin/depots/template` | 🔐 Admin only |
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
 
@@ -517,10 +589,17 @@ X-Driver-Token: a1b2c3d4-...
 GET /api/ride/active?source=ALIPURDUAR&destination=FALAKATA
 ```
 
-#### Get All Active Buses *(Admin — also used by the driver's resume check)*
+#### Search Running Buses by Bus Number
+```http
+GET /api/ride/search?busNumber=wb23a
+```
+Public. Returns the same `ActiveRideResponse` shape as the other ride lists, up to 20 matches, exact matches first. The query is normalised (case, spaces, dashes, `_`, `/`, `.` ignored) and matched with a database query; results are cached server-side for 5s and the cache is cleared whenever a ride starts or ends.
+
+#### Get All Active Buses
 ```http
 GET /api/ride/active/all
 ```
+Public — used by `track.html`, the admin grid and the driver's "Active ride found" check.
 
 #### Cancel Ride
 ```http
@@ -556,9 +635,9 @@ Public endpoint, no auth required — same access level as the REST tracking end
 /topic/ride/{rideId}
 ```
 ```json
-{ "rideId": 5, "latitude": 26.494, "longitude": 89.368, "timestamp": "2026-09-19T10:15:03" }
+{ "rideId": 5, "latitude": 26.494, "longitude": 89.368, "accuracy": 12.5, "timestamp": "2026-09-19T10:15:03Z" }
 ```
-Published every time that ride's driver sends a GPS update.
+Published every time that ride's driver sends a GPS update. `accuracy` (metres) may be `null`; `timestamp` is an ISO-8601 instant (`Z`), so it reads the same in every time zone.
 
 #### Subscribe — full active-bus list
 ```
@@ -664,9 +743,9 @@ GET /admin/routes/template
 
 | Page | Who uses it | Description |
 |---|---|---|
-| `index.html` | Passenger | Search buses via a custom styled autocomplete dropdown, recent searches, quick results, header shortcuts to Driver/Admin |
+| `index.html` | Passenger | Three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, header shortcuts to Driver/Admin |
 | `track.html` | Passenger | Live route timeline, ETA, bus position, dark mode |
-| `driver.html` | Driver | Depot + code verification, route picker (stop lists scoped to it), start/resume ride, live GPS updates |
+| `driver.html` | Driver | Loading screen → bus number + depot + code login → resume screen (if a ride is running) or new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride |
 | `login.html` | Admin | Secure login form |
 | `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list) |
 
@@ -696,6 +775,7 @@ WIMB/
 │   │   ├── RideService.java
 │   │   ├── LocationService.java
 │   │   ├── ActiveRideCache.java         # in-memory rideId→busNumber, avoids a DB hit per GPS ping
+│   │   ├── BusSearchCache.java          # 5s TTL cache for bus-number search, cleared when a ride starts/ends
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
 │   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload)
@@ -714,14 +794,14 @@ WIMB/
 │   ├── enums/
 │   │   └── RideStatus.java
 │   ├── repository/
-│   │   ├── RideRepository.java
+│   │   ├── RideRepository.java          # incl. searchByBusNumber(...) — the bus-number search query
 │   │   ├── BusRepository.java
 │   │   ├── RouteRepository.java
 │   │   └── AdminUploadRepository.java
 │   └── dto/
 │       ├── StartRideRequest.java
 │       ├── LocationUpdateRequest.java
-│       ├── LocationBroadcast.java       # lean {rideId, lat, lng, timestamp} payload for WebSocket pushes
+│       ├── LocationBroadcast.java       # lean {rideId, lat, lng, accuracy, timestamp} payload for WebSocket pushes + last-loc
 │       ├── ActiveRideResponse.java
 │       ├── RouteStop.java
 │       └── RouteSummary.java            # public-safe route listing (no file paths)
@@ -736,9 +816,9 @@ WIMB/
 │   │   ├── track.html                   # Route timeline
 │   │   ├── login.html                   # Admin login
 │   │   ├── js/
-│   │   │   ├── index.js                 # includes custom autocomplete dropdown logic
-│   │   │   ├── track.js
-│   │   │   ├── driver.js
+│   │   │   ├── index.js                 # autocomplete dropdown + search tabs (incl. bus-number search, caching, stale-result guard)
+│   │   │   ├── track.js                 # live timeline: WebSocket push + 5s fallback poll, reconnect, tab wake-up
+│   │   │   ├── driver.js                # login, resume, GPS sending (no dropped fixes), Simulate location, current-stop card
 │   │   │   └── admin-buses.js
 │   │   └── data/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
@@ -873,7 +953,10 @@ A multi-stage `Dockerfile`:
 - [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
 - [x] ~~Deploy to production~~ — done: Docker + Render, live at the link above
 - [x] ~~Move admin-uploaded files (routes, depot codes) off the container's ephemeral disk and into the database~~ — done: both are `bytea` columns in Postgres now, disk copies are best-effort only
-- [ ] Give `Ride` a real route reference, so `track.html` resolves correctly for any route, not just the legacy one
+- [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
+- [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
+- [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [ ] Move `BusSearchCache` to Redis too when running multiple instances (same caveat as `ActiveRideCache`)
 - [ ] Move `ActiveRideCache` and the WebSocket message broker from in-memory to Redis-backed, once the app runs more than one instance (see the caveats in [Active Ride Cache](#-active-ride-cache) and [Live Updates](#-live-updates-websocket))
 - [ ] Push notifications when bus is nearby
 - [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
