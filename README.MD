@@ -46,7 +46,7 @@
 - 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
-- 📍 Live route timeline (like "Where is my Train")
+- 📍 Live route timeline (like "Where is my Train") — opens with the bus scrolled to the middle of the screen, then you scroll freely
 - 🚌 Animated bus icon on current stop
 - ⏱️ ETA per stop from bus position
 - 🌙 Dark mode support
