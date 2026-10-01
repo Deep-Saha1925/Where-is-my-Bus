@@ -12,6 +12,8 @@ let routeStops     = [];
 let fullRouteStops = [];
 let busLocation    = null;
 let rideInfo       = null;
+let centeredOnBus  = false; // scroll the bus to the middle of the screen once per opened ride
+let userMovedView  = false; // the passenger scrolled/touched the page -- never fight them after that
 let hasEnteredOnce = false; // only slide the rows in on the first render, not every WS/poll refresh
 
 let stompClient        = null;
@@ -213,6 +215,7 @@ async function autoSelectRide() {
     );
     if (buses.length > 0) {
       rideId = buses[0].rideId;
+      centeredOnBus = false;
       rideInfo = buses[0];
       if (buses[0].routeCode) routeCode = buses[0].routeCode;
       document.getElementById("busNumberDisplay").innerText = buses[0].busNumber || "—";
@@ -456,6 +459,37 @@ function calcETA(stopDistKm, busDistKm) {
 }
 
 /* ─── RENDER TIMELINE ───────────────────────────────────────────── */
+/* ─── CENTER THE BUS ON OPEN ─────────────────────────────────────────
+   When a passenger opens a ride the timeline can be long, with the bus
+   somewhere off-screen. Scroll it into the vertical middle of the visible
+   area once; after that the passenger scrolls freely and live updates
+   never move the page again. */
+['wheel', 'touchstart', 'touchmove', 'keydown', 'mousedown'].forEach(ev =>
+  window.addEventListener(ev, () => { userMovedView = true; }, { passive: true })
+);
+
+function scrollBusToCenter() {
+  const icon = document.querySelector("#stopList .bus-icon");
+  if (!icon) return false;
+  const header  = document.querySelector(".header-bar");
+  const headerH = header ? header.getBoundingClientRect().height : 0;
+  const rect    = icon.getBoundingClientRect();
+  const visible = window.innerHeight - headerH;            // space below the sticky header
+  const top = rect.top + window.scrollY - headerH - (visible - rect.height) / 2;
+  window.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+  return true;
+}
+
+function centerOnBusOnce() {
+  if (centeredOnBus || userMovedView) return;
+  // Rows slide in over ~0.4s + 40ms per row, which moves them; wait for that so the
+  // bus lands exactly in the middle, and re-check once more in case the layout settled.
+  if (!scrollBusToCenter()) return;          // no bus position yet -- try on the next update
+  centeredOnBus = true;
+  const settle = 450 + Math.min(40 * (fullRouteStops.length || routeStops.length), 1200);
+  setTimeout(() => { if (!userMovedView) scrollBusToCenter(); }, settle);
+}
+
 function renderTimeline() {
   const container    = document.getElementById("stopList");
   const displayStops = fullRouteStops.length ? fullRouteStops : routeStops;
@@ -615,6 +649,7 @@ function renderTimeline() {
 
   container.innerHTML = bannerHtml + stopsHtml;
   hasEnteredOnce = true;
+  centerOnBusOnce();
 }
 
 function goBack() { window.history.back(); }
