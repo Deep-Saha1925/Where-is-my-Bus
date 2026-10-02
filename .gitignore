@@ -33,4 +33,21 @@ build/
 
 ### VS Code ###
 .vscode/
-.env.old
+
+### Secrets & local runtime data -- NEVER commit these ###
+# (the previous entry ".env.old" had a stray dot, so the real file "env.old" was never ignored)
+.env
+.env.*
+!.env.example
+env.old
+env.*
+!env.example
+*.env
+*.pem
+*.key
+*.p12
+*.jks
+
+# Depot codes are driver credentials. They live in the database (admin_upload table),
+# uploaded through the admin panel -- the spreadsheet must not be in git.
+data/depot-codes.xlsx
