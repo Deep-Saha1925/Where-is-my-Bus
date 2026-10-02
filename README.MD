@@ -880,9 +880,20 @@ wimb.depot.file.path=data/depot-codes.xlsx
 # Directory admin-added routes are stored in (same idea — created automatically)
 wimb.route.dir=data/routes
 ```
-Set the actual values as real environment variables — e.g. in IntelliJ's Run Configuration (via the EnvFile plugin or built-in env-file support pointed at a local, gitignored `.env` file), or exported in your shell before running.
+Set the actual values as real environment variables. The easiest way locally:
 
-> 🔒 Never commit real credentials — not in `application.properties`, not in any file tracked by git. Use environment variables (locally via `.env` + your IDE, in production via your host's environment variable settings) for every environment beyond a fully offline personal test.
+1. Copy `.env.example` to `.env` (already git-ignored) and fill in real values.
+2. Load it in your IDE's run configuration (IntelliJ: EnvFile plugin or built-in env-file support), or export the variables in your shell.
+3. In production (Render) set the same names in the dashboard under *Environment*.
+
+| Variable | Purpose |
+|---|---|
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Admin login. Use a long random password (12+ chars). |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL (e.g. Neon). |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis (e.g. Upstash). |
+| `ENFORCE_STRONG_ADMIN_PASSWORD` | Optional. `true` = refuse to start with a weak/blank admin password (recommended in production). Default `false` = warning only. |
+
+> 🔒 **Never commit real credentials**: not in `application.properties`, not in any file tracked by git. `.gitignore` blocks `.env`, `.env.*`, `env.*`, key files and `data/depot-codes.xlsx` (depot codes are driver credentials and live in the database, uploaded through the admin panel). Only `.env.example`, which has placeholders only, is committed. `.dockerignore` keeps the same files out of Docker images. If a secret ever lands in git, follow [`SECURITY-CLEANUP.md`](SECURITY-CLEANUP.md): rotate first, then purge history.
 
 ```bash
 # 3. Build and run
