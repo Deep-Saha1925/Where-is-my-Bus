@@ -67,7 +67,7 @@ public class StartupConfigValidator {
         if (problems.isEmpty()) return;
 
         String message = "Weak admin configuration: " + String.join("; ", problems)
-                + ". Set a long random ADMIN_PASSWORD (see .env.example).";
+                + ". Set a long random ADMIN_PASSWORD (see ..env.example).";
 
         if (enforce) {
             throw new IllegalStateException(message + " Startup refused because "
