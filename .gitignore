@@ -40,8 +40,8 @@ build/
 .env.*
 !.env.example
 env.old
-env.*
-!env.example
+.env.example
+!.env.example
 *.env
 *.pem
 *.key

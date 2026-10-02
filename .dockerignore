@@ -14,7 +14,7 @@ README.MD
 .env.*
 !.env.example
 env.old
-env.*
+.env.example
 *.env
 *.pem
 *.key
