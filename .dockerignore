@@ -1,0 +1,21 @@
+# Keeps secrets, git history and IDE/build junk out of the Docker build context
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+target
+images
+HELP.md
+README.MD
+
+# secrets -- supplied as real environment variables at runtime, never baked into an image
+.env
+.env.*
+!.env.example
+env.old
+env.*
+*.env
+*.pem
+*.key
+data/depot-codes.xlsx
