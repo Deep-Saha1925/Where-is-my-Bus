@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -90,6 +90,7 @@
 - 🗂️ JSON auto-synced from Excel on startup
 - 🔐 Admin auth via config file, no DB needed
 - 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
+- 👻 **Ghost buses are handled automatically**: a ride whose driver goes silent is hidden from passengers after 5 minutes and ended after 30, see [Ghost Rides](#-ghost-rides-auto-end)
 - 🛡️ Driver login is **brute-force protected** (failed attempts counted per IP, per depot and per bus, then locked out with HTTP 429), see [Login Rate Limiting & CORS](#-login-rate-limiting--cors)
 - ⚡ Redis buffer for high-frequency GPS writes
 - 🧠 In-memory active-ride cache — driver token checks on the GPS hot path no longer hit Postgres at all (see [Active Ride Cache](#-active-ride-cache))
@@ -489,6 +490,35 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 👻 Ghost Rides (Auto-End)
+
+### The problem
+A driver who closes the tab, loses signal or runs out of battery never presses *Stop Ride*, so the ride stayed ACTIVE forever and passengers kept seeing a bus that was not running.
+
+### How it works
+`RideActivityTracker` remembers, in memory, when each ride last sent a location (no database or Redis call). Two time limits apply:
+
+| Silent for | What happens |
+|---|---|
+| more than **5 min** (`RIDE_STALE_AFTER_SECONDS`) | The ride is **hidden** from passenger live search and bus-number search. If the driver's location starts arriving again, it **reappears by itself**. The tracking page still warns after 2 minutes (`STALE_AFTER_SEC` in `track.js`). |
+| more than **30 min** (`RIDE_AUTO_END_AFTER_SECONDS`) | `StaleRideScheduler` **ends the ride** (status `ENDED`). Its stored end time is when the bus was last heard from, not "now". |
+
+- The cleanup job runs every minute (`RIDE_CLEANUP_INTERVAL_MS`, first run 30 seconds after startup). Each run re-checks a ride just before ending it, so a location that landed a moment ago always wins.
+- **After a restart** the in-memory tracker is empty, so it is refilled from each ride's newest stored location. Until then a ride with no known time counts as live, so a restart never hides every bus at once.
+- **The driver can still resume a hidden ride:** `/api/ride/active/all` keeps listing silent rides (with `stale: true` and `silentSeconds`), so the driver's "Active ride found" screen and the admin grid still see them. The admin card shows a red **No signal N min** badge instead of green *Active*.
+- Safety checks: stale time below 30 seconds is raised to 30, and the auto-end time must be larger than the stale time (otherwise it is set to double).
+- Single instance only, like `ActiveRideCache`; with several instances this would need to move to Redis.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RIDE_STALE_AFTER_SECONDS` | 300 | Silence before a ride is hidden from passengers |
+| `RIDE_AUTO_END_AFTER_SECONDS` | 1800 | Silence before a ride is ended automatically |
+| `RIDE_CLEANUP_INTERVAL_MS` | 60000 | How often the cleanup job runs |
+
+> ⚠️ Keep the stale time well above the driver's send interval (about 10 seconds). Rural routes have dead zones, so very short limits would hide buses that are only briefly out of signal.
+
+---
+
 ## 🛣️ Multi-Route Support
 
 Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
@@ -638,13 +668,13 @@ GET /api/ride/active?source=ALIPURDUAR&destination=FALAKATA
 ```http
 GET /api/ride/search?busNumber=wb23a
 ```
-Public. Returns the same `ActiveRideResponse` shape as the other ride lists, up to 20 matches, exact matches first. The query is normalised (case, spaces, dashes, `_`, `/`, `.` ignored) and matched with a database query; results are cached server-side for 5s and the cache is cleared whenever a ride starts or ends.
+Public. Returns the same `ActiveRideResponse` shape as the other ride lists, up to 20 matches, exact matches first. Rides that have gone silent are left out. The query is normalised (case, spaces, dashes, `_`, `/`, `.` ignored) and matched with a database query; results are cached server-side for 5s and the cache is cleared whenever a ride starts or ends.
 
 #### Get All Active Buses
 ```http
 GET /api/ride/active/all
 ```
-Public — used by `track.html`, the admin grid and the driver's "Active ride found" check.
+Public — used by `track.html`, the admin grid and the driver's "Active ride found" check. Unlike the passenger searches it **includes silent rides**, marked with `"stale": true` and `"silentSeconds": N` (see [Ghost Rides](#-ghost-rides-auto-end)).
 
 #### Cancel Ride
 ```http
@@ -826,6 +856,7 @@ WIMB/
 │   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
 │   │   ├── LoginRateLimiter.java        # failed-login counters per IP / depot / bus, lockouts
+│   │   ├── RideActivityTracker.java     # when each ride last sent a location (drives stale/auto-end)
 │   │   ├── ClientIpResolver.java        # real client IP behind a proxy (spoof-safe X-Forwarded-For)
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
@@ -833,6 +864,7 @@ WIMB/
 │   │   └── ApiExceptionHandler.java     # turns errors into JSON, not HTML pages
 │   ├── scheduler/
 │   │   └── LocationFlushScheduler.java  # batch flush Redis → PostgreSQL
+│   │   ├── StaleRideScheduler.java      # auto-ends rides that stopped sending location
 │   ├── model/
 │   │   ├── Ride.java
 │   │   ├── Bus.java
@@ -993,6 +1025,7 @@ A multi-stage `Dockerfile`:
 | `ENFORCE_STRONG_ADMIN_PASSWORD` | `true` = refuse to start with a weak admin password (recommended) |
 | `TRUSTED_PROXY_HOPS` | Trusted proxies in front of the app, used to find the real client IP for rate limiting (Render = `1`, default) |
 | `CORS_ALLOWED_ORIGINS` | Leave **unset** in production; dev-only list of extra allowed origins |
+| `RIDE_STALE_AFTER_SECONDS`, `RIDE_AUTO_END_AFTER_SECONDS`, `RIDE_CLEANUP_INTERVAL_MS` (optional) | Ghost-ride timing, see [Ghost Rides](#-ghost-rides-auto-end) |
 | `LOGIN_*` (optional) | Tune the driver-login rate limits, see [Login Rate Limiting & CORS](#-login-rate-limiting--cors) |
 
 ### Deploying your own instance
@@ -1019,6 +1052,7 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Ghost buses (rides left ACTIVE forever)~~ — done: hidden after 5 min, auto-ended after 30 min of silence
 - [x] ~~Brute-force protection for the driver login~~ — done: per-IP / per-depot / per-bus lockouts (HTTP 429)
 - [x] ~~Hard-coded CORS origins~~ — done: configurable, off by default
 - [ ] Move the login rate-limit counters to Redis when running multiple instances
