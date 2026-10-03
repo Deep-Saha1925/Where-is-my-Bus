@@ -70,9 +70,14 @@ function renderCards(rides) {
           <div class="bus-icon-circle">🚌</div>
           ${ride.busNumber}
         </div>
-        <div class="status-badge">
-          <span class="status-dot"></span> Active
-        </div>
+        ${ride.stale
+        ? `<div class="status-badge" style="background:#fdecec; color:#b42318;">
+               <span class="status-dot" style="background:#b42318; animation:none;"></span>
+               No signal${ride.silentSeconds != null ? ` ${Math.max(1, Math.round(ride.silentSeconds / 60))} min` : ""}
+             </div>`
+        : `<div class="status-badge">
+               <span class="status-dot"></span> Active
+             </div>`}
       </div>
 
       <div class="route-row">
