@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
 
 </div>
 
@@ -90,6 +90,7 @@
 - 🗂️ JSON auto-synced from Excel on startup
 - 🔐 Admin auth via config file, no DB needed
 - 🔑 Driver actions protected by a short-lived, per-bus token — not just an open endpoint
+- 🛡️ Driver login is **brute-force protected** (failed attempts counted per IP, per depot and per bus, then locked out with HTTP 429), see [Login Rate Limiting & CORS](#-login-rate-limiting--cors)
 - ⚡ Redis buffer for high-frequency GPS writes
 - 🧠 In-memory active-ride cache — driver token checks on the GPS hot path no longer hit Postgres at all (see [Active Ride Cache](#-active-ride-cache))
 - 📡 WebSocket push for live tracking — replaces the old 3s/5s polling, see [Live Updates](#-live-updates-websocket)
@@ -451,6 +452,43 @@ same bus number the request claims to control.
 
 ---
 
+## 🛡️ Login Rate Limiting & CORS
+
+### Why
+A depot code is one short secret shared by a whole depot, so without limits it could be guessed by trying codes in a loop against `POST /api/driver/verify`.
+
+### How it works
+Only **failed** attempts are counted, in three ways. Tripping **any** of them blocks that key for the lockout time:
+
+| Counter | Default | Stops |
+|---|---|---|
+| Per client IP | 10 failures / 10 min | one machine hammering the endpoint |
+| Per depot (any IP) | 40 failures / 10 min | an attacker rotating IPs or faking headers |
+| Per depot + bus | 8 failures / 10 min | guessing the code for one specific bus |
+
+- When locked, the endpoint answers **HTTP 429** with a `Retry-After` header and `{ "error": "...try again in about N minutes.", "retryAfterSeconds": N }`. The driver page already shows `error` in its alert. A locked client is refused *before* the code is even checked, so it learns nothing.
+- A correct login does **not** reset the counters, so someone holding one valid code can't wash their failures between guesses.
+- The depot code is compared in **constant time**, and over-long inputs are rejected with 400.
+- Counters live in memory and are cleaned up every 5 minutes (per instance, like `ActiveRideCache`; move to Redis if you run several instances).
+- **Trade-off:** because of the per-depot limit, someone who keeps failing on purpose can lock that depot's drivers out for the lockout time. That is deliberate and short-lived; tune the numbers below.
+
+### Client IP behind a proxy
+On Render, `getRemoteAddr()` is the proxy, so the real IP comes from `X-Forwarded-For`. That header is only trusted when the connection comes from an internal/private address (a client connecting straight from the internet can't fake its IP), and the entry `TRUSTED_PROXY_HOPS` from the **right** is used (default `1` = Render alone; use `2` if a CDN sits in front too). When a lockout happens the IP is written to the log (`Driver login locked out: ip=...`), so you can confirm real client IPs (not the proxy's address) are showing up.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LOGIN_WINDOW_SECONDS` | 600 | Period failures are counted over |
+| `LOGIN_LOCKOUT_SECONDS` | 900 | How long a tripped key stays blocked |
+| `LOGIN_MAX_FAILURES_PER_IP` | 10 | Failures allowed per IP |
+| `LOGIN_MAX_FAILURES_PER_DEPOT` | 40 | Failures allowed per depot |
+| `LOGIN_MAX_FAILURES_PER_BUS` | 8 | Failures allowed per depot + bus |
+| `TRUSTED_PROXY_HOPS` | 1 | Trusted proxies in front of the app |
+
+### CORS
+The real app's pages are served by this same server, so browsers never need CORS for them. Cross-origin access is therefore **off by default**. For development with a separate front-end (e.g. VS Code Live Server) set `CORS_ALLOWED_ORIGINS=http://localhost:5500,http://127.0.0.1:5500`. Origins must be exact: `*` is rejected at startup because these mappings allow credentials. (The `/ws` WebSocket endpoint stays open to any origin on purpose: it only carries the same public bus data as `/api/ride/active/all`.)
+
+---
+
 ## 🛣️ Multi-Route Support
 
 Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
@@ -550,6 +588,13 @@ Returns a token on success, tied to the given bus number for ~12 hours:
 ```json
 { "token": "a1b2c3d4-..." }
 ```
+| Status | Meaning |
+|---|---|
+| `200` | Verified, token returned |
+| `400` | Missing bus number / depot / code, or an over-long field |
+| `401` | Invalid depot or code |
+| `429` | Too many failed attempts: locked out. Body has `retryAfterSeconds`, and the `Retry-After` header carries the same value. See [Login Rate Limiting & CORS](#-login-rate-limiting--cors) |
+
 
 </details>
 
@@ -759,7 +804,8 @@ WIMB/
 │   │   ├── SecurityConfig.java          # Spring Security rules
 │   │   ├── RedisConfig.java             # Redis template config
 │   │   ├── WebSocketConfig.java         # STOMP/SockJS endpoint + broker config
-│   │   └── CorsConfig.java
+│   │   ├── CorsConfig.java              # CORS from CORS_ALLOWED_ORIGINS (off by default) + /data/** mapping
+│   │   └── StartupConfigValidator.java  # warns/refuses on a weak admin password
 │   ├── controller/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
@@ -778,7 +824,9 @@ WIMB/
 │   │   ├── BusSearchCache.java          # 5s TTL cache for bus-number search, cleared when a ride starts/ends
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
 │   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
-│   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload)
+│   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
+│   │   ├── LoginRateLimiter.java        # failed-login counters per IP / depot / bus, lockouts
+│   │   ├── ClientIpResolver.java        # real client IP behind a proxy (spoof-safe X-Forwarded-For)
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
 │   │   ├── DriverNotVerifiedException.java
@@ -942,6 +990,10 @@ A multi-stage `Dockerfile`:
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Admin login credentials |
 | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Neon Postgres connection |
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Upstash Redis connection |
+| `ENFORCE_STRONG_ADMIN_PASSWORD` | `true` = refuse to start with a weak admin password (recommended) |
+| `TRUSTED_PROXY_HOPS` | Trusted proxies in front of the app, used to find the real client IP for rate limiting (Render = `1`, default) |
+| `CORS_ALLOWED_ORIGINS` | Leave **unset** in production; dev-only list of extra allowed origins |
+| `LOGIN_*` (optional) | Tune the driver-login rate limits, see [Login Rate Limiting & CORS](#-login-rate-limiting--cors) |
 
 ### Deploying your own instance
 
@@ -967,6 +1019,9 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Brute-force protection for the driver login~~ — done: per-IP / per-depot / per-bus lockouts (HTTP 429)
+- [x] ~~Hard-coded CORS origins~~ — done: configurable, off by default
+- [ ] Move the login rate-limit counters to Redis when running multiple instances
 - [ ] Move `BusSearchCache` to Redis too when running multiple instances (same caveat as `ActiveRideCache`)
 - [ ] Move `ActiveRideCache` and the WebSocket message broker from in-memory to Redis-backed, once the app runs more than one instance (see the caveats in [Active Ride Cache](#-active-ride-cache) and [Live Updates](#-live-updates-websocket))
 - [ ] Push notifications when bus is nearby
