@@ -1,3 +1,9 @@
+/*
+ * Where Is My Bus (WIMB)
+ * Copyright (c) 2025-2026 Deep Saha. All rights reserved.
+ * Proprietary and confidential. See the LICENSE file in the project root.
+ * Unauthorized copying, modification, distribution, hosting or use is prohibited.
+ */
 const map = L.map("map").setView([26.7271, 88.3953], 13);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

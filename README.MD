@@ -14,14 +14,14 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 [![Docker](https://img.shields.io/badge/Docker-Deployed-2496ED?style=flat-square&logo=docker)](Dockerfile)
 [![Render](https://img.shields.io/badge/Hosted%20on-Render-46E3B7?style=flat-square&logo=render)](https://render.com)
-[![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary%20(All%20Rights%20Reserved)-red?style=flat-square)](LICENSE)
 
 *Solving the problem of uncertain bus timings in semi-urban and rural regions*
 
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -1029,6 +1029,18 @@ A multi-stage `Dockerfile`:
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
 - [ ] Mobile app (Android)
+
+---
+
+## 📜 License
+
+**Copyright © 2025–2026 Deep Saha. All rights reserved.**
+
+This is **proprietary software**, not open source. Seeing the code on GitHub does **not** give you permission to use it. Without the owner's written permission you may not copy, modify, host, run, redistribute, sell, or build on it, use it commercially, use the name *Where Is My Bus* / *WIMB* for your own product, or present any part of it as your own work. Reading the source for personal, non-commercial learning is allowed.
+
+- Full terms: [LICENSE](LICENSE)
+- Open-source libraries used (they keep their own licenses): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
 
 ---
 

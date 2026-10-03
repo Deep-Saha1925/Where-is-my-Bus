@@ -15,10 +15,17 @@
 	<description>Track your bus with ease.</description>
 	<url/>
 	<licenses>
-		<license/>
+		<license>
+			<name>Proprietary - All Rights Reserved</name>
+			<url>https://github.com/Deep-Saha1925/Where-is-my-Bus/blob/main/LICENSE</url>
+			<distribution>manual</distribution>
+		</license>
 	</licenses>
 	<developers>
-		<developer/>
+		<developer>
+			<name>Deep Saha</name>
+			<url>https://github.com/Deep-Saha1925</url>
+		</developer>
 	</developers>
 	<scm>
 		<connection/>

@@ -1,0 +1,74 @@
+Where Is My Bus (WIMB) -- Proprietary Software License
+
+Copyright (c) 2025-2026 Deep Saha. All rights reserved.
+
+"Software" means all source code, compiled code, scripts, stylesheets, web pages,
+database schemas, data files (including route and depot spreadsheets), documentation,
+text, graphics, design, and the name "Where Is My Bus" / "WIMB", in this repository
+and in any copy or part of it.
+
+1. OWNERSHIP
+   The Software is and remains the exclusive property of Deep Saha ("Owner"). It is
+   protected by copyright and other intellectual-property laws, including the Copyright
+   Act, 1957 (India) and applicable international treaties. No ownership or license is
+   transferred to you by receiving, viewing, downloading, forking or cloning the Software.
+
+2. NO LICENSE GRANTED
+   Except for the limited permission in Section 3, NO right is granted to you under this
+   document or by implication. You may NOT, without the Owner's prior written permission:
+     a) copy, reproduce, or mirror the Software or any part of it;
+     b) modify, adapt, translate, or create derivative works based on it;
+     c) distribute, publish, sublicense, sell, rent, lease, or lend it;
+     d) install, run, host, or offer it (or a modified or similar copy) to others,
+        including as a website, app, API, or service, whether free or paid;
+     e) use it, or any part, in a commercial, business, or revenue-generating context;
+     f) present it or any part of it as your own work, remove or alter any copyright,
+        license, or attribution notice, or use the name "Where Is My Bus" / "WIMB"
+        or any similar name, logo, or branding for your own product or service;
+     g) use it to train, fine-tune, or evaluate machine-learning or AI models, or to
+        build datasets for that purpose;
+     h) attempt to circumvent any access control, rate limit, or protection in it.
+
+3. LIMITED VIEWING PERMISSION
+   If the Owner makes this repository publicly visible, you may view the source code
+   solely to read and understand it for personal, non-commercial educational purposes.
+   Any forking or caching that the hosting platform's own terms of service necessarily
+   allow is permitted only for that viewing purpose and gives you no other right.
+   This permission can be withdrawn by the Owner at any time and ends immediately if
+   you breach this license.
+
+4. THIRD-PARTY COMPONENTS
+   The Software uses third-party open-source libraries and services (see
+   THIRD_PARTY_NOTICES.md). They remain the property of their respective owners and are
+   governed by their own licenses, not by this one. This license applies only to the
+   Owner's original work.
+
+5. CONTRIBUTIONS
+   Unless the Owner agrees otherwise in writing, anything you submit to the Software
+   (suggestions, patches, pull requests) may be used by the Owner without restriction or
+   payment, and you confirm you have the right to submit it.
+
+6. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY,
+   AND NON-INFRINGEMENT.
+
+7. LIMITATION OF LIABILITY
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE OWNER IS NOT LIABLE FOR ANY CLAIM, DAMAGES
+   OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE, INCLUDING ANY
+   INCORRECT BUS LOCATION, TIMING OR ETA INFORMATION.
+
+8. TERMINATION AND REMEDIES
+   This license ends automatically if you breach any term. You must then stop all use and
+   delete all copies in your possession. Unauthorised use may infringe the Owner's
+   copyright and may lead to legal action, including injunctions, damages, takedown
+   requests to hosting providers and platforms, and criminal remedies where available.
+
+9. GOVERNING LAW
+   This license is governed by the laws of India. Courts in India have jurisdiction over
+   any dispute arising from it.
+
+10. PERMISSIONS AND CONTACT
+   To request permission to use, license, or collaborate on the Software, contact the Owner
+   through his GitHub profile: https://github.com/Deep-Saha1925
+   Permission is valid only if given in writing by the Owner.
