@@ -39,6 +39,7 @@ public class RideService {
     private final RedisLocationService redisLocationService;
     private final ActiveRideCache activeRideCache;
     private final BusSearchCache busSearchCache;
+    private final RideActivityTracker activityTracker;
     private final SimpMessagingTemplate messagingTemplate;
 
     // Pushed to /topic/activeRides whenever a ride starts or ends, so
@@ -115,6 +116,7 @@ public class RideService {
                     r.setEndTime(LocalDateTime.now());
                     rideRepository.save(r);
                     activeRideCache.remove(r.getId());
+                    activityTracker.forget(r.getId());
                 });
 
         Ride ride = new Ride();
@@ -125,6 +127,7 @@ public class RideService {
         ride.setStatus(RideStatus.ACTIVE);
         ride = rideRepository.save(ride);
         activeRideCache.put(ride.getId(), bus.getBusNumber());
+        activityTracker.touch(ride.getId()); // a brand-new ride has just been heard from
 
         Location loc = new Location();
         loc.setRide(ride);
@@ -159,6 +162,7 @@ public class RideService {
         ride.setEndTime(LocalDateTime.now());
         Ride saved = rideRepository.save(ride);
         activeRideCache.remove(rideId);
+        activityTracker.forget(rideId);
         broadcastActiveRides();
         return saved;
     }
@@ -172,6 +176,15 @@ public class RideService {
                 + "\" against " + activeRides.size() + " active ride(s)");
 
         List<ActiveRideResponse> matches = activeRides.stream()
+                .filter(ride -> {
+                    if (activityTracker.isStale(ride.getId())) {
+                        System.out.println("Live search: ride " + ride.getId() + " (bus " + ride.getBus().getBusNumber()
+                                + ") hidden — no location for " + activityTracker.silentSeconds(ride.getId())
+                                + "s (it reappears as soon as the driver's location arrives again)");
+                        return false;
+                    }
+                    return true;
+                })
                 .map(ride -> resolveActiveRide(ride, userSource, userDestination))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -336,6 +349,7 @@ public class RideService {
         List<ActiveRideResponse> results = rideRepository
                 .searchByBusNumber(RideStatus.ACTIVE, query, PageRequest.of(0, BUS_SEARCH_LIMIT))
                 .stream()
+                .filter(r -> !activityTracker.isStale(r.getId())) // silent buses are not "running right now"
                 .sorted(Comparator.comparingInt((Ride r) ->
                                 normalizeBusNumber(r.getBus().getBusNumber()).equals(query) ? 0 : 1)
                         .thenComparing(r -> r.getBus().getBusNumber()))
@@ -452,7 +466,82 @@ public class RideService {
             dto.setLatitude(latest.getLatitude());
             dto.setLongitude(latest.getLongitude());
         }
+        dto.setStale(activityTracker.isStale(ride.getId()));
+        dto.setSilentSeconds(activityTracker.silentSeconds(ride.getId()));
         return dto;
+    }
+
+    // ================= GHOST RIDES: refill after restart + auto-end =================
+
+    /** When was this ride last heard from? Newest stored location, else the ride's start time. */
+    private long seedRideActivity(Ride ride) {
+        Location latest = getLatestLocation(ride.getId());
+        LocalDateTime when = (latest != null && latest.getTimestamp() != null)
+                ? latest.getTimestamp()
+                : ride.getStartTime();
+        long epoch = when != null
+                ? when.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                : System.currentTimeMillis();
+        activityTracker.touch(ride.getId(), epoch);
+        return epoch;
+    }
+
+    /** After a restart the in-memory tracker is empty: fill it in for every running ride. */
+    public void seedUnknownRideActivity() {
+        int seeded = 0;
+        for (Ride ride : rideRepository.findByStatus(RideStatus.ACTIVE)) {
+            if (!activityTracker.isKnown(ride.getId())) {
+                seedRideActivity(ride);
+                seeded++;
+            }
+        }
+        if (seeded > 0) {
+            log.info("Seeded last-seen time for {} active ride(s) from stored locations", seeded);
+        }
+    }
+
+    /**
+     * Ends every ACTIVE ride that has sent no location for longer than auto-end-after-seconds.
+     * The end time recorded is when the bus was last heard from, not "now", so ride history
+     * stays truthful. Returns how many rides were ended.
+     */
+    public int endStaleRides() {
+        long now = System.currentTimeMillis();
+        long limit = activityTracker.autoEndAfterMillis();
+        int ended = 0;
+
+        for (Ride ride : rideRepository.findByStatus(RideStatus.ACTIVE)) {
+            Long id = ride.getId();
+            Long lastSeen = activityTracker.lastSeen(id);
+            if (lastSeen == null) {
+                lastSeen = seedRideActivity(ride);
+            }
+            if (now - lastSeen < limit) continue;
+
+            // A location may have landed a moment ago: re-check before ending anything
+            Long again = activityTracker.lastSeen(id);
+            if (again != null && now - again < limit) continue;
+
+            try {
+                flushRideFromRedisToMySQL(id);
+                ride.setStatus(RideStatus.ENDED);
+                ride.setEndTime(LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(lastSeen), java.time.ZoneId.systemDefault()));
+                rideRepository.save(ride);
+                activeRideCache.remove(id);
+                activityTracker.forget(id);
+                ended++;
+                log.warn("Auto-ended ride {} (bus {}): no location for {} minutes",
+                        id, ride.getBus().getBusNumber(), (now - lastSeen) / 60_000);
+            } catch (Exception e) {
+                log.error("Could not auto-end ride {}: {}", id, e.getMessage(), e);
+            }
+        }
+
+        if (ended > 0) {
+            broadcastActiveRides(); // also clears the bus-number search cache
+        }
+        return ended;
     }
 
     public Ride getRideById(Long rideId) {
