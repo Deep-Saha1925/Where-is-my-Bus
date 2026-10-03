@@ -22,4 +22,9 @@ public class ActiveRideResponse {
     private Double latitude;
     private Double longitude;
     private Double remainingDistanceKm;
+    // true when the driver has not sent a location for a while (hidden from passenger search,
+    // still listed in /api/ride/active/all so admins and the driver's resume check can see it)
+    private Boolean stale;
+    // seconds since the last location, null if not known yet (e.g. just after a restart)
+    private Long silentSeconds;
 }
