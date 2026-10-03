@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -134,7 +136,12 @@ public class DriverAccessService {
     public boolean isValid(String depotName, String code) {
         if (depotName == null || code == null) return false;
         String expected = depotCodes.get(depotName.trim().toUpperCase());
-        return expected != null && expected.equals(code.trim());
+        if (expected == null) return false;
+        // Constant-time comparison: String.equals stops at the first wrong character, which
+        // can leak (via response timing) how much of a guess was right.
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                code.trim().getBytes(StandardCharsets.UTF_8));
     }
 
     public List<String> getDepotNames() {
