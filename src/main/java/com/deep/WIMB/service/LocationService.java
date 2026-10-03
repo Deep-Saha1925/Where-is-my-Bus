@@ -25,6 +25,7 @@ public class LocationService {
     private final RideRepository rideRepository;
     private final RedisLocationService redisLocationService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final RideActivityTracker activityTracker;
 
     // Latest reported GPS accuracy (metres) per ride. Not persisted -- it only
     // matters for the live view -- so it's kept here instead of adding a DB
@@ -75,6 +76,8 @@ public class LocationService {
         if (!savedToRedis) {
             locationRepository.save(location);
         }
+
+        activityTracker.touch(rideId); // the driver is alive -- see RideActivityTracker
 
         messagingTemplate.convertAndSend(
                 "/topic/ride/" + rideId,
