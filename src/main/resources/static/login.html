@@ -100,7 +100,15 @@
         font-weight: 600;
         color: var(--text-muted);
     }
-  </style>
+  
+    @media (max-width: 420px) {
+        body { padding: 14px; align-items: flex-start; padding-top: 64px; }
+        .card { padding: 28px 20px; border-radius: 16px; }
+    }
+    @media (max-height: 560px) {
+        body { align-items: flex-start; padding-top: 64px; }
+    }
+    </style>
 </head>
 <body id="appBody">
 
