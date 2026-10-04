@@ -142,6 +142,17 @@
             .outer-wrap { padding: 14px !important; }
             .brand-card { padding: 22px 18px !important; border-radius: 16px; }
         }
+    
+        /* ── Extra responsive hardening ── */
+        html, body { max-width: 100%; overflow-x: hidden; }
+        .outer-wrap { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+        .pos-main { overflow-wrap: anywhere; }
+        .tab-btn { min-width: 0; }
+        @media (max-width: 480px) {
+            .outer-wrap { align-items: flex-start !important; }
+            .pos-main { font-size: 17px; }
+        }
+        @media (max-height: 600px) { .outer-wrap { align-items: flex-start !important; } }
     </style>
 </head>
 
