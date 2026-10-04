@@ -377,6 +377,29 @@
             .card-grid { grid-template-columns: 1fr; padding: 12px; }
             .stat-refresh { display: none; }
         }
+    
+        /* ── Extra responsive hardening ── */
+        html, body { max-width: 100%; overflow-x: hidden; }
+        .card-grid { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+        .example-table-wrap { overflow-x: auto; }
+        .example-table { min-width: 260px; }
+        .bus-card { min-width: 0; overflow-wrap: anywhere; }
+        .tab-bar { max-width: calc(100% - 40px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .tab-bar::-webkit-scrollbar { display: none; }
+        .tab-btn { white-space: nowrap; flex-shrink: 0; }
+        @media (max-width: 600px) {
+            .page-header { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+            .header-title { font-size: 16px; }
+            .tab-bar { margin: 12px 14px 0; max-width: calc(100% - 28px); }
+            .tab-btn { padding: 8px 14px; }
+            .stats-row, .search-wrap { padding-left: 14px; padding-right: 14px; }
+            .depot-layout { padding: 12px 14px 20px; }
+            .panel-card-header, .panel-card-body { padding-left: 14px; padding-right: 14px; }
+            .depot-table th, .depot-table td { padding: 8px 8px; }
+        }
+        @media (max-width: 380px) {
+            .live-pill { padding: 4px 9px; font-size: 11px; }
+        }
     </style>
 </head>
 
