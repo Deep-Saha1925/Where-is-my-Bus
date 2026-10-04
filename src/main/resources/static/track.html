@@ -186,8 +186,16 @@
         /* ── Bus icon ── */
         .bus-icon {
             position: absolute;
-            left: -22px;
-            font-size: 21px;
+            /* centred exactly over the stop dot / road line (not beside it) */
+            left: 50%;
+            top: 50%;
+            width: 26px; height: 26px;
+            margin: -13px 0 0 -13px;
+            display: flex; align-items: center; justify-content: center;
+            line-height: 1;
+            z-index: 2;
+            pointer-events: none;
+            font-size: 20px;
             animation: busFloat 1s ease-in-out infinite alternate,
             busPulse 2s ease-in-out infinite;
             filter: drop-shadow(0 2px 4px rgba(226,137,47,0.45));
@@ -377,6 +385,32 @@
             outline: 2px solid var(--accent);
             outline-offset: 2px;
         }
+    
+        /* ── Responsive ── */
+        html, body { max-width: 100%; overflow-x: hidden; }
+        .header-bar { padding-top: max(12px, env(safe-area-inset-top)); }
+        .stop-name { overflow-wrap: anywhere; min-width: 0; }
+        .stat-row { display: flex; justify-content: space-between; gap: 8px; }
+        .stat-card { min-width: 0; }
+        #busNumberDisplay, #remainingDisplay { overflow-wrap: anywhere; }
+        #currentStopDisplay { overflow-wrap: anywhere; line-height: 1.25; }
+        #progressStart, #progressEnd { max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        @media (max-width: 480px) {
+            .stat-row { flex-wrap: wrap; }
+            .stat-row .stat-card { flex: 1 1 calc(50% - 8px); }
+            .stat-row .stat-card:nth-child(2) { order: 3; flex-basis: 100%; text-align: left !important; }
+            .stat-row .stat-card:nth-child(3) { text-align: right; }
+            .stat-value { font-size: 15px; }
+            #routeTitle { font-size: 14px; }
+            .stop-row { padding: 0 12px; }
+            .section-label { padding: 12px 14px 9px; }
+            .badge { font-size: 11px; padding: 2px 8px; }
+        }
+        @media (max-width: 360px) {
+            #lastUpdated { font-size: 10px; }
+            .live-badge { padding: 4px 8px; font-size: 10.5px; }
+        }
     </style>
 </head>
 <body id="appBody">
@@ -402,7 +436,7 @@
 <div style="padding:12px 12px 0;">
     <div class="card" style="padding:16px;">
 
-        <div style="display:flex; justify-content:space-between; gap:8px;">
+        <div class="stat-row">
             <div class="stat-card">
                 <div class="stat-label">Bus</div>
                 <div class="stat-value" id="busNumberDisplay">—</div>
