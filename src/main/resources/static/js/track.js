@@ -619,7 +619,7 @@ function renderTimeline() {
     const bottomLine = busOnLineBelow
         ? `<div style="position:relative; display:flex; flex-direction:column; align-items:center; flex:1;">
              <div class="line-seg ${botLineCl}" style="flex:1"></div>
-             <span class="bus-icon" style="top:calc(50% - 12px);">🚌</span>
+             <span class="bus-icon">🚌</span>
            </div>`
         : `<div class="line-seg ${botLineCl}" style="${isLast ? 'visibility:hidden' : ''}"></div>`;
 
@@ -639,9 +639,9 @@ function renderTimeline() {
         ${bottomLine}
       </div>
 
-      <div style="flex:1; padding:14px 0 14px 14px;">
+      <div style="flex:1; min-width:0; padding:14px 0 14px 14px;">
         <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
-          <span style="font-size:15px; font-weight:600; ${nameCl}">${escapeHtml(stop.stopName)}</span>
+          <span class="stop-name" style="font-size:15px; font-weight:600; ${nameCl}">${escapeHtml(stop.stopName)}</span>
           ${markerHtml}
           ${badgeHtml}
         </div>
