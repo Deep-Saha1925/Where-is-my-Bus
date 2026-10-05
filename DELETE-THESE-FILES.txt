@@ -1,0 +1,6 @@
+Delete this file from your project (a zip cannot delete files):
+
+  src/test/java/com/deep/WIMB/WhereIsMyBusApplicationTests.java
+
+It needed a real database and failed on every "mvn test". It is replaced by
+src/test-extra/java/com/deep/WIMB/WhereIsMyBusApplicationIT.java (run by hand only).
