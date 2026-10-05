@@ -322,15 +322,10 @@ public class RideService {
 
     // ================= SEARCH ACTIVE RIDES BY BUS NUMBER =================
     private static final int BUS_SEARCH_LIMIT = 20;
-    private static final int BUS_SEARCH_MAX_QUERY_LENGTH = 30;
 
-    /** Lower-case letters and digits only, so "WB-23A 1245" and "wb23a1245" compare equal. */
+    /** See BusNumbers#normalize. */
     static String normalizeBusNumber(String value) {
-        if (value == null) return "";
-        String cleaned = value.toLowerCase().replaceAll("[^a-z0-9]", "");
-        return cleaned.length() > BUS_SEARCH_MAX_QUERY_LENGTH
-                ? cleaned.substring(0, BUS_SEARCH_MAX_QUERY_LENGTH)
-                : cleaned;
+        return BusNumbers.normalize(value);
     }
 
     /**
