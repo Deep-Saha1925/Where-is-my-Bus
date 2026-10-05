@@ -1,0 +1,50 @@
+# Runs the automated tests on every push and pull request.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  java-unit-tests:
+    name: Java unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: chmod +x mvnw
+      - run: ./mvnw -B test
+
+  javascript-tests:
+    name: Browser-script tests (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  # Repository query, security rules and ride-service tests (see README, "Automated Tests").
+  # They were written without being able to run them, so a failure here does not block the
+  # build yet. Once this job is green, delete the continue-on-error line to make it count.
+  extra-tests:
+    name: Extra tests (H2, security, Mockito)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: chmod +x mvnw
+      - run: ./mvnw -B test -Pextra-tests
