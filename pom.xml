@@ -75,6 +75,12 @@
 			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- In-memory database for the opt-in repository tests (./mvnw test -Pextra-tests) -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
@@ -144,5 +150,60 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!--
+			Opt-in extra tests: ./mvnw test -Pextra-tests
+			These need Spring's test support, Mockito and an in-memory H2 database (repository query,
+			security rules, ride service). They live in src/test-extra so a problem in them can never
+			break the normal build or the Docker build.
+		-->
+		<profile>
+			<id>extra-tests</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>build-helper-maven-plugin</artifactId>
+						<version>3.6.0</version>
+						<executions>
+							<execution>
+								<id>add-extra-test-source</id>
+								<phase>generate-test-sources</phase>
+								<goals><goal>add-test-source</goal></goals>
+								<configuration>
+									<sources><source>src/test-extra/java</source></sources>
+								</configuration>
+							</execution>
+							<execution>
+								<id>add-extra-test-resource</id>
+								<phase>generate-test-resources</phase>
+								<goals><goal>add-test-resource</goal></goals>
+								<configuration>
+									<resources>
+										<resource><directory>src/test-extra/resources</directory></resource>
+									</resources>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<includes>
+								<include>**/*Test.java</include>
+								<include>**/*IT.java</include>
+							</includes>
+							<excludes>
+								<!-- starts the whole app against real services: run by hand only, see the class comment -->
+								<exclude>**/WhereIsMyBusApplicationIT.java</exclude>
+							</excludes>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>
