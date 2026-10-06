@@ -1,0 +1,9 @@
+{
+  "name": "where-is-my-bus-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Runs the browser-script tests (no dependencies needed). The app itself is a Spring Boot project built with Maven.",
+  "scripts": {
+    "test": "node tests/js/run-all.js"
+  }
+}
