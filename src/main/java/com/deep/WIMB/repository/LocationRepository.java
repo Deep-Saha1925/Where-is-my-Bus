@@ -9,10 +9,13 @@ package com.deep.WIMB.repository;
 import com.deep.WIMB.model.Location;
 import com.deep.WIMB.model.Ride;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -37,4 +40,26 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
     // that automatically and needs it spelled out.
     @Query("SELECT l FROM Location l WHERE l.ride.id = :rideId ORDER BY l.timestamp DESC LIMIT 1")
     Optional<Location> findTopByRideIdOrderByTimestampDesc(@Param("rideId") Long rideId);
+
+    /**
+     * Deletes up to {@code batchSize} location rows older than {@code cutoff}, never touching rides
+     * that are still ACTIVE. Returns how many rows were deleted (less than batchSize means "done").
+     *
+     * Done in small batches (the caller loops) so a big clean-up never holds one huge transaction
+     * or locks the table for long. Each call is its own transaction.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = """
+            DELETE FROM location
+            WHERE id IN (
+                SELECT l.id
+                FROM location l
+                JOIN ride r ON r.id = l.ride_id
+                WHERE l.timestamp < :cutoff
+                  AND r.status <> 'ACTIVE'
+                LIMIT :batchSize
+            )
+            """, nativeQuery = true)
+    int deleteOldBatch(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
 }
