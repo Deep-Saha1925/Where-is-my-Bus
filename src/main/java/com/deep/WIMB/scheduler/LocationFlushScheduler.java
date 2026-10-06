@@ -28,7 +28,7 @@ public class LocationFlushScheduler {
     // Flushes location to DB
     @Scheduled(fixedRate = 600000)  // 10 min
     public void flushLocationsToDB() {
-        log.info("Starting scheduled Redis → MySQL flush...");
+        log.info("Starting scheduled Redis → database (PostgreSQL) flush...");
 
         Set<String> keys = redisLocationService.getAllLocationKeys();
         if (keys == null || keys.isEmpty()) {
@@ -44,7 +44,7 @@ public class LocationFlushScheduler {
             if (!locations.isEmpty()) {
                 locationRepository.saveAll(locations);
                 redisLocationService.clearLocationsFromRedis(rideId);
-                log.info("Flushed {} locations for rideId={} to MySQL", locations.size(), rideId);
+                log.info("Flushed {} locations for rideId={} to the database", locations.size(), rideId);
             }
         }
     }
