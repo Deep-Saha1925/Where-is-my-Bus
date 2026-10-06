@@ -142,17 +142,6 @@
             .outer-wrap { padding: 14px !important; }
             .brand-card { padding: 22px 18px !important; border-radius: 16px; }
         }
-    
-        /* ── Extra responsive hardening ── */
-        html, body { max-width: 100%; overflow-x: hidden; }
-        .outer-wrap { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); padding-bottom: max(14px, env(safe-area-inset-bottom)); }
-        .pos-main { overflow-wrap: anywhere; }
-        .tab-btn { min-width: 0; }
-        @media (max-width: 480px) {
-            .outer-wrap { align-items: flex-start !important; }
-            .pos-main { font-size: 17px; }
-        }
-        @media (max-height: 600px) { .outer-wrap { align-items: flex-start !important; } }
     </style>
 </head>
 
@@ -318,6 +307,9 @@
                 </div>
             </div>
         </div>
+        <!-- Background-tracking notice: amber in a browser (GPS pauses when the phone locks), green in the Android app -->
+        <div id="bgNotice" class="hidden panel-amber mb-4" style="padding:10px 14px; font-size:12.5px; line-height:1.45; color:var(--text-muted);"></div>
+
         <!-- Where the bus is right now (live GPS or simulated) -->
         <div class="pos-card" id="posCard">
             <div class="pos-title"><span>Current stop position</span><span id="posMode" class="sim-badge">📡 Live</span></div>
@@ -370,6 +362,7 @@
     <p id="status" class="status-text"></p>
 </div>
 
+<script src="/js/native-gps.js"></script>
 <script src="/js/driver.js"></script>
 </body>
 </html>
