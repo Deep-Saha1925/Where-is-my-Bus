@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -490,6 +490,32 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 🧹 Location History Clean-up
+
+### How locations are stored
+Each GPS update from a driver goes to **Redis** first (fast), and is pushed to passengers over WebSocket. A job copies the Redis points into the **PostgreSQL** `location` table every 10 minutes, and again when a ride ends or is replaced. If Redis is unreachable, the point is saved straight to PostgreSQL instead, so nothing is lost. (Some old log messages and method names say "MySQL"; the database is PostgreSQL.)
+
+### The problem
+That table only ever grew. One bus sending every 10 seconds adds thousands of rows a day, and a hosted free-tier database is small. Passengers only ever need the **current** position.
+
+### What it does
+- Every night at **03:30 India time**, `LocationRetentionScheduler` deletes location rows **older than 30 days** (`LOCATION_RETENTION_DAYS`; `0` turns it off).
+- It deletes in batches of 5,000 (`RETENTION_BATCH_SIZE`), at most 200 batches a night (`RETENTION_MAX_BATCHES`), so the first clean-up of a large old table may take a few nights and never holds one huge transaction.
+- It **never** deletes rows of a ride that is still ACTIVE.
+- The schema is untouched: no migrations, `ddl-auto=update` stays as it was.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LOCATION_RETENTION_DAYS` | 30 | Days of GPS history to keep; 0 = never delete |
+| `RETENTION_BATCH_SIZE` | 5000 | Rows per delete statement |
+| `RETENTION_MAX_BATCHES` | 200 | Most statements per nightly run |
+| `RETENTION_CRON` | `0 30 3 * * *` | When it runs |
+| `RETENTION_ZONE` | `Asia/Kolkata` | Time zone for the schedule |
+
+To see the table size, run in the Neon SQL editor: `SELECT count(*) FROM location;`
+
+---
+
 ## 📱 Driver App (Background GPS)
 
 ### The problem
@@ -906,6 +932,7 @@ WIMB/
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
 │   │   ├── LoginRateLimiter.java        # failed-login counters per IP / depot / bus, lockouts
 │   │   ├── RideActivityTracker.java     # when each ride last sent a location (drives stale/auto-end)
+│   │   ├── LocationRetentionService.java # deletes old GPS history in batches
 │   │   ├── ClientIpResolver.java        # real client IP behind a proxy (spoof-safe X-Forwarded-For)
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
 │   ├── exception/
@@ -914,6 +941,7 @@ WIMB/
 │   ├── scheduler/
 │   │   └── LocationFlushScheduler.java  # batch flush Redis → PostgreSQL
 │   │   ├── StaleRideScheduler.java      # auto-ends rides that stopped sending location
+│   │   ├── LocationRetentionScheduler.java # nightly clean-up of old locations
 │   ├── model/
 │   │   ├── Ride.java
 │   │   ├── Bus.java
@@ -1080,6 +1108,7 @@ A multi-stage `Dockerfile`:
 | `ENFORCE_STRONG_ADMIN_PASSWORD` | `true` = refuse to start with a weak admin password (recommended) |
 | `TRUSTED_PROXY_HOPS` | Trusted proxies in front of the app, used to find the real client IP for rate limiting (Render = `1`, default) |
 | `CORS_ALLOWED_ORIGINS` | Leave **unset** in production; dev-only list of extra allowed origins |
+| `LOCATION_RETENTION_DAYS`, `RETENTION_*` (optional) | Location clean-up, see [Location Clean-up](#-location-history-clean-up) |
 | `RIDE_STALE_AFTER_SECONDS`, `RIDE_AUTO_END_AFTER_SECONDS`, `RIDE_CLEANUP_INTERVAL_MS` (optional) | Ghost-ride timing, see [Ghost Rides](#-ghost-rides-auto-end) |
 | `LOGIN_*` (optional) | Tune the driver-login rate limits, see [Login Rate Limiting & CORS](#-login-rate-limiting--cors) |
 
@@ -1107,6 +1136,8 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Location history growing forever~~ — done: nightly clean-up of rows older than 30 days
+- [ ] Database migrations (Flyway) instead of `ddl-auto=update` — postponed on purpose
 - [x] ~~Driver GPS dying when the phone locks~~ — done in code: background-GPS Android app scaffold + honest tracking status (app build still to be tested)
 - [x] ~~Real automated tests~~ — done: Java + browser-script unit tests, opt-in integration tests, CI
 - [x] ~~Ghost buses (rides left ACTIVE forever)~~ — done: hidden after 5 min, auto-ended after 30 min of silence
