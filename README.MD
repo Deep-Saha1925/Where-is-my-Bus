@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -490,6 +490,24 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 📱 Driver App (Background GPS)
+
+### The problem
+The driver page runs in a browser tab. When the phone locks or the driver switches apps, the browser pauses GPS and the page, so the bus quietly stops updating. A web page cannot fully prevent this (the screen wake lock only helps while the screen stays on).
+
+### What changed
+- **`native-gps.js`** gives the driver page one GPS source for both worlds: the browser's `watchPosition`, or, inside the Android app, a background-location plugin that runs a **foreground service** (visible "ride active" notification) so location keeps flowing with the screen off.
+- **`driver-app/`** is a small Capacitor project that wraps the same `/driver` page as an Android app. No server changes: same login, ride and location endpoints. Build steps and phone settings are in [`driver-app/README.md`](driver-app/README.md).
+- **Honest tracking in a browser too:**
+  - A notice on the ride screen says whether background tracking is on (green, in the app) or that the browser pauses GPS when the phone locks (amber).
+  - When the page comes back after more than 20 seconds in the background, the GPS watch is restarted and the pause is noted ("Last pause: 3 min at 14:05").
+  - If the GPS has not produced a new fix for 30 seconds, the status says so ("No new GPS fix for 2 min: passengers see your last known position") instead of claiming "Sharing live location" while the heartbeat re-sends an old point.
+  - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
+
+> The Android app has **not been built or tested yet**; follow "First test" in `driver-app/README.md`. The browser-side changes work without it and are covered by tests in `tests/js/native-gps.test.js`.
+
+---
+
 ## ✅ Automated Tests
 
 Three layers, from "always runs" to "opt in":
@@ -929,7 +947,8 @@ WIMB/
 │   │   ├── js/
 │   │   │   ├── index.js                 # autocomplete dropdown + search tabs (incl. bus-number search, caching, stale-result guard)
 │   │   │   ├── track.js                 # live timeline: WebSocket push + 5s fallback poll, reconnect, tab wake-up
-│   │   │   ├── driver.js                # login, resume, GPS sending (no dropped fixes), Simulate location, current-stop card
+│   │   │   ├── driver.js                # login, resume, GPS sending (no dropped fixes), Simulate location, current-stop card, tracking health
+│   │   │   ├── native-gps.js            # GPS source: browser, or background service inside the Android app
 │   │   │   └── admin-buses.js
 │   │   └── data/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
@@ -942,6 +961,7 @@ WIMB/
 │   └── routes/                          # every admin-added route's Excel file
 │       └── APD_FLK.xlsx
 │
+├── driver-app/                          # Android wrapper (Capacitor) for background GPS
 ├── tests/js/                            # browser-script tests (Node, no dependencies)
 ├── src/test/java/                       # Java unit tests (run by ./mvnw test)
 ├── src/test-extra/                      # opt-in H2 / security / Mockito tests (-Pextra-tests)
@@ -1087,6 +1107,7 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Driver GPS dying when the phone locks~~ — done in code: background-GPS Android app scaffold + honest tracking status (app build still to be tested)
 - [x] ~~Real automated tests~~ — done: Java + browser-script unit tests, opt-in integration tests, CI
 - [x] ~~Ghost buses (rides left ACTIVE forever)~~ — done: hidden after 5 min, auto-ended after 30 min of silence
 - [x] ~~Brute-force protection for the driver login~~ — done: per-IP / per-depot / per-bus lockouts (HTTP 429)
