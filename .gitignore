@@ -40,8 +40,8 @@ build/
 .env.*
 !.env.example
 env.old
-.env.example
-!.env.example
+env.*
+!env.example
 *.env
 *.pem
 *.key
@@ -51,3 +51,13 @@ env.old
 # Depot codes are driver credentials. They live in the database (admin_upload table),
 # uploaded through the admin panel -- the spreadsheet must not be in git.
 data/depot-codes.xlsx
+
+### Driver app (Capacitor / Android) ###
+driver-app/node_modules/
+driver-app/android/.gradle/
+driver-app/android/build/
+driver-app/android/app/build/
+driver-app/android/local.properties
+driver-app/android/capacitor-cordova-android-plugins/
+*.apk
+*.aab
