@@ -29,7 +29,7 @@ function fakeElement() {
   return el;
 }
 
-function loadPageScript(fileName, { search = "" } = {}) {
+function loadPageScript(fileName, { search = "", globals = {} } = {}) {
   const file = path.join(__dirname, "..", "..", "src", "main", "resources", "static", "js", fileName);
   const source = fs.readFileSync(file, "utf8");
 
@@ -58,6 +58,7 @@ function loadPageScript(fileName, { search = "" } = {}) {
     location: { search, href: "http://localhost/", pathname: "/" },
     history: { back() {} },
   };
+  Object.assign(sandbox, globals);   // e.g. a fake Capacitor, or a navigator.geolocation spy
   sandbox.window = sandbox;
   sandbox.window.addEventListener = () => {};
   sandbox.window.innerHeight = 800;

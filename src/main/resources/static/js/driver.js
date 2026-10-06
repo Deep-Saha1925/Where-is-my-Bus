@@ -22,6 +22,10 @@ let heartbeatTimer = null;
 let wakeLock       = null;
 let sendFailures   = 0;
 let trailingSendTimer = null;  // pending "send the newest position" after a throttled update
+let lastFixAt      = 0;      // when the device last gave us a REAL GPS fix (not a heartbeat re-send)
+let hiddenAt       = 0;      // when the page last went to the background (screen off / app switch)
+let lastPauseNote  = "";     // "Last pause: 3 min at 14:05", shown in the tracking notice
+const STALE_FIX_MS = 30000;  // a fix older than this is called out instead of "sharing live location"
 
 // ---- simulated location (test panel) ----
 let locationMode   = "live";  // "live" | "sim"
@@ -54,11 +58,61 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Coming back to the tab (unlocking the phone etc.): re-grab the wake lock
 // and push a fresh location straight away.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && rideId) {
-    requestWakeLock();
-    sendLocation(true);
+  if (document.visibilityState === "hidden") {
+    hiddenAt = Date.now();
+    return;
+  }
+  if (!rideId) return;
+
+  const hiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = 0;
+  requestWakeLock();
+
+  // A browser may have silently stopped delivering GPS while the page was in the background:
+  // start the GPS watch again. (The Android app's foreground service keeps running, nothing to restart.)
+  if (!GpsSource.isNative() && hiddenMs > 20000 && rideWatchId) {
+    restartGpsWatch();
+    lastPauseNote = `Last pause: ${formatAge(hiddenMs)} at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    updateBackgroundNotice();
+    setTrackingStatus(`📱 Screen was off for ${formatAge(hiddenMs)}: GPS restarted. Keep the screen on for continuous tracking.`);
+  }
+  sendLocation(true);
+});
+
+// Closing or refreshing the tab mid-ride silently stops tracking in a browser: ask first.
+window.addEventListener("beforeunload", e => {
+  if (rideId && !GpsSource.isNative()) {
+    e.preventDefault();
+    e.returnValue = "";
   }
 });
+
+/* ------------------ TRACKING HEALTH (fix age, background notice) ------------------ */
+function formatAge(ms) {
+  const sec = Math.max(0, Math.round(ms / 1000));
+  return sec < 90 ? `${sec}s` : `${Math.round(sec / 60)} min`;
+}
+
+// "" while fixes are fresh, otherwise a warning that the position being re-sent is old
+function describeFixAge(ageMs) {
+  if (!(ageMs >= STALE_FIX_MS)) return "";
+  return `⚠️ No new GPS fix for ${formatAge(ageMs)}: passengers see your last known position`;
+}
+
+function updateBackgroundNotice() {
+  const box = document.getElementById("bgNotice");
+  if (!box) return;
+  if (!rideId) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  box.innerText = GpsSource.isNative()
+    ? "✅ Background tracking is on. Location keeps sending with the screen off (see the app notification)."
+    : "📱 Keep this screen on and this page open. Browsers pause GPS when the phone locks or you switch apps."
+        + " For tracking with the screen off, use the WIMB Driver app."
+        + (lastPauseNote ? ` (${lastPauseNote})` : "");
+}
 
 /* ------------------ DEPOTS ------------------ */
 async function loadDepots() {
@@ -357,32 +411,17 @@ function getPositionFromGPS() {
 /* ------------------ LIVE RIDE TRACKING (GPS after ride starts) ------------------ */
 function startRideTracking() {
   if (rideWatchId !== null) return;
-  if (!navigator.geolocation) {
+  if (!GpsSource.available()) {
     alert("This device/browser does not support GPS, so live tracking cannot start.");
     return;
   }
 
   requestWakeLock();
   updateCurrentStop();
+  updateBackgroundNotice();
   loadSimStops().then(updateCurrentStop);
 
-  rideWatchId = navigator.geolocation.watchPosition(
-      pos => {
-        if (simOverride) return; // simulating: ignore real GPS
-        lastFix = {
-          latitude:  pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy:  pos.coords.accuracy
-        };
-        updateCurrentStop();
-        sendLocation(false);
-      },
-      err => {
-        console.error("Ride GPS error:", err.message);
-        setTrackingStatus("⚠️ GPS problem: " + err.message + " — check location permission");
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-  );
+  startGpsWatch();
 
   // Heartbeat: watchPosition only fires when the position changes, so a bus
   // waiting at a stop (or a laptop on a desk) would go silent and look
@@ -390,9 +429,38 @@ function startRideTracking() {
   heartbeatTimer = setInterval(() => sendLocation(true), HEARTBEAT_MS);
 }
 
+// Starts (or after restartGpsWatch(), starts again) the GPS source; rideWatchId holds its handle.
+function startGpsWatch() {
+  rideWatchId = GpsSource.start(
+      fix => {
+        lastFixAt = Date.now();
+        if (simOverride) return; // simulating: ignore real GPS
+        lastFix = {
+          latitude:  fix.latitude,
+          longitude: fix.longitude,
+          accuracy:  fix.accuracy
+        };
+        updateCurrentStop();
+        sendLocation(false);
+      },
+      err => {
+        console.error("Ride GPS error:", err.message);
+        setTrackingStatus("⚠️ GPS problem: " + err.message + (GpsSource.isNative() ? "" : " — check location permission"));
+      }
+  );
+}
+
+function restartGpsWatch() {
+  if (rideWatchId !== null) {
+    rideWatchId.stop();
+    rideWatchId = null;
+  }
+  startGpsWatch();
+}
+
 function stopRideTracking() {
   if (rideWatchId !== null) {
-    navigator.geolocation.clearWatch(rideWatchId);
+    rideWatchId.stop();
     rideWatchId = null;
   }
   if (heartbeatTimer !== null) {
@@ -401,6 +469,9 @@ function stopRideTracking() {
   }
   releaseWakeLock();
   lastFix = null;
+  lastFixAt = 0;
+  lastPauseNote = "";
+  hiddenAt = 0;
   lastSentAt = 0;
   sendFailures = 0;
   if (trailingSendTimer) { clearTimeout(trailingSendTimer); trailingSendTimer = null; }
@@ -465,9 +536,12 @@ async function sendLocation(isHeartbeat, force = false) {
     sendFailures = 0;
     const t = new Date().toLocaleTimeString();
     const acc = lastFix.accuracy != null ? ` (GPS ±${Math.round(lastFix.accuracy)} m)` : "";
+    const staleWarning = simOverride ? "" : describeFixAge(lastFixAt ? Date.now() - lastFixAt : 0);
     setTrackingStatus(simOverride
         ? `🧪 Sending SIMULATED location — last sent ${t}`
-        : `📡 Sharing live location — last sent ${t}${acc}`);
+        : (staleWarning
+            ? `${staleWarning} (last sent ${t})`
+            : `📡 Sharing live location — last sent ${t}${acc}`));
   } catch (err) {
     sendFailures++;
     console.error("Location update failed:", err);
