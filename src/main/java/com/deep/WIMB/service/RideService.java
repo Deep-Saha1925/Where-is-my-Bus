@@ -40,6 +40,8 @@ public class RideService {
     private final ActiveRideCache activeRideCache;
     private final BusSearchCache busSearchCache;
     private final RideActivityTracker activityTracker;
+    private final LastLocationCache lastLocationCache;
+    private final LatestLocationResolver latestLocationResolver;
     private final SimpMessagingTemplate messagingTemplate;
 
     // Pushed to /topic/activeRides whenever a ride starts or ends, so
@@ -117,6 +119,7 @@ public class RideService {
                     rideRepository.save(r);
                     activeRideCache.remove(r.getId());
                     activityTracker.forget(r.getId());
+                    lastLocationCache.remove(r.getId());
                 });
 
         Ride ride = new Ride();
@@ -142,6 +145,7 @@ public class RideService {
         if (!savedToRedis) {
             locationRepository.save(loc);
         }
+        lastLocationCache.put(ride.getId(), loc);   // findable even if Redis is down and the DB has nothing yet
 
         broadcastActiveRides();
         return ride;
@@ -163,6 +167,7 @@ public class RideService {
         Ride saved = rideRepository.save(ride);
         activeRideCache.remove(rideId);
         activityTracker.forget(rideId);
+        lastLocationCache.remove(rideId);
         broadcastActiveRides();
         return saved;
     }
@@ -364,14 +369,9 @@ public class RideService {
     }
 
     // ================= HELPER: Redis-first latest location =================
+    // Redis (skipped while it is down) and this server's memory, newest wins; the database is the last resort.
     private Location getLatestLocation(Long rideId) {
-        Location redisLocation = redisLocationService.getLastLocationFromRedis(rideId);
-        if (redisLocation != null) {
-            return redisLocation;
-        }
-        return locationRepository
-                .findTopByRideIdOrderByTimestampDesc(rideId)
-                .orElse(null);
+        return latestLocationResolver.find(rideId);
     }
 
     // ================= HELPER: Flush Redis → MySQL =================
@@ -525,6 +525,7 @@ public class RideService {
                 rideRepository.save(ride);
                 activeRideCache.remove(id);
                 activityTracker.forget(id);
+                lastLocationCache.remove(id);
                 ended++;
                 log.warn("Auto-ended ride {} (bus {}): no location for {} minutes",
                         id, ride.getBus().getBusNumber(), (now - lastSeen) / 60_000);
