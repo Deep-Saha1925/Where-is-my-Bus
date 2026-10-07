@@ -26,6 +26,8 @@ public class LocationService {
     private final RedisLocationService redisLocationService;
     private final SimpMessagingTemplate messagingTemplate;
     private final RideActivityTracker activityTracker;
+    private final LastLocationCache lastLocationCache;
+    private final LatestLocationResolver latestLocationResolver;
 
     // Latest reported GPS accuracy (metres) per ride. Not persisted -- it only
     // matters for the live view -- so it's kept here instead of adding a DB
@@ -77,6 +79,7 @@ public class LocationService {
             locationRepository.save(location);
         }
 
+        lastLocationCache.put(rideId, location);   // newest point is always findable, even if Redis is down
         activityTracker.touch(rideId); // the driver is alive -- see RideActivityTracker
 
         messagingTemplate.convertAndSend(
@@ -88,23 +91,16 @@ public class LocationService {
     }
 
     public Location getLastKnownLocation(Long rideId) {
-
-        Location redisLocation = redisLocationService.getLastLocationFromRedis(rideId);
-        if (redisLocation != null) {
-            return redisLocation;
+        Location location = latestLocationResolver.find(rideId);
+        if (location == null) {
+            throw new RuntimeException("Location not found");
         }
-
-        return locationRepository
-                .findTopByRideIdOrderByTimestampDesc(rideId)
-                .orElseThrow(() -> new RuntimeException("Location not found"));
+        return location;
     }
 
     /** Last known position in the same shape the WebSocket push uses, or null if none recorded yet. */
     public LocationBroadcast getLastKnownBroadcast(Long rideId) {
-        Location loc = redisLocationService.getLastLocationFromRedis(rideId);
-        if (loc == null) {
-            loc = locationRepository.findTopByRideIdOrderByTimestampDesc(rideId).orElse(null);
-        }
+        Location loc = latestLocationResolver.find(rideId);
         return loc == null ? null : LocationBroadcast.of(rideId, loc, lastAccuracy.get(rideId));
     }
 }
