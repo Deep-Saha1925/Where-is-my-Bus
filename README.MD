@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -490,6 +490,30 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 🔌 When Redis Is Down
+
+### The problem
+During a Redis outage passengers and admins saw **no buses**, even though the buses were still running and their last locations were in the database. Two things caused it:
+1. **Driver tokens lived only in Redis.** With Redis down a driver could not log in, and every location update was rejected because its token could not be looked up. The bus went silent, then was hidden as a ghost.
+2. **Every read waited on Redis.** A search reads the last location of every active ride, and each call to an unreachable Redis blocked for its 2-second timeout, so a search took many seconds and showed nothing.
+
+### What it does now
+- **`RedisCircuitBreaker`:** after one failed Redis call, Redis is skipped for 30 seconds (`REDIS_CIRCUIT_COOLDOWN_SECONDS`), then one trial call decides whether it is back. No more per-bus 2-second waits. The Redis connect timeout is also cut to 1 second.
+- **`LastLocationCache`:** this server remembers the newest location of every running ride in memory, whether or not Redis works.
+- **`LatestLocationResolver`:** answers "where is this bus?" for search, the live lists, the admin grid and the tracking page: **Redis and memory, the newer one wins** (so a bus never jumps backwards after an outage), and if neither has anything, **the newest row in the database**.
+- **`DriverTokenService`:** tokens are kept in memory as well as Redis (memory is checked first, which also saves a Redis call on every GPS update). Drivers can log in and keep sending locations with Redis down.
+- Location updates were already saved straight to the database when Redis is unreachable; that is unchanged.
+
+### What you will see during an outage
+Running buses stay in search and on the admin grid at their last known position, and keep moving as drivers keep sending. `Redis unavailable ... skipping Redis for 30s` appears in the log once, and `Redis is reachable again` when it recovers.
+
+### Limits
+- Memory is lost if the server restarts during the outage. After that, a bus is shown at its last position **in the database**, which can be up to 10 minutes old (locations are copied from Redis to the database every 10 minutes). A ride started less than 10 minutes before such a restart has no database row yet, so it stays hidden until its next update arrives.
+- A token issued while Redis is down exists only in memory, so after a restart in that same outage the driver logs in again.
+- All of this is per server instance, like the other in-memory caches.
+
+---
+
 ## 🧹 Location History Clean-up
 
 ### How locations are stored
@@ -932,6 +956,9 @@ WIMB/
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
 │   │   ├── LoginRateLimiter.java        # failed-login counters per IP / depot / bus, lockouts
 │   │   ├── RideActivityTracker.java     # when each ride last sent a location (drives stale/auto-end)
+│   │   ├── RedisCircuitBreaker.java     # skips Redis for 30s after a failure
+│   │   ├── LastLocationCache.java       # newest location per running ride, in memory
+│   │   ├── LatestLocationResolver.java  # Redis / memory / database lookup of a bus's last location
 │   │   ├── LocationRetentionService.java # deletes old GPS history in batches
 │   │   ├── ClientIpResolver.java        # real client IP behind a proxy (spoof-safe X-Forwarded-For)
 │   │   └── DriverTokenService.java      # issues/resolves driver tokens (Redis)
@@ -1108,6 +1135,7 @@ A multi-stage `Dockerfile`:
 | `ENFORCE_STRONG_ADMIN_PASSWORD` | `true` = refuse to start with a weak admin password (recommended) |
 | `TRUSTED_PROXY_HOPS` | Trusted proxies in front of the app, used to find the real client IP for rate limiting (Render = `1`, default) |
 | `CORS_ALLOWED_ORIGINS` | Leave **unset** in production; dev-only list of extra allowed origins |
+| `REDIS_CIRCUIT_COOLDOWN_SECONDS` (optional) | How long to skip Redis after a failure, see [When Redis Is Down](#-when-redis-is-down) |
 | `LOCATION_RETENTION_DAYS`, `RETENTION_*` (optional) | Location clean-up, see [Location Clean-up](#-location-history-clean-up) |
 | `RIDE_STALE_AFTER_SECONDS`, `RIDE_AUTO_END_AFTER_SECONDS`, `RIDE_CLEANUP_INTERVAL_MS` (optional) | Ghost-ride timing, see [Ghost Rides](#-ghost-rides-auto-end) |
 | `LOGIN_*` (optional) | Tune the driver-login rate limits, see [Login Rate Limiting & CORS](#-login-rate-limiting--cors) |
@@ -1136,6 +1164,7 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Buses disappearing from search when Redis is down~~ — done: circuit breaker, in-memory last location, database fallback, tokens in memory
 - [x] ~~Location history growing forever~~ — done: nightly clean-up of rows older than 30 days
 - [ ] Database migrations (Flyway) instead of `ddl-auto=update` — postponed on purpose
 - [x] ~~Driver GPS dying when the phone locks~~ — done in code: background-GPS Android app scaffold + honest tracking status (app build still to be tested)
