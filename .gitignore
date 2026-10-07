@@ -53,6 +53,7 @@ env.*
 data/depot-codes.xlsx
 
 ### Driver app (Capacitor / Android) ###
+driver-app/*
 driver-app/node_modules/
 driver-app/android/.gradle/
 driver-app/android/build/
