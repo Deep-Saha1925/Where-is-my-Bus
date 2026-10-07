@@ -56,6 +56,8 @@ class RideServiceGhostRidesTest {
     @Mock ActiveRideCache activeRideCache;
     @Mock BusSearchCache busSearchCache;
     @Mock SimpMessagingTemplate messagingTemplate;
+    @Mock LatestLocationResolver latestLocationResolver;
+    @Spy LastLocationCache lastLocationCache = new LastLocationCache();
     @Spy RideActivityTracker activityTracker = new RideActivityTracker();
 
     @InjectMocks RideService rideService;
@@ -130,7 +132,7 @@ class RideServiceGhostRidesTest {
         when(rideRepository.findByStatus(RideStatus.ACTIVE)).thenReturn(List.of(ride));
         Location old = new Location();
         old.setTimestamp(LocalDateTime.now().minusMinutes(45));
-        when(locationRepository.findTopByRideIdOrderByTimestampDesc(1L)).thenReturn(Optional.of(old));
+        when(latestLocationResolver.find(1L)).thenReturn(old);
 
         assertEquals(1, rideService.endStaleRides());
         assertEquals(RideStatus.ENDED, ride.getStatus());
@@ -142,7 +144,7 @@ class RideServiceGhostRidesTest {
         when(rideRepository.findByStatus(RideStatus.ACTIVE)).thenReturn(List.of(ride));
         Location recent = new Location();
         recent.setTimestamp(LocalDateTime.now().minusMinutes(2));
-        when(locationRepository.findTopByRideIdOrderByTimestampDesc(1L)).thenReturn(Optional.of(recent));
+        when(latestLocationResolver.find(1L)).thenReturn(recent);
 
         assertEquals(0, rideService.endStaleRides());
         assertEquals(RideStatus.ACTIVE, ride.getStatus());
