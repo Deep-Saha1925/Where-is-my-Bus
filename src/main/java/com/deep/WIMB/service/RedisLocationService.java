@@ -28,6 +28,7 @@ import java.util.Set;
 public class RedisLocationService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final RedisCircuitBreaker redisCircuit;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
@@ -52,17 +53,22 @@ public class RedisLocationService {
      *         to anyone except this server's own logs.
      */
     public boolean saveLocationToRedis(Location location){
+        if (!redisCircuit.allowCall()) {
+            return false; // Redis is known to be down: the caller saves straight to the database
+        }
         try{
             String key = REDIS_KEY + location.getRide().getId();
             String json = objectMapper.writeValueAsString(location);
 
             redisTemplate.opsForList().rightPush(key, json);
+            redisCircuit.recordSuccess();
             log.info("Saved location to Redis | key={}", key);
             return true;
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize location: {}", e.getMessage());
             return false;
         } catch (Exception redisUnavailable) {
+            redisCircuit.recordFailure(redisUnavailable);
             log.error("Redis unavailable, could not save location for ride {}: {}",
                     location.getRide().getId(), redisUnavailable.getMessage());
             return false;
@@ -74,11 +80,16 @@ public class RedisLocationService {
         List<Location> locations = new ArrayList<>();
         List<String> jsonList;
 
+        if (!redisCircuit.allowCall()) {
+            return locations; // Redis is known to be down: empty, the caller uses what the database has
+        }
         try {
             jsonList = redisTemplate.opsForList().range(key, 0, -1);
+            redisCircuit.recordSuccess();
         } catch (Exception redisUnavailable) {
+            redisCircuit.recordFailure(redisUnavailable);
             log.error("Redis unavailable, could not read locations for ride {}: {}", rideId, redisUnavailable.getMessage());
-            return locations; // empty — caller falls back to whatever's in MySQL
+            return locations; // empty — caller falls back to whatever's in the database
         }
 
         if(jsonList == null) return locations;
@@ -95,11 +106,16 @@ public class RedisLocationService {
     }
 
     public void clearLocationsFromRedis(Long rideId){
+        if (!redisCircuit.allowCall()) {
+            return;
+        }
         try {
             String key = REDIS_KEY + rideId;
             redisTemplate.delete(key);
+            redisCircuit.recordSuccess();
             log.info("Cleared Redis key={}", key);
         } catch (Exception redisUnavailable) {
+            redisCircuit.recordFailure(redisUnavailable);
             // Nothing to clear if Redis is unreachable — the flush this
             // follows already handled getting the data into MySQL (or
             // fell back gracefully if it couldn't), so this is safe to skip.
@@ -110,6 +126,9 @@ public class RedisLocationService {
     public Set<String> getAllLocationKeys() {
 
         Set<String> keys = new HashSet<>();
+        if (!redisCircuit.allowCall()) {
+            return keys;
+        }
         ScanOptions options = ScanOptions.scanOptions()
                 .match(REDIS_KEY + "*")
                 .count(100)
@@ -119,7 +138,9 @@ public class RedisLocationService {
             while (cursor.hasNext()) {
                 keys.add(cursor.next());
             }
+            redisCircuit.recordSuccess();
         } catch (Exception e) {
+            redisCircuit.recordFailure(e);
             System.err.println("Redis SCAN error: " + e.getMessage());
         }
 
@@ -129,12 +150,17 @@ public class RedisLocationService {
     public Location getLastLocationFromRedis(Long rideId) {
         String key = REDIS_KEY + rideId;
         String json;
+        if (!redisCircuit.allowCall()) {
+            return null; // Redis is known to be down: skip the 2-second wait, caller uses its fallback
+        }
         try {
             // rightPop index -1 = last element (most recent)
             json = redisTemplate.opsForList().index(key, -1);
+            redisCircuit.recordSuccess();
         } catch (Exception redisUnavailable) {
+            redisCircuit.recordFailure(redisUnavailable);
             log.error("Redis unavailable, could not read last location for ride {}: {}", rideId, redisUnavailable.getMessage());
-            return null; // caller falls back to MySQL
+            return null; // caller falls back to memory / the database
         }
         if (json == null) return null;
         try {
