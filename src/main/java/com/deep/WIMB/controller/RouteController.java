@@ -8,6 +8,7 @@ package com.deep.WIMB.controller;
 
 import com.deep.WIMB.dto.DepotRouteMatch;
 import com.deep.WIMB.dto.RouteStop;
+import com.deep.WIMB.dto.StopPoint;
 import com.deep.WIMB.dto.RouteSummary;
 import com.deep.WIMB.service.RouteExcelLoader;
 import org.springframework.http.HttpStatus;
@@ -65,6 +66,13 @@ public class RouteController {
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
+    }
+
+    // Every stop with coordinates (one per name), for the passenger "use my location" button.
+    // The browser works out the nearest stop itself, so the passenger's location never reaches the server.
+    @GetMapping("/all-stops")
+    public List<StopPoint> getAllStopPoints() {
+        return loader.getAllStopPoints();
     }
 
     // Splits "SOURCE_DESTINATION" correctly even when stop names contain "_".
