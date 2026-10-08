@@ -464,6 +464,61 @@ function switchSearchTab(tab) {
     }
 }
 
+/* ─── USE MY LOCATION (nearest stop as the "From" stop) ──────────── */
+// The passenger's position is used only in this browser: the page downloads every stop with its
+// coordinates once and works out the nearest one itself, so nothing about the passenger's location
+// is sent to the server.
+const MAX_NEAREST_STOP_M = 20000;   // farther than this is not a useful boarding stop
+let stopPoints = null;              // [{ name, latitude, longitude }], loaded on first use
+
+async function loadStopPoints() {
+    if (stopPoints) return stopPoints;
+    const res = await fetch("/api/routes/all-stops");
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    stopPoints = await res.json();
+    return stopPoints;
+}
+
+function setGeoNote(text, kind) {
+    const note = document.getElementById("geoNote");
+    if (!note) return;
+    note.textContent   = text || "";
+    note.className     = "geo-note" + (kind ? " " + kind : "");
+    note.style.display = text ? "block" : "none";
+}
+
+async function useMyLocation() {
+    const btn = document.getElementById("geoBtn");
+    btn.disabled = true;
+    btn.classList.add("busy");
+    setGeoNote("Finding your location…");
+
+    try {
+        const [position, points] = await Promise.all([Geo.request(), loadStopPoints()]);
+        const hit = Geo.nearest(position.latitude, position.longitude, points);
+
+        if (!hit) {
+            setGeoNote("No stop locations are available yet.", "error");
+        } else if (hit.distanceM > MAX_NEAREST_STOP_M) {
+            setGeoNote(`The nearest stop is ${Geo.formatDistance(hit.distanceM)} away, too far to use as your boarding stop.`, "error");
+        } else {
+            const stopName = hit.point.name.toUpperCase();
+            document.getElementById("source").value = stopName;
+            const rough = position.accuracy > 2000
+                ? ` Your location is approximate (about ${Geo.formatDistance(position.accuracy)}), so check it.`
+                : "";
+            setGeoNote(`📍 Nearest stop: ${stopName} (${Geo.formatDistance(hit.distanceM)} away). Your location stays on your device.${rough}`, "ok");
+            const dest = document.getElementById("destination");
+            if (!dest.value.trim()) dest.focus();
+        }
+    } catch (err) {
+        setGeoNote(Geo.explainError(err), "error");
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove("busy");
+    }
+}
+
 /* ─── SEARCH BY BUS NUMBER (live buses only) ─────────────────────── */
 // The server does the filtering (GET /api/ride/search, a DB query) and caches for a
 // few seconds. This side adds a tiny per-tab cache and makes sure only the LATEST
