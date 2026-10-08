@@ -43,7 +43,7 @@
 
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
-- 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop, and the tracking page can show how far the bus is from you, see [Use My Location](#-use-my-location-passenger)
+- 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop; the tracking page shows how far the bus is from you and can send your location to a friend (WhatsApp, SMS...), see [Use My Location](#-use-my-location-passenger)
 - 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
@@ -496,11 +496,12 @@ The real app's pages are served by this same server, so browsers never need CORS
 Optional, and only when the passenger taps it: the browser shows its own permission prompt, and nothing happens if it is refused.
 
 - **Home page:** the crosshair button in the **From** field finds the stop nearest to you and puts it in the field (in capital letters, like the autocomplete). It says how far away the stop is, ignores stops more than 20 km away, and flags a rough location (accuracy worse than 2 km) as approximate.
-- **Tracking page, "My location" card:** tap **Share** to see *"You are near BRAVO (350 m). The bus is about 3.2 km from you (straight line)."* Your nearest stop gets a **You are here** badge on the timeline, and the distance keeps updating as you and the bus move. Tap **Stop** to turn it off.
-- **Privacy:** your position is used only inside your browser. The page downloads every stop with its coordinates (`GET /api/routes/all-stops`, public) and works out the nearest one itself, so your location is **never sent to the server** and never stored.
+- **Tracking page, "My location" card, Show:** tap **Show** to see *"You are near BRAVO (350 m). The bus is about 3.2 km from you (straight line)."* Your nearest stop gets a **You are here** badge on the timeline, and the distance keeps updating as you and the bus move. Tap **Stop** to turn it off. Only you see this.
+- **Tracking page, 📤 Send my location to a friend:** opens the phone's share menu (WhatsApp, SMS, anything installed) with a ready message: a Google Maps link to your exact position, your nearest stop, how far the bus is from you, and the link to this bus's live tracking page. If the browser has no share menu (most desktops) or blocks it, **WhatsApp** and **Copy message** buttons appear instead. If location wasn't switched on yet, tapping the button asks for it first. Closing the share menu is not treated as an error.
+- **Privacy:** showing your location happens only inside your browser. The page downloads every stop with its coordinates (`GET /api/routes/all-stops`, public) and works out the nearest one itself. Sending to a friend is something you start yourself: the message goes through the app **you** pick, to the person **you** pick. Neither action sends your location to our server, and nothing is stored.
 - **Helpful messages:** denied permission, no GPS signal, timeout, a browser without location support, and a non-https page each give a plain-language message with what to do. Location only works over **https** (or localhost), which your Render site already uses.
 
-Files: `static/js/geo-utils.js` (shared helpers), `index.html` / `index.js` (button), `track.html` / `track.js` (card and badge), `StopPoint.java` and `RouteController` (the stop list endpoint). Covered by `tests/js/geo.test.js` and `StopPointTest`.
+Files: `static/js/geo-utils.js` (shared helpers and the share message), `index.html` / `index.js` (button), `track.html` / `track.js` (card, badge, sharing), `StopPoint.java` and `RouteController` (the stop list endpoint). Covered by `tests/js/geo.test.js` and `StopPointTest`.
 
 ---
 
