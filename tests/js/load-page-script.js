@@ -29,7 +29,7 @@ function fakeElement() {
   return el;
 }
 
-function loadPageScript(fileName, { search = "", globals = {} } = {}) {
+function loadPageScript(fileName, { search = "", globals = {}, preload = [] } = {}) {
   const file = path.join(__dirname, "..", "..", "src", "main", "resources", "static", "js", fileName);
   const source = fs.readFileSync(file, "utf8");
 
@@ -67,6 +67,11 @@ function loadPageScript(fileName, { search = "", globals = {} } = {}) {
   sandbox.window.matchMedia = () => ({ matches: false, addEventListener() {} });
 
   const context = vm.createContext(sandbox);
+  // other page scripts this one depends on (as the browser would load them first), in the same context
+  for (const dependency of preload) {
+    const depFile = path.join(__dirname, "..", "..", "src", "main", "resources", "static", "js", dependency);
+    vm.runInContext(fs.readFileSync(depFile, "utf8"), context, { filename: dependency });
+  }
   vm.runInContext(source, context, { filename: fileName });
   return { eval: (expr) => vm.runInContext(expr, context), sandbox };
 }
