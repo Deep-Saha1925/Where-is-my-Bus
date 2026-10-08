@@ -268,13 +268,13 @@ test("track: far from the route, it says so and puts no 'You are here' marker", 
   assert.doesNotMatch(el("stopList").innerHTML, /You are here/);
 });
 
-test("track: a denied permission explains how to fix it and the button goes back to Share", async () => {
+test("track: a denied permission explains how to fix it and the button goes back to Show", async () => {
   const geolocation = trackingGeolocation((ok, fail) => fail({ code: 1 }));
   const { page, el } = trackingPage({ geolocation });
   await page.eval("startMyLocation()");
 
   assert.match(el("myLocText").textContent, /Allow it in your browser/);
-  assert.equal(el("myLocBtn").textContent, "Share");
+  assert.equal(el("myLocBtn").textContent, "Show");
   assert.equal(el("myLocBtn").disabled, false);
   assert.equal(page.eval("myWatchId"), null);
   assert.equal(geolocation.watchers.length, 0, "no watcher is left running");
@@ -288,7 +288,7 @@ test("track: Stop stops watching, forgets the position and removes the marker", 
 
   assert.deepEqual(geolocation.cleared, [7]);
   assert.equal(page.eval("myPos"), null);
-  assert.equal(el("myLocBtn").textContent, "Share");
+  assert.equal(el("myLocBtn").textContent, "Show");
   assert.doesNotMatch(el("stopList").innerHTML, /You are here/);
 });
 
@@ -300,4 +300,151 @@ test("track: a moving passenger updates the card through the watch", async () =>
 
   geolocation.watchers[0]({ coords: { latitude: 26.0198, longitude: 89.0, accuracy: 15 } });
   assert.match(el("myLocText").textContent, /near CHARLIE/);
+});
+
+/* ─── sending my location to a friend ─────────────────────────── */
+test("buildShareMessage: a map link with the exact position, nearest stop, bus distance and tracking link", () => {
+  const page = geo();
+  page.sandbox.__d = {
+    latitude: 26.4912345678, longitude: 89.5270001, accuracy: 20,
+    nearestStopName: "ALIPURDUAR", nearestDistanceM: 350, busDistanceM: 3200,
+    trackUrl: "https://wimb.example/track.html?rideId=5",
+  };
+  const text = page.eval("Geo.buildShareMessage(__d)");
+  assert.match(text, /^📍 My location: https:\/\/www\.google\.com\/maps\?q=26\.491235,89\.527000/);
+  assert.match(text, /Near ALIPURDUAR \(350 m away\)/);
+  assert.match(text, /The bus is about 3\.2 km from me/);
+  assert.match(text, /Track the bus live: https:\/\/wimb\.example\/track\.html\?rideId=5/);
+  assert.doesNotMatch(text, /Approximate/);
+});
+
+test("buildShareMessage: leaves out lines it has nothing true to say about", () => {
+  const page = geo();
+  page.sandbox.__d = { latitude: 26.1, longitude: 89.2, accuracy: 10, nearestStopName: "FARAWAY", nearestDistanceM: 30000, busDistanceM: null, trackUrl: "" };
+  const text = page.eval("Geo.buildShareMessage(__d)");
+  assert.doesNotMatch(text, /Near FARAWAY/, "a stop 30 km away is not 'near'");
+  assert.doesNotMatch(text, /bus is about/);
+  assert.doesNotMatch(text, /Track the bus/);
+  assert.equal(text.split("\n").length, 1);
+});
+
+test("buildShareMessage: flags a rough location as approximate", () => {
+  const page = geo();
+  page.sandbox.__d = { latitude: 26.1, longitude: 89.2, accuracy: 4000 };
+  assert.match(page.eval("Geo.buildShareMessage(__d)"), /Approximate location, about 4\.0 km/);
+});
+
+test("whatsappLink: the message is URL-encoded so links and new lines survive", () => {
+  const { eval: run } = geo();
+  const link = run('Geo.whatsappLink("a b\\nhttps://x.y/?q=1&z=2")');
+  assert.ok(link.startsWith("https://wa.me/?text="));
+  assert.ok(!link.includes(" ") && !link.includes("&z=2"), `got ${link}`);
+  assert.equal(decodeURIComponent(link.slice("https://wa.me/?text=".length)), "a b\nhttps://x.y/?q=1&z=2");
+});
+
+function sharingPage({ geolocation, share, clipboard }) {
+  const elements = {};
+  const el = (id) => (elements[id] ||= {
+    id, value: "", textContent: "", innerText: "", innerHTML: "", className: "", disabled: false, href: "",
+    style: {}, dataset: {}, children: [],
+    classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} },
+    addEventListener() {}, focus() {}, querySelectorAll() { return []; },
+    getBoundingClientRect() { return { top: 0, height: 0 }; },
+  });
+  const document = {
+    readyState: "complete", visibilityState: "visible",
+    getElementById: el, querySelector: () => el("_q"), querySelectorAll: () => [],
+    createElement: () => el("_new"), addEventListener() {}, body: el("_body"),
+  };
+  const navigator = { geolocation };
+  if (share) navigator.share = share;
+  if (clipboard) navigator.clipboard = clipboard;
+  const prompts = [];
+  const page = loadPageScript("track.js", {
+    search: "?rideId=5&routeKey=A_C",
+    preload: ["geo-utils.js"],
+    globals: { document, navigator, prompt: (...args) => prompts.push(args) },
+  });
+  page.sandbox.__stops = [
+    { stopName: "Alpha",   latitude: 26.00, longitude: 89.0, distanceFromStartKm: 0,   slackTimeMin: 0 },
+    { stopName: "Bravo",   latitude: 26.01, longitude: 89.0, distanceFromStartKm: 1.1, slackTimeMin: 0 },
+  ];
+  page.eval("fullRouteStops = __stops; routeStops = __stops; busLocation = { latitude: 26.02, longitude: 89.0 };");
+  return { page, el, prompts };
+}
+
+const here = (ok) => ok({ coords: { latitude: 26.0102, longitude: 89.0, accuracy: 15 } });
+
+test("share: opens the phone's share menu with the position, nearest stop and tracking link", async () => {
+  const shared = [];
+  const { page, el } = sharingPage({ geolocation: fakeGeolocation(here), share: async (data) => shared.push(data) });
+  await page.eval("shareMyLocation()");
+
+  assert.equal(shared.length, 1);
+  assert.equal(shared[0].title, "My location");
+  assert.match(shared[0].text, /google\.com\/maps\?q=26\.010200,89\.000000/);
+  assert.match(shared[0].text, /Near BRAVO/);
+  assert.match(shared[0].text, /Track the bus live: http/);
+  assert.equal(el("shareNote").textContent, "Sent.");
+  assert.equal(el("shareFallback").style.display, "none");
+  assert.equal(el("shareLocBtn").disabled, false);
+});
+
+test("share: asks for the location itself if it was not being shown yet", async () => {
+  const geolocation = fakeGeolocation(here);
+  const { page } = sharingPage({ geolocation, share: async () => {} });
+  assert.equal(page.eval("myPos"), null);
+  await page.eval("shareMyLocation()");
+  assert.equal(geolocation.calls.length, 1);
+  assert.notEqual(page.eval("myPos"), null);
+});
+
+test("share: closing the share menu is not an error and shows nothing", async () => {
+  const cancelled = async () => { const e = new Error("cancelled"); e.name = "AbortError"; throw e; };
+  const { page, el } = sharingPage({ geolocation: fakeGeolocation(here), share: cancelled });
+  await page.eval("shareMyLocation()");
+  assert.equal(el("shareNote").textContent, "");
+  assert.equal(el("shareFallback").style.display, "none");
+  assert.equal(el("shareLocBtn").disabled, false);
+});
+
+test("share: a browser without a share menu gets WhatsApp and Copy options", async () => {
+  const { page, el } = sharingPage({ geolocation: fakeGeolocation(here) });
+  await page.eval("shareMyLocation()");
+  assert.equal(el("shareFallback").style.display, "flex");
+  assert.ok(el("shareWhatsApp").href.startsWith("https://wa.me/?text="));
+  assert.match(decodeURIComponent(el("shareWhatsApp").href), /My location: https:\/\/www\.google\.com\/maps/);
+});
+
+test("share: if sharing is blocked by the browser, the same manual options appear", async () => {
+  const blocked = async () => { const e = new Error("blocked"); e.name = "NotAllowedError"; throw e; };
+  const { page, el } = sharingPage({ geolocation: fakeGeolocation(here), share: blocked });
+  await page.eval("shareMyLocation()");
+  assert.equal(el("shareFallback").style.display, "flex");
+});
+
+test("share: a denied location permission stops before sharing anything and says how to fix it", async () => {
+  const shared = [];
+  const denied = fakeGeolocation((ok, fail) => fail({ code: 1 }));
+  const { page, el } = sharingPage({ geolocation: denied, share: async (d) => shared.push(d) });
+  await page.eval("shareMyLocation()");
+
+  assert.equal(shared.length, 0);
+  assert.match(el("shareNote").textContent, /Allow it in your browser/);
+  assert.equal(el("shareLocBtn").disabled, false);
+});
+
+test("share: Copy message uses the clipboard, or a prompt when the clipboard is blocked", async () => {
+  const copied = [];
+  const ok = sharingPage({ geolocation: fakeGeolocation(here), clipboard: { writeText: async (t) => copied.push(t) } });
+  await ok.page.eval("shareMyLocation()");
+  await ok.page.eval("copyShareMessage()");
+  assert.equal(copied.length, 1);
+  assert.match(copied[0], /My location:/);
+  assert.match(ok.el("shareNote").textContent, /Copied/);
+
+  const blocked = sharingPage({ geolocation: fakeGeolocation(here), clipboard: { writeText: async () => { throw new Error("no"); } } });
+  await blocked.page.eval("shareMyLocation()");
+  await blocked.page.eval("copyShareMessage()");
+  assert.equal(blocked.prompts.length, 1);
 });

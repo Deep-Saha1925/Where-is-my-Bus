@@ -680,7 +680,7 @@ function setMyLocButton(sharing, busy) {
   const btn = document.getElementById("myLocBtn");
   if (!btn) return;
   btn.disabled    = !!busy;
-  btn.textContent = busy ? "…" : (sharing ? "Stop" : "Share");
+  btn.textContent = busy ? "…" : (sharing ? "Stop" : "Show");
   btn.style.background = sharing ? "#6b7280" : "#1f6f5c";
 }
 
@@ -720,7 +720,7 @@ function stopMyLocation() {
   myNearestIdx = -1;
   myNearestM = null;
   setMyLocButton(false, false);
-  setMyLocText("Share your location to see how far the bus is from you. It stays on your device.");
+  setMyLocText("Show your location to see how far the bus is from you. It stays on your device.");
   renderTimeline();
 }
 
@@ -753,3 +753,91 @@ function updateMyLocation() {
 window.addEventListener("pagehide", () => {
   if (myWatchId !== null) navigator.geolocation.clearWatch(myWatchId);
 });
+
+/* ─── SEND MY LOCATION TO A FRIEND (the passenger picks the app; nothing goes to our server) ─── */
+let lastShareText = "";
+
+function setShareNote(text, isError) {
+  const el = document.getElementById("shareNote");
+  if (!el) return;
+  el.textContent   = text || "";
+  el.style.display = text ? "block" : "none";
+  el.style.color   = isError ? "#b42318" : "#1f6f5c";
+}
+
+function showShareFallback(text) {
+  lastShareText = text;
+  const box = document.getElementById("shareFallback");
+  const wa  = document.getElementById("shareWhatsApp");
+  if (wa)  wa.href = Geo.whatsappLink(text);
+  if (box) box.style.display = "flex";
+}
+
+function hideShareFallback() {
+  const box = document.getElementById("shareFallback");
+  if (box) box.style.display = "none";
+}
+
+async function copyShareMessage() {
+  try {
+    await navigator.clipboard.writeText(lastShareText);
+    setShareNote("Copied. Paste it into any chat.", false);
+  } catch (err) {
+    window.prompt("Copy this message:", lastShareText);   // browsers that block the clipboard
+  }
+}
+
+function isLocationError(err) {
+  return !!err && (typeof err.code === "number" || err.code === "INSECURE" || err.code === "UNSUPPORTED");
+}
+
+async function shareMyLocation() {
+  const btn = document.getElementById("shareLocBtn");
+  btn.disabled = true;
+  setShareNote("");
+  hideShareFallback();
+
+  try {
+    // Needs a position: use the one already shown, or ask the browser once (it prompts for permission)
+    if (!myPos) {
+      setShareNote("Finding your location…", false);
+      myPos = await Geo.request();
+      updateMyLocation();
+      setShareNote("");
+    }
+
+    const stops = (fullRouteStops.length ? fullRouteStops : routeStops);
+    const hit = Geo.nearest(myPos.latitude, myPos.longitude, stops);
+    const text = Geo.buildShareMessage({
+      latitude:  myPos.latitude,
+      longitude: myPos.longitude,
+      accuracy:  myPos.accuracy,
+      nearestStopName:  hit ? hit.point.stopName.trim().toUpperCase() : null,
+      nearestDistanceM: hit ? hit.distanceM : null,
+      busDistanceM: (busLocation && typeof busLocation.latitude === "number")
+        ? Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude)
+        : null,
+      trackUrl: window.location.href
+    });
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "My location", text });
+        setShareNote("Sent.", false);
+      } catch (shareErr) {
+        if (shareErr && shareErr.name === "AbortError") return;   // the passenger closed the share menu
+        showShareFallback(text);                                    // sharing blocked: offer the manual options
+      }
+    } else {
+      showShareFallback(text);                                      // desktop browsers have no share menu
+    }
+  } catch (err) {
+    if (isLocationError(err)) {
+      setShareNote(Geo.explainError(err), true);
+    } else {
+      setShareNote("Couldn't share your location. Please try again.", true);
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}

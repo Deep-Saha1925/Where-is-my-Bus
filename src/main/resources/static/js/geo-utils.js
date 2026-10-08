@@ -73,5 +73,36 @@ const Geo = (() => {
     });
   }
 
-  return { distanceM, nearest, formatDistance, explainError, request };
+  function mapsLink(latitude, longitude) {
+    return `https://www.google.com/maps?q=${Number(latitude).toFixed(6)},${Number(longitude).toFixed(6)}`;
+  }
+
+  // The message a passenger sends to a friend. Only what the passenger chose to send: their position as a
+  // map link, the nearest stop, and the link to this bus's live tracking page.
+  //   details = { latitude, longitude, accuracy, nearestStopName, nearestDistanceM, busDistanceM, trackUrl }
+  function buildShareMessage(details) {
+    // null/undefined must count as "unknown": in JavaScript null >= 0 is true, which printed "0 m"
+    const known = (n) => typeof n === "number" && n >= 0;
+
+    const lines = [`📍 My location: ${mapsLink(details.latitude, details.longitude)}`];
+    if (details.nearestStopName && known(details.nearestDistanceM) && details.nearestDistanceM <= 5000) {
+      lines.push(`Near ${details.nearestStopName} (${formatDistance(details.nearestDistanceM)} away).`);
+    }
+    if (known(details.accuracy) && details.accuracy > 1000) {
+      lines.push(`(Approximate location, about ${formatDistance(details.accuracy)}.)`);
+    }
+    if (known(details.busDistanceM)) {
+      lines.push(`The bus is about ${formatDistance(details.busDistanceM)} from me.`);
+    }
+    if (details.trackUrl) {
+      lines.push(`🚌 Track the bus live: ${details.trackUrl}`);
+    }
+    return lines.join("\n");
+  }
+
+  function whatsappLink(text) {
+    return "https://wa.me/?text=" + encodeURIComponent(text);
+  }
+
+  return { distanceM, nearest, formatDistance, explainError, request, mapsLink, buildShareMessage, whatsappLink };
 })();
