@@ -8,6 +8,7 @@ package com.deep.WIMB.service;
 
 import com.deep.WIMB.dto.DepotRouteMatch;
 import com.deep.WIMB.dto.RouteStop;
+import com.deep.WIMB.dto.StopPoint;
 import com.deep.WIMB.model.Route;
 import com.deep.WIMB.repository.RouteRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -638,6 +639,11 @@ public class RouteExcelLoader {
             }
         }
         return new ArrayList<>(stopNames);
+    }
+
+    /** Every stop with its coordinates, one per name, across all loaded routes (see StopPoint). */
+    public synchronized List<StopPoint> getAllStopPoints() {
+        return StopPoint.uniqueByName(routeCache.values());
     }
 
     private void updateStopsJson() {
