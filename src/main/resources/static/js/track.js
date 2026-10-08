@@ -20,7 +20,12 @@ let busLocation    = null;
 let rideInfo       = null;
 let centeredOnBus  = false; // scroll the bus to the middle of the screen once per opened ride
 let userMovedView  = false; // the passenger scrolled/touched the page -- never fight them after that
-let hasEnteredOnce = false; // only slide the rows in on the first render, not every WS/poll refresh
+let hasEnteredOnce = false;
+let myPos          = null;  // { latitude, longitude, accuracy } while the passenger shares their location
+let myWatchId      = null;
+let myNearestIdx   = -1;    // index (in the displayed stop list) of the stop nearest to the passenger
+let myNearestM     = null;
+const MY_STOP_MAX_M = 5000; // "You are here" is only shown on a stop this close // only slide the rows in on the first render, not every WS/poll refresh
 
 let stompClient        = null;
 let wsSubscribedRideId = null;
@@ -346,7 +351,7 @@ function applyLocation(loc) {
   document.getElementById("liveBadge").classList.add("flex");
   updateLastUpdatedLabel();
 
-  renderTimeline();
+  if (myPos) updateMyLocation(); else renderTimeline();
 }
 
 /* ─── GEOMETRY ───────────────────────────────────────────────────── */
@@ -608,6 +613,9 @@ function renderTimeline() {
     let markerHtml = "";
     if (isPassengerSrc)  markerHtml = `<span class="badge badge-src">📍 Your stop</span>`;
     if (isPassengerDest) markerHtml = `<span class="badge badge-dest">🏁 Your dest</span>`;
+    if (i === myNearestIdx && myNearestM !== null && myNearestM <= MY_STOP_MAX_M) {
+      markerHtml += `<span class="badge badge-you">You are here</span>`;
+    }
 
     const enterCl = hasEnteredOnce ? '' : ' row-enter';
     const rowCl  = `stop-row${enterCl}${isCurrent ? ' row-current' : ''}${isPassed ? ' row-passed' : ''}`;
@@ -619,7 +627,7 @@ function renderTimeline() {
     const bottomLine = busOnLineBelow
         ? `<div style="position:relative; display:flex; flex-direction:column; align-items:center; flex:1;">
              <div class="line-seg ${botLineCl}" style="flex:1"></div>
-             <span class="bus-icon">🚌</span>
+             <span class="bus-icon" style="top:calc(50% - 12px);">🚌</span>
            </div>`
         : `<div class="line-seg ${botLineCl}" style="${isLast ? 'visibility:hidden' : ''}"></div>`;
 
@@ -639,9 +647,9 @@ function renderTimeline() {
         ${bottomLine}
       </div>
 
-      <div style="flex:1; min-width:0; padding:14px 0 14px 14px;">
+      <div style="flex:1; padding:14px 0 14px 14px;">
         <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
-          <span class="stop-name" style="font-size:15px; font-weight:600; ${nameCl}">${escapeHtml(stop.stopName)}</span>
+          <span style="font-size:15px; font-weight:600; ${nameCl}">${escapeHtml(stop.stopName)}</span>
           ${markerHtml}
           ${badgeHtml}
         </div>
@@ -659,3 +667,89 @@ function renderTimeline() {
 }
 
 function goBack() { window.history.back(); }
+
+/* ─── MY LOCATION (optional; the position never leaves this browser) ─── */
+function setMyLocText(text, isError) {
+  const el = document.getElementById("myLocText");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isError ? "#b42318" : "";
+}
+
+function setMyLocButton(sharing, busy) {
+  const btn = document.getElementById("myLocBtn");
+  if (!btn) return;
+  btn.disabled    = !!busy;
+  btn.textContent = busy ? "…" : (sharing ? "Stop" : "Share");
+  btn.style.background = sharing ? "#6b7280" : "#1f6f5c";
+}
+
+function toggleMyLocation() {
+  if (myWatchId !== null) stopMyLocation();
+  else startMyLocation();
+}
+
+async function startMyLocation() {
+  setMyLocButton(false, true);
+  setMyLocText("Finding your location…");
+  try {
+    myPos = await Geo.request();            // shows the browser's permission prompt
+    myWatchId = navigator.geolocation.watchPosition(
+      pos => {
+        myPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        updateMyLocation();
+      },
+      err => setMyLocText(Geo.explainError(err), true),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    setMyLocButton(true, false);
+    updateMyLocation();
+  } catch (err) {
+    myPos = null;
+    setMyLocButton(false, false);
+    setMyLocText(Geo.explainError(err), true);
+  }
+}
+
+function stopMyLocation() {
+  if (myWatchId !== null) {
+    navigator.geolocation.clearWatch(myWatchId);
+    myWatchId = null;
+  }
+  myPos = null;
+  myNearestIdx = -1;
+  myNearestM = null;
+  setMyLocButton(false, false);
+  setMyLocText("Share your location to see how far the bus is from you. It stays on your device.");
+  renderTimeline();
+}
+
+// Works out the stop nearest to the passenger and the distance to the bus, then redraws.
+// Also called whenever the bus moves, so the distance stays current.
+function updateMyLocation() {
+  if (!myPos) return;
+  const stops = (fullRouteStops.length ? fullRouteStops : routeStops);
+  const hit = Geo.nearest(myPos.latitude, myPos.longitude, stops);
+
+  myNearestIdx = hit ? hit.index : -1;
+  myNearestM   = hit ? hit.distanceM : null;
+
+  const lines = [];
+  if (hit) {
+    lines.push(hit.distanceM <= MY_STOP_MAX_M
+      ? `You are near ${hit.point.stopName.trim().toUpperCase()} (${Geo.formatDistance(hit.distanceM)}).`
+      : `You are ${Geo.formatDistance(hit.distanceM)} from the nearest stop on this route.`);
+  }
+  if (busLocation && typeof busLocation.latitude === "number") {
+    const toBus = Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude);
+    lines.push(`The bus is about ${Geo.formatDistance(toBus)} from you (straight line).`);
+  } else {
+    lines.push("Waiting for the bus's location…");
+  }
+  setMyLocText(lines.join(" "));
+  renderTimeline();
+}
+
+window.addEventListener("pagehide", () => {
+  if (myWatchId !== null) navigator.geolocation.clearWatch(myWatchId);
+});
