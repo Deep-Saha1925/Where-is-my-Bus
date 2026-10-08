@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -43,6 +43,7 @@
 
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
+- 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop, and the tracking page can show how far the bus is from you, see [Use My Location](#-use-my-location-passenger)
 - 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
@@ -487,6 +488,19 @@ On Render, `getRemoteAddr()` is the proxy, so the real IP comes from `X-Forwarde
 
 ### CORS
 The real app's pages are served by this same server, so browsers never need CORS for them. Cross-origin access is therefore **off by default**. For development with a separate front-end (e.g. VS Code Live Server) set `CORS_ALLOWED_ORIGINS=http://localhost:5500,http://127.0.0.1:5500`. Origins must be exact: `*` is rejected at startup because these mappings allow credentials. (The `/ws` WebSocket endpoint stays open to any origin on purpose: it only carries the same public bus data as `/api/ride/active/all`.)
+
+---
+
+## 📍 Use My Location (Passenger)
+
+Optional, and only when the passenger taps it: the browser shows its own permission prompt, and nothing happens if it is refused.
+
+- **Home page:** the crosshair button in the **From** field finds the stop nearest to you and puts it in the field (in capital letters, like the autocomplete). It says how far away the stop is, ignores stops more than 20 km away, and flags a rough location (accuracy worse than 2 km) as approximate.
+- **Tracking page, "My location" card:** tap **Share** to see *"You are near BRAVO (350 m). The bus is about 3.2 km from you (straight line)."* Your nearest stop gets a **You are here** badge on the timeline, and the distance keeps updating as you and the bus move. Tap **Stop** to turn it off.
+- **Privacy:** your position is used only inside your browser. The page downloads every stop with its coordinates (`GET /api/routes/all-stops`, public) and works out the nearest one itself, so your location is **never sent to the server** and never stored.
+- **Helpful messages:** denied permission, no GPS signal, timeout, a browser without location support, and a non-https page each give a plain-language message with what to do. Location only works over **https** (or localhost), which your Render site already uses.
+
+Files: `static/js/geo-utils.js` (shared helpers), `index.html` / `index.js` (button), `track.html` / `track.js` (card and badge), `StopPoint.java` and `RouteController` (the stop list endpoint). Covered by `tests/js/geo.test.js` and `StopPointTest`.
 
 ---
 
@@ -1004,6 +1018,7 @@ WIMB/
 │   │   │   ├── track.js                 # live timeline: WebSocket push + 5s fallback poll, reconnect, tab wake-up
 │   │   │   ├── driver.js                # login, resume, GPS sending (no dropped fixes), Simulate location, current-stop card, tracking health
 │   │   │   ├── native-gps.js            # GPS source: browser, or background service inside the Android app
+│   │   │   ├── geo-utils.js             # passenger location helpers: nearest stop, distances, error messages
 │   │   │   └── admin-buses.js
 │   │   └── data/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
@@ -1164,6 +1179,7 @@ A multi-stage `Dockerfile`:
 - [x] ~~Give `Ride` a real route reference, so `track.html` resolves correctly for any route~~ — done: `Ride.routeCode`
 - [x] ~~Passenger search by bus number~~ — done: DB-backed query + short caches, see [Search by Bus Number](#-search-by-bus-number)
 - [x] ~~Driver-side testing without a real bus~~ — done: Simulate location tab
+- [x] ~~Passenger "use my location"~~ — done: nearest stop on the home page, distance to the bus on the tracking page
 - [x] ~~Buses disappearing from search when Redis is down~~ — done: circuit breaker, in-memory last location, database fallback, tokens in memory
 - [x] ~~Location history growing forever~~ — done: nightly clean-up of rows older than 30 days
 - [ ] Database migrations (Flyway) instead of `ddl-auto=update` — postponed on purpose
