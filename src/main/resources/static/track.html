@@ -430,20 +430,37 @@
     </div>
 </div>
 
-<!-- ── MY LOCATION (optional, stays on the device) ── -->
+<!-- ── MY LOCATION (optional): show it here, or send it to a friend ── -->
 <div style="padding:12px 12px 0;">
     <div class="card" id="myLocCard" style="padding:12px 16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
                 <div style="font-weight:700; font-size:14px; color:var(--text-primary);">📍 My location</div>
                 <div id="myLocText" role="status" aria-live="polite" style="font-size:12.5px; line-height:1.4; color:var(--text-muted); margin-top:2px;">
-                    Share your location to see how far the bus is from you. It stays on your device.
+                    Show your location to see how far the bus is from you. It stays on your device.
                 </div>
             </div>
             <button type="button" id="myLocBtn" onclick="toggleMyLocation()"
                     style="flex-shrink:0; border:none; border-radius:10px; padding:9px 14px; font-weight:700; font-size:13px; cursor:pointer; background:#1f6f5c; color:#fff;">
-                Share
+                Show
             </button>
+        </div>
+
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border, #e5e7eb);">
+            <button type="button" id="shareLocBtn" onclick="shareMyLocation()"
+                    style="width:100%; border:1.5px solid #1f6f5c; background:transparent; color:#1f6f5c; border-radius:10px; padding:9px 14px; font-weight:700; font-size:13px; cursor:pointer;">
+                📤 Send my location to a friend
+            </button>
+            <div style="font-size:11.5px; line-height:1.4; color:var(--text-muted); margin-top:6px;">
+                Opens your phone's share menu (WhatsApp, SMS...). Only the person you pick receives it; we never see it.
+            </div>
+            <div id="shareNote" role="status" aria-live="polite" style="display:none; font-size:12.5px; margin-top:6px;"></div>
+            <div id="shareFallback" style="display:none; margin-top:8px; gap:8px; flex-wrap:wrap;">
+                <a id="shareWhatsApp" target="_blank" rel="noopener"
+                   style="text-decoration:none; border-radius:10px; padding:8px 12px; font-weight:700; font-size:13px; background:#25d366; color:#fff;">WhatsApp</a>
+                <button type="button" id="shareCopy" onclick="copyShareMessage()"
+                        style="border:none; border-radius:10px; padding:8px 12px; font-weight:700; font-size:13px; cursor:pointer; background:#e5e7eb; color:#111827;">Copy message</button>
+            </div>
         </div>
     </div>
 </div>
