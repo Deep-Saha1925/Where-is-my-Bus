@@ -570,7 +570,7 @@ function renderTimeline() {
   if (notYetArrived) {
     bannerHtml += `
     <div class="banner banner-yellow">
-      <span style="font-size:18px">🚌</span>
+      <img src="/images/logo.png" alt="" style="width:20px; height:20px; vertical-align:middle;">
       Bus is on its way — not yet reached your boarding stop
     </div>`;
   }
@@ -627,7 +627,7 @@ function renderTimeline() {
     const bottomLine = busOnLineBelow
         ? `<div style="position:relative; display:flex; flex-direction:column; align-items:center; flex:1;">
              <div class="line-seg ${botLineCl}" style="flex:1"></div>
-             <span class="bus-icon" style="top:calc(50% - 12px);">🚌</span>
+             <img class="bus-icon" src="/images/logo.png" alt="Bus" style="top:calc(50% - 14px);">
            </div>`
         : `<div class="line-seg ${botLineCl}" style="${isLast ? 'visibility:hidden' : ''}"></div>`;
 
@@ -640,7 +640,7 @@ function renderTimeline() {
         ${isCurrent ? `
           <div style="position:relative; display:flex; align-items:center; justify-content:center;">
             <div class="${dotCl}"></div>
-            <span class="bus-icon">🚌</span>
+            <img class="bus-icon" src="/images/logo.png" alt="Bus">
           </div>
         ` : `<div class="${dotCl}"></div>`}
 

@@ -105,6 +105,42 @@
         }
         .back-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
 
+        /* ── Track page logo ── */
+        .track-logo-circle {
+            width: 68px;
+            height: 68px;
+            min-width: 68px;
+            border-radius: 50%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.14);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+        .track-logo-circle img {
+            width: 58px;
+            height: 58px;
+            object-fit: contain;
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .track-logo-circle {
+                width: 60px;
+                height: 60px;
+                min-width: 60px;
+            }
+            .track-logo-circle img {
+                width: 51px;
+                height: 51px;
+            }
+        }
+
         #routeTitle {
             font-family: 'JetBrains Mono', ui-monospace, monospace;
             font-weight: 700;
@@ -187,7 +223,9 @@
         .bus-icon {
             position: absolute;
             left: -22px;
-            font-size: 21px;
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
             animation: busFloat 1s ease-in-out infinite alternate,
             busPulse 2s ease-in-out infinite;
             filter: drop-shadow(0 2px 4px rgba(226,137,47,0.45));
@@ -386,6 +424,10 @@
 <!-- ── STICKY HEADER — styled like an LED bus destination board ── -->
 <div class="header-bar px-4 py-3 flex items-center gap-3" style="position:relative;">
     <button onclick="goBack()" class="back-btn" aria-label="Go back">←</button>
+
+    <div class="track-logo-circle" aria-label="Where Is My Bus logo">
+        <img src="/images/logo.png" alt="Where Is My Bus">
+    </div>
 
     <div class="flex-1 min-w-0" style="position:relative; z-index:1;">
         <div id="routeTitle">Loading route...</div>
