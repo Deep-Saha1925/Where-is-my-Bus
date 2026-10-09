@@ -220,18 +220,35 @@
         }
 
         /* ── Bus icon ── */
+        /* The bus marker: the app logo on a black circle (same look as the logo in the header),
+           centred on the road line / stop dot. Bigger than before so it is easy to spot. */
         .bus-icon {
             position: absolute;
-            left: -22px;
-            width: 28px;
-            height: 28px;
-            object-fit: contain;
+            left: 50%;
+            top: 50%;
+            width: 46px;
+            height: 46px;
+            margin: -23px 0 0 -23px;          /* centres it on the line without using transform (the float animation uses it) */
+            border-radius: 50%;
+            background: #000;
+            border: 2px solid #fff;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.45), 0 0 0 4px rgba(226,137,47,0.30);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            z-index: 4;
             animation: busFloat 1s ease-in-out infinite alternate,
-            busPulse 2s ease-in-out infinite;
-            filter: drop-shadow(0 2px 4px rgba(226,137,47,0.45));
+                       busPulse 2s ease-in-out infinite;
+        }
+        .bus-icon img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            display: block;
         }
         .dark-mode .bus-icon {
-            filter: drop-shadow(0 2px 8px rgba(240,162,74,0.6));
+            box-shadow: 0 3px 12px rgba(0,0,0,0.7), 0 0 0 4px rgba(240,162,74,0.40);
         }
 
         /* ── Stop rows ── */
@@ -426,7 +443,7 @@
     <button onclick="goBack()" class="back-btn" aria-label="Go back">←</button>
 
     <div class="track-logo-circle" aria-label="Where Is My Bus logo">
-        <img src="/images/logo.png" alt="Where Is My Bus">
+        <img src="/images/bus.png" alt="Where Is My Bus">
     </div>
 
     <div class="flex-1 min-w-0" style="position:relative; z-index:1;">
