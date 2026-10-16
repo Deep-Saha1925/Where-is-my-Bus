@@ -291,6 +291,50 @@
         .badge-dest    { background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-family: 'Oswald', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
         .dark-mode .badge-src  { color: #6fd6b4; }
 
+        /* ── Stop row layout (the same look as before on wide screens) ── */
+        .stop-rail { width: 32px; }
+        .stop-main { flex: 1; min-width: 0; padding: 14px 0 14px 14px; }
+        .stop-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .stop-name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+        .stop-chips { display: contents; }
+        .stop-meta { display: flex; gap: 12px; margin-top: 4px; font-size: 13px; }
+        .stat-card { min-width: 0; }
+
+        /* ── Per-stop ETA column (right side of each row) ── */
+        .eta-col {
+            flex-shrink: 0;
+            min-width: 62px;
+            padding: 12px 0 12px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            text-align: right;
+            line-height: 1.15;
+        }
+        .eta-min   { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+        .eta-min small { font-size: 10.5px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+        .eta-clock { font-size: 11.5px; font-weight: 500; color: var(--text-muted); margin-top: 3px; white-space: nowrap; }
+        .eta-col.eta-soon .eta-min { color: var(--accent); }
+        .eta-col.eta-next .eta-min { color: var(--accent); }
+        .eta-col.eta-stale .eta-min,
+        .eta-col.eta-stale .eta-clock { opacity: 0.55; }
+        .eta-col.eta-halt .eta-clock { color: var(--text-faint); }
+
+        /* ── ETA summary strip (your stop / destination) ── */
+        .eta-summary {
+            display: flex;
+            gap: 10px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-stop);
+            background: linear-gradient(180deg, var(--accent-soft), transparent);
+        }
+        .eta-sum-item { flex: 1; min-width: 0; }
+        .eta-sum-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .eta-sum-value { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 2px; }
+        .eta-sum-value small { font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 500; color: var(--text-muted); margin-left: 6px; }
+        .eta-sum-note { padding: 0 18px 8px; font-size: 11px; color: var(--text-faint); }
+
         /* ── Live badge (sits on the dark header board) ──
            display is controlled by track.js toggling Tailwind's
            "hidden" / "flex" utility classes, not by this rule */
@@ -433,6 +477,46 @@
         :focus-visible {
             outline: 2px solid var(--accent);
             outline-offset: 2px;
+        }
+
+        /* ── Phones: give every row room to breathe ──
+           name on its own line, tags + status underneath, ETA kept as a compact column */
+        @media (max-width: 520px) {
+            .header-bar { padding: 10px 10px !important; gap: 8px !important; }
+            .track-logo-circle { width: 40px; height: 40px; min-width: 40px; border-width: 1.5px; }
+            .track-logo-circle img { width: 34px; height: 34px; }
+            #routeTitle { font-size: 14px; letter-spacing: 0.01em; }
+            #lastUpdated { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .live-badge { padding: 3px 8px; font-size: 10px; gap: 4px; }
+            .live-dot { width: 6px; height: 6px; }
+
+            .stat-card { padding: 10px 8px; }
+            .stat-value { font-size: 14px; overflow-wrap: anywhere; }
+            #currentStopDisplay { font-size: 12.5px !important; }
+            .stat-label { font-size: 10px; letter-spacing: 0.05em; margin-bottom: 4px; }
+
+            .stop-row { padding: 0 10px 0 12px; }
+            .stop-rail { width: 26px; }
+            .stop-main { padding: 11px 0 11px 8px; }
+            .stop-name { font-size: 14.5px; flex: 1 1 100%; line-height: 1.25; }
+            .stop-head { gap: 4px 6px; }
+            .stop-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; flex: 1 1 100%; margin-top: 1px; }
+            .stop-chips .badge { margin-left: 0; font-size: 10.5px; padding: 2px 8px; }
+            .stop-chips .badge-src, .stop-chips .badge-dest, .stop-chips .badge-you { font-size: 10px; }
+            .stop-meta { gap: 10px; margin-top: 3px; font-size: 12px; flex-wrap: wrap; }
+
+            .eta-col { min-width: 52px; padding: 10px 0 10px 8px; }
+            .eta-min { font-size: 14px; }
+            .eta-min small { font-size: 10px; }
+            .eta-clock { font-size: 10.5px; margin-top: 2px; }
+
+            .eta-summary { padding: 10px 12px; gap: 8px; }
+            .eta-sum-label { font-size: 10px; letter-spacing: 0.04em; }
+            .eta-sum-value { font-size: 15px; }
+            .eta-sum-value small { display: block; margin: 1px 0 0; font-size: 11px; }
+            .eta-sum-note { padding: 0 12px 8px; font-size: 10.5px; }
+
+            .banner { font-size: 12.5px; }
         }
     </style>
 </head>
