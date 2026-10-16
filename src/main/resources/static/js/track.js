@@ -646,7 +646,7 @@ function renderTimeline() {
   if (notYetArrived) {
     bannerHtml += `
     <div class="banner banner-yellow">
-      <img src="/images/logo.png" alt="" style="width:20px; height:20px; vertical-align:middle;">
+      <img src="/images/bus.png" alt="" style="width:20px; height:20px; vertical-align:middle;">
       Bus is on its way — not yet reached your boarding stop
     </div>`;
   }
