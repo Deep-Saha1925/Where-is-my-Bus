@@ -179,6 +179,7 @@ async function loadRoute(src, dest) {
     if (rideId) await loadFullRoute();
     posDirty = true;
     lastProgressKm = null; lastLocated = null; // new route/stops -> forget old progress
+    speedSamples = []; speedKmh = null;
     renderTimeline();
   } catch (err) {
     console.error("Failed to load route:", err);
@@ -288,6 +289,19 @@ let lastProgressKm = null;
 let posDirty       = true;
 let wasStale       = false;
 
+/* ─── ETA TUNABLES ──────────────────────────────────────────────────
+   The ETA for a stop = driving time over the remaining distance at the bus's
+   recent real speed (falls back to a typical city-bus speed until enough GPS
+   history exists) + the scheduled halt at every stop in between.            */
+const DEFAULT_SPEED_KMH  = 30;
+const MIN_SPEED_KMH      = 12;    // never assume slower than this (a halt/traffic jam would blow up ETAs)
+const MAX_SPEED_KMH      = 55;
+const SPEED_WINDOW_MS    = 6 * 60 * 1000;
+const SPEED_MIN_SPAN_MS  = 60 * 1000;   // need at least this much history for a measured speed
+const SPEED_MIN_KM       = 0.15;
+let speedSamples = [];    // [{ ts, km }] newest last
+let speedKmh     = null;  // smoothed measured speed, null until measurable
+
 /* ─── TIMESTAMPS ─────────────────────────────────────────────────── */
 // The server now sends ISO instants ("...Z"). This also copes with older
 // shapes: a zone-less string or a [y,m,d,h,mi,s,nano] array is treated as UTC
@@ -334,6 +348,9 @@ setInterval(() => {
   const stale = (ageSeconds() || 0) > STALE_AFTER_SEC;
   if (stale !== wasStale) renderTimeline();
 }, 5000);
+
+// Between GPS fixes the "in N min" countdown still needs to tick down.
+setInterval(() => { if (busLocation && !document.hidden) renderTimeline(); }, 30000);
 
 /* ─── APPLY LOCATION (shared by the WebSocket push and the fallback poll) */
 function applyLocation(loc) {
@@ -460,13 +477,72 @@ function updateBusPos(displayStops) {
 }
 
 /* ─── ETA CALC ──────────────────────────────────────────────────── */
-function calcETA(stopDistKm, busDistKm) {
-  const diff = stopDistKm - busDistKm;
-  if (diff <= 0) return null;
-  const mins = Math.ceil((diff / 30) * 60);
-  if (mins <= 1)  return "Arriving";
-  if (mins < 60)  return `${mins} min`;
-  return `${Math.floor(mins/60)}h ${mins%60}m`;
+// Learns the bus's real speed from how fast its progress along the route is changing.
+function recordSpeedSample() {
+  if (!busPos || busPos.offRoute || busPos.noPosition || lastLocTs == null) return;
+  const last = speedSamples[speedSamples.length - 1];
+  if (last && last.ts === lastLocTs) return;           // same fix re-rendered
+  if (last && busPos.progressKm < last.km - JITTER_KM) speedSamples = [];   // route restarted / jumped back
+  speedSamples.push({ ts: lastLocTs, km: busPos.progressKm });
+  const cutoff = lastLocTs - SPEED_WINDOW_MS;
+  while (speedSamples.length > 2 && speedSamples[1].ts < cutoff) speedSamples.shift();
+
+  const a = speedSamples[0], b = speedSamples[speedSamples.length - 1];
+  const span = b.ts - a.ts, km = b.km - a.km;
+  if (span >= SPEED_MIN_SPAN_MS && km >= SPEED_MIN_KM) {
+    const measured = km / (span / 3600000);
+    speedKmh = speedKmh == null ? measured : speedKmh * 0.5 + measured * 0.5;
+  }
+}
+
+function currentSpeedKmh() {
+  const v = speedKmh == null ? DEFAULT_SPEED_KMH : speedKmh;
+  // Blend towards the default so one odd reading can't swing every ETA
+  const blended = speedKmh == null ? v : v * 0.7 + DEFAULT_SPEED_KMH * 0.3;
+  return Math.max(MIN_SPEED_KMH, Math.min(MAX_SPEED_KMH, blended));
+}
+
+// ETA for stop index `i`, or null when it is already behind the bus.
+// Returns { arriveMs, mins } -- arriveMs is fixed to the last GPS fix, so it only changes when the
+// bus actually reports a new position; mins counts down in real time between fixes.
+function etaForStop(stops, i, behindIdx) {
+  if (!busPos || busPos.offRoute || busPos.noPosition || lastLocTs == null) return null;
+  const diffKm = stops[i].distanceFromStartKm - busPos.progressKm;
+  if (diffKm <= 0 || i <= behindIdx) return null;
+  let haltMin = 0;
+  for (let j = behindIdx + 1; j < i; j++) haltMin += Math.max(0, stops[j].slackTimeMin || 0);
+  const travelMs = (diffKm / currentSpeedKmh()) * 3600000;
+  const arriveMs = lastLocTs + travelMs + haltMin * 60000;
+  return { arriveMs, mins: Math.max(0, Math.round((arriveMs - Date.now()) / 60000)) };
+}
+
+function formatClock(ms) {
+  try { return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+  catch (_) { return ""; }
+}
+
+function formatEtaMins(mins) {
+  if (mins < 60) return { num: String(mins), unit: "min" };
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return { num: m ? `${h}h ${m}` : `${h}h`, unit: m ? "m" : "" };
+}
+
+// The right-hand column for one stop row.
+function etaColumnHtml(eta, isNext, stale, hasHalt) {
+  if (!eta) return `<div class="eta-col"></div>`;
+  const cls = ["eta-col"];
+  if (stale) cls.push("eta-stale");
+  let top;
+  if (eta.mins <= 1) { top = `<span class="eta-min">Now</span>`; cls.push("eta-soon"); }
+  else {
+    const f = formatEtaMins(eta.mins);
+    top = `<span class="eta-min">${f.num}${f.unit ? `<small>${f.unit}</small>` : ""}</span>`;
+    if (isNext || eta.mins <= 5) cls.push(isNext ? "eta-next" : "eta-soon");
+  }
+  return `<div class="${cls.join(" ")}" title="Estimated arrival${stale ? " (based on last known position)" : ""}">
+            ${top}
+            <span class="eta-clock">${stale ? "~" : ""}${formatClock(eta.arriveMs)}</span>
+          </div>`;
 }
 
 /* ─── RENDER TIMELINE ───────────────────────────────────────────── */
@@ -511,7 +587,7 @@ function renderTimeline() {
     return;
   }
 
-  if (posDirty) { updateBusPos(displayStops); posDirty = false; }
+  if (posDirty) { updateBusPos(displayStops); posDirty = false; recordSpeedSample(); }
 
   const hasPos   = !!busPos && !busPos.noPosition;
   const atIdx    = hasPos ? busPos.atIdx : -1;
@@ -570,7 +646,7 @@ function renderTimeline() {
   if (notYetArrived) {
     bannerHtml += `
     <div class="banner banner-yellow">
-      <img src="/images/logo.png" alt="" style="width:20px; height:20px; vertical-align:middle;">
+      <img src="/images/bus.png" alt="" style="width:20px; height:20px; vertical-align:middle;">
       Bus is on its way — not yet reached your boarding stop
     </div>`;
   }
@@ -595,7 +671,7 @@ function renderTimeline() {
     const isPassengerSrc  = stop.stopName.trim().toUpperCase() === srcName;
     const isPassengerDest = stop.stopName.trim().toUpperCase() === destName;
 
-    const eta = hasPos ? calcETA(stop.distanceFromStartKm, progressKm) : null;
+    const eta = hasPos ? etaForStop(displayStops, i, passedThrough) : null;
 
     let badgeHtml = "";
     if (isPassed) {
@@ -603,11 +679,9 @@ function renderTimeline() {
     } else if (isCurrent) {
       badgeHtml = `<span class="badge badge-here">● Here</span>`;
     } else if (isNext) {
-      badgeHtml = `<span class="badge badge-arriving">Next${eta && eta !== "Arriving" ? " · " + eta : ""}</span>`;
-    } else if (eta === "Arriving") {
+      badgeHtml = `<span class="badge badge-arriving">Next</span>`;
+    } else if (eta && eta.mins <= 1) {
       badgeHtml = `<span class="badge badge-arriving">Arriving</span>`;
-    } else if (eta) {
-      badgeHtml = `<span class="badge badge-eta">${eta}</span>`;
     }
 
     let markerHtml = "";
@@ -658,10 +732,43 @@ function renderTimeline() {
           ${stop.slackTimeMin > 0 ? `<span>Halt ${stop.slackTimeMin} min</span>` : ""}
         </div>
       </div>
+
+      ${etaColumnHtml(eta, isNext || (isCurrent ? false : (hasPos && i === nextIdx)), wasStale)}
     </div>`;
   });
 
-  container.innerHTML = bannerHtml + stopsHtml;
+  // Summary: when the bus reaches the passenger's boarding stop and the end of the line
+  let summaryHtml = "";
+  if (hasPos && !(busPos && busPos.offRoute && busPos.noPosition)) {
+    const items = [];
+    const addItem = (label, idx) => {
+      if (idx < 0) return;
+      const e = etaForStop(displayStops, idx, passedThrough);
+      let val;
+      if (e) {
+        if (e.mins <= 1) val = `Now`;
+        else { const f = formatEtaMins(e.mins); val = `${f.num}${f.unit ? " " + f.unit : ""}`; }
+        val += `<small>${wasStale ? "~" : ""}${formatClock(e.arriveMs)}</small>`;
+      } else if (idx === atIdx) {
+        val = `Here<small>at the stop</small>`;
+      } else {
+        val = `Passed`;
+      }
+      items.push(`<div class="eta-sum-item"><div class="eta-sum-label">${label}</div><div class="eta-sum-value">${val}</div></div>`);
+    };
+    const lastIdx = displayStops.length - 1;
+    if (srcOnFull > 0 || (srcOnFull === 0 && lastIdx > 0)) addItem(`📍 ${escapeHtml(displayStops[srcOnFull].stopName.trim())}`, srcOnFull);
+    const destOnFull = displayStops.findIndex(s => s.stopName.trim().toUpperCase() === destName);
+    const destIdx = destOnFull >= 0 ? destOnFull : lastIdx;
+    if (destIdx !== srcOnFull) addItem(`🏁 ${escapeHtml(displayStops[destIdx].stopName.trim())}`, destIdx);
+    if (items.length) {
+      summaryHtml = `<div class="eta-summary">${items.join("")}</div>` +
+        `<div class="eta-sum-note">${wasStale ? "Based on the last known position · " : ""}` +
+        `Estimated from the bus's recent speed and scheduled halts</div>`;
+    }
+  }
+
+  container.innerHTML = bannerHtml + summaryHtml + stopsHtml;
   hasEnteredOnce = true;
   centerOnBusOnce();
 }
