@@ -265,30 +265,7 @@
         </button>
     </div>
 
-    <!-- STEP 2a: Active ride found -->
-    <div id="resumeSection" class="hidden">
-        <div class="panel-amber mb-4">
-            <p class="eyebrow" style="font-size:13.5px; color:var(--text-primary); margin:0 0 12px;">🚌 Active ride found for this bus</p>
-            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-                <div class="info-row">
-                    <span class="label">Route</span>
-                    <span class="value" id="savedRouteKey"></span>
-                </div>
-                <div class="info-row">
-                    <span class="label">Ride ID</span>
-                    <span class="value" id="savedRideId"></span>
-                </div>
-            </div>
-            <button onclick="resumeRide()" class="brand-btn btn-amber mb-2">
-                ↩ Resume This Ride
-            </button>
-            <button onclick="showNewRideForm()" class="brand-btn btn-ghost">
-                ＋ Start New Ride Instead
-            </button>
-        </div>
-    </div>
-
-    <!-- STEP 2b: New ride form -->
+    <!-- STEP 2: New ride form (an already-running ride for the bus skips this and opens the active ride screen) -->
     <div id="newRideSection" class="hidden">
         <label class="brand-label">Route</label>
         <select
