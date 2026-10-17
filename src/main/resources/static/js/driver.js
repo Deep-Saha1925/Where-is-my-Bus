@@ -32,11 +32,14 @@ let locationMode   = "live";  // "live" | "sim"
 let simOverride    = null;    // {latitude, longitude} while simulating; real GPS is ignored then
 let simStops       = [];      // ordered stops of the active ride's route
 let activeRouteCode = null;   // routeCode of the ride currently running
+let activeSource      = null; // the running ride's own start stop (what the driver picked as "from")
+let activeDestination = null; // ...and end stop; the ride's direction is source -> destination, whatever order the route sheet lists the stops in
+let activeRideKey     = null; // "SRC_DEST" of a resumed ride, used to work out the two ends if the names weren't supplied
 
 /* ------------------ SCREEN SECTIONS ------------------ */
 // Exactly one step of the flow is visible at a time. Every transition goes
 // through here so two panels can never show together.
-const SECTION_IDS = ["loadingSection", "busNumberSection", "resumeSection", "newRideSection", "activeRideSection"];
+const SECTION_IDS = ["loadingSection", "busNumberSection", "newRideSection", "activeRideSection"];
 function showSection(name) {
   SECTION_IDS.forEach(id => {
     const el = document.getElementById(id);
@@ -383,6 +386,9 @@ async function startRide() {
 
     // Remember the ride so a page refresh / tab kill doesn't silently end tracking
     activeRouteCode = selectedRouteCode;
+    activeSource = source;
+    activeDestination = destination;
+    activeRideKey = null;
 
     startRideTracking();
 
@@ -478,6 +484,7 @@ function stopRideTracking() {
   simOverride = null;
   simStops = [];
   activeRouteCode = null;
+  activeSource = activeDestination = activeRideKey = null;
   const simSel = document.getElementById("simStop");
   if (simSel) simSel.innerHTML = `<option value="" disabled selected>Loading stops...</option>`;
   setLocationMode("live");
@@ -580,21 +587,67 @@ function setLocationMode(mode) {
   }
 }
 
+// The route sheet may list a route's stops in the opposite direction to the one the driver is
+// running (sheet says B -> A, driver starts A -> B). The simulator, the "Next stop" button and the
+// current-stop card must follow the RIDE's direction, so the stops are always taken as the slice
+// from the ride's source to its destination, in that order.
+function orientStops(stops, source, destination) {
+  const norm = s => (s || "").trim().toUpperCase();
+  const a = stops.findIndex(s => norm(s.stopName) === norm(source));
+  const b = stops.findIndex(s => norm(s.stopName) === norm(destination));
+  if (a < 0 || b < 0 || a === b) return null;
+  return a < b ? stops.slice(a, b + 1) : stops.slice(b, a + 1).reverse();
+}
+
 async function loadSimStops() {
   const select = document.getElementById("simStop");
   if (!simStops.length) {
-    // Right after starting a ride the stops are already loaded for the selected route
-    if (routeStopsCache.length && (!activeRouteCode || activeRouteCode === selectedRouteCode)) {
-      simStops = routeStopsCache;
-    } else if (activeRouteCode) {
+    let src = activeSource, dst = activeDestination;
+
+    // A resumed ride may only know its "SRC_DEST" key (stop names can contain "_"): let the server split it
+    if ((!src || !dst) && activeRideKey) {
       try {
-        const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(activeRouteCode)}`);
-        const stops = await safeJson(res);
-        if (res.ok && Array.isArray(stops)) simStops = stops;
+        const codeParam = activeRouteCode ? `&routeCode=${encodeURIComponent(activeRouteCode)}` : "";
+        const res = await fetch(`/api/routes/split?routeKey=${encodeURIComponent(activeRideKey)}${codeParam}`);
+        const d = await safeJson(res);
+        if (res.ok && d && d.source && d.destination) { src = d.source; dst = d.destination; }
       } catch (err) {
-        console.error("Could not load route stops:", err);
+        console.error("Could not split ride route key:", err);
       }
     }
+
+    let stops = null;
+
+    // 1) The server's own source -> destination slice (already in the ride's direction)
+    if (src && dst) {
+      try {
+        const codeParam = activeRouteCode ? `&routeCode=${encodeURIComponent(activeRouteCode)}` : "";
+        const res = await fetch(`/api/routes?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dst)}${codeParam}`);
+        const slice = await safeJson(res);
+        if (res.ok && Array.isArray(slice) && slice.length > 1) stops = slice;
+      } catch (err) {
+        console.error("Could not load the ride's stops:", err);
+      }
+    }
+
+    // 2) Fallback: take the whole route and orient it here
+    if (!stops) {
+      let full = [];
+      if (routeStopsCache.length && (!activeRouteCode || activeRouteCode === selectedRouteCode)) {
+        full = routeStopsCache;
+      } else if (activeRouteCode) {
+        try {
+          const res = await fetch(`/api/routes/stops?routeCode=${encodeURIComponent(activeRouteCode)}`);
+          const all = await safeJson(res);
+          if (res.ok && Array.isArray(all)) full = all;
+        } catch (err) {
+          console.error("Could not load route stops:", err);
+        }
+      }
+      stops = (src && dst && orientStops(full, src, dst)) || full;
+    }
+
+    if (stops && stops.length) simStops = stops;
   }
 
   if (select && select.options.length <= 1) {
@@ -854,14 +907,16 @@ async function checkBus() {
     document.getElementById("status").innerText = "";
 
     if (existing) {
-      document.getElementById("savedRouteKey").innerText = routeLabel(existing);
-      document.getElementById("savedRideId").innerText = existing.rideId;
+      // A bus runs one route, so there is nothing to choose: go straight back into its running ride.
       document.getElementById("activeBusNumber").innerText = busNumber;
 
       rideId = existing.rideId;
       activeRouteCode = existing.routeCode || null;
+      activeSource = existing.sourceName || null;
+      activeDestination = existing.destinationName || null;
+      activeRideKey = existing.routeKey || null;
 
-      showSection("resumeSection");
+      resumeRide(routeLabel(existing));
     } else {
       showNewRideForm();
     }
@@ -879,9 +934,8 @@ function routeLabel(ride) {
 }
 
 /* ------------------ RESUME RIDE ------------------ */
-function resumeRide() {
+function resumeRide(routeKey) {
   // rideId already set in checkBus()
-  const routeKey = document.getElementById("savedRouteKey").innerText;
 
   showSection("activeRideSection");
   document.getElementById("activeRouteKey").innerText = routeKey;
