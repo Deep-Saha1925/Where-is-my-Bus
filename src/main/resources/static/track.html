@@ -148,7 +148,8 @@
             display: grid; grid-template-columns: 78px 1fr 78px; align-items: center;
             padding: 11px 12px; font-size: 15px; font-weight: 600;
         }
-        .col-head span:nth-child(2) { text-align: center; font-size: 14.5px; }
+        .col-head span { white-space: nowrap; }
+        .col-head span:nth-child(2) { text-align: center; font-size: 13.5px; font-weight: 500; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
         .col-head span:last-child { text-align: right; }
 
         /* ── Panels shown under the chips ── */
@@ -295,7 +296,8 @@
         }
 
         @media (max-width: 400px) {
-            .col-head, .srow { grid-template-columns: 66px 26px 1fr 66px; }
+            .col-head { grid-template-columns: 66px 1fr 66px; padding: 10px 12px; font-size: 14.5px; }
+            .srow { grid-template-columns: 66px 26px 1fr 66px; }
             .t-main { font-size: 14.5px; }
             .t-sub  { font-size: 11.5px; }
             .sname  { font-size: 16px; }
@@ -377,56 +379,56 @@
 
 <!-- ── BOTTOM STATUS SHEET ── -->
 <div class="sheet" id="sheet">
-  <div class="sheet-inner">
-    <button type="button" class="sheet-handle" onclick="toggleSheet()" aria-label="Show or hide trip details"><span></span></button>
-    <div class="sheet-head">
-        <div class="sheet-status" onclick="toggleSheet()">
-            <div class="status-title tone-gray" id="statusTitle">Waiting for bus location…</div>
-            <div class="status-sub" id="lastUpdated">Fetching location...</div>
+    <div class="sheet-inner">
+        <button type="button" class="sheet-handle" onclick="toggleSheet()" aria-label="Show or hide trip details"><span></span></button>
+        <div class="sheet-head">
+            <div class="sheet-status" onclick="toggleSheet()">
+                <div class="status-title tone-gray" id="statusTitle">Waiting for bus location…</div>
+                <div class="status-sub" id="lastUpdated">Fetching location...</div>
+            </div>
+            <button type="button" class="fab" id="reloadBtn" onclick="manualReload()" aria-label="Refresh bus location" title="Refresh">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+                    <polyline points="21 3 21 9 15 9"/>
+                </svg>
+            </button>
         </div>
-        <button type="button" class="fab" id="reloadBtn" onclick="manualReload()" aria-label="Refresh bus location" title="Refresh">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-                <polyline points="21 3 21 9 15 9"/>
-            </svg>
-        </button>
-    </div>
 
-    <div class="sheet-body hidden" id="sheetBody">
-        <div class="trip-card">
-            <div class="trip-top">
-                <div class="trip-ends"><span id="progressStart">—</span><span id="progressEnd">—</span></div>
-                <div class="trip-bar">
-                    <span class="trip-dot"></span>
-                    <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
-                    <span class="trip-dot end"></span>
+        <div class="sheet-body hidden" id="sheetBody">
+            <div class="trip-card">
+                <div class="trip-top">
+                    <div class="trip-ends"><span id="progressStart">—</span><span id="progressEnd">—</span></div>
+                    <div class="trip-bar">
+                        <span class="trip-dot"></span>
+                        <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
+                        <span class="trip-dot end"></span>
+                    </div>
+                    <div class="trip-meta">
+                        <span>Now <b id="currentStopDisplay">—</b></span>
+                        <span><b id="progressPct">0%</b> done</span>
+                        <span>Left <b id="remainingDisplay">—</b></span>
+                    </div>
                 </div>
-                <div class="trip-meta">
-                    <span>Now <b id="currentStopDisplay">—</b></span>
-                    <span><b id="progressPct">0%</b> done</span>
-                    <span>Left <b id="remainingDisplay">—</b></span>
+                <div class="trip-grid">
+                    <div class="trip-cell">
+                        <div class="cell-label">Next Stop</div>
+                        <div class="cell-name" id="nextStopName">—</div>
+                        <div class="cell-sub" id="nextStopSub">—</div>
+                    </div>
+                    <div class="trip-cell">
+                        <div class="cell-label">Crossed</div>
+                        <div class="cell-name" id="crossedName">—</div>
+                        <div class="cell-sub" id="crossedSub">—</div>
+                    </div>
                 </div>
+                <div class="status-banner tone-gray" id="statusBanner">Waiting for bus location</div>
             </div>
-            <div class="trip-grid">
-                <div class="trip-cell">
-                    <div class="cell-label">Next Stop</div>
-                    <div class="cell-name" id="nextStopName">—</div>
-                    <div class="cell-sub" id="nextStopSub">—</div>
-                </div>
-                <div class="trip-cell">
-                    <div class="cell-label">Crossed</div>
-                    <div class="cell-name" id="crossedName">—</div>
-                    <div class="cell-sub" id="crossedSub">—</div>
-                </div>
+            <div class="sheet-actions">
+                <button type="button" class="act" onclick="toggleMyLocPanel(true)">📍 My location</button>
+                <button type="button" class="act" onclick="shareBus()">🔗 Share</button>
             </div>
-            <div class="status-banner tone-gray" id="statusBanner">Waiting for bus location</div>
-        </div>
-        <div class="sheet-actions">
-            <button type="button" class="act" onclick="toggleMyLocPanel(true)">📍 My location</button>
-            <button type="button" class="act" onclick="shareBus()">🔗 Share</button>
         </div>
     </div>
-  </div>
 </div>
 
 <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
