@@ -11,334 +11,487 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Track Bus | WIMB</title>
     <link rel="icon" type="image/jpeg" href="data:image/jpeg;base64,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">
-    <meta name="theme-color" content="#22344a">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ── Theme tokens: dark by default (like a train-tracker), light via the ⋮ menu ── */
         :root {
-            --bg-page:     #101216;
-            --bg-top:      #22344a;
-            --bg-colhead:  #000000;
-            --bg-card:     #1b1f26;
-            --bg-sheet:    #22344a;
-            --bg-sheet-in: #1b1f26;
-            --border:      #2a303a;
-            --border-stop: #1b1f26;
-            --text-primary:#f2f5f8;
-            --text-muted:  #9aa6b4;
-            --text-faint:  #667180;
-            --rail:        #0b4d6b;
-            --rail-done:   #2a9fd8;
-            --dot:         #6cb8ff;
-            --dot-done:    #bfe3ff;
-            --line-done:   #2a9fd8;
-            --accent:      #5fb8ff;
-            --accent-soft: rgba(95,184,255,0.14);
-            --ok:          #3ddc84;
-            --warn:        #f5a524;
-            --bad:         #ff5a5f;
-            --chip-bg:     rgba(255,255,255,0.08);
-            --chip-bd:     rgba(255,255,255,0.10);
-            --on-top:      #f2f5f8;
-            --fab-bg:      #b9d6ff;
-            --fab-fg:      #12355f;
-            --shadow:      0 -8px 28px rgba(0,0,0,0.45);
-            --act-bg:      rgba(255,255,255,0.09);
-        }
-        body.light-mode {
-            --act-bg:      rgba(17,26,36,0.07);
-            --bg-page:     #f2f5f8;
-            --bg-colhead:  #dfe6ee;
+            --bg-page:     #eef1ec;
             --bg-card:     #ffffff;
-            --bg-sheet:    #ffffff;
-            --bg-sheet-in: #f1f5f9;
-            --border:      #dbe2ea;
-            --border-stop: #eef2f6;
-            --text-primary:#111a24;
-            --text-muted:  #566474;
-            --text-faint:  #8995a3;
-            --rail:        #bcdcee;
-            --rail-done:   #1f8fc4;
-            --dot:         #1f8fc4;
-            --dot-done:    #0f6b99;
-            --line-done:   #1f8fc4;
-            --accent:      #0d6fb8;
-            --accent-soft: rgba(13,111,184,0.10);
-            --ok:          #138a49;
-            --warn:        #b26a00;
-            --bad:         #d92d33;
-            --fab-bg:      #cfe3ff;
-            --shadow:      0 -8px 28px rgba(20,40,70,0.18);
+            --bg-header:   #0f1f18;
+            --border:      #dbe2da;
+            --border-stop: #eef1ec;
+            --text-primary:#16261f;
+            --text-muted:  #5c6b62;
+            --text-faint:  #8a978d;
+            --line-done:   #1f6f5c;
+            --line-empty:  #dde3d8;
+            --dot-future:  #dde3d8;
+            --dot-border:  #b8c3b7;
+            --accent:      #e2892f;
+            --accent-soft: rgba(226,137,47,0.15);
+            --shadow:      0 1px 3px rgba(22,38,31,0.07), 0 10px 26px -18px rgba(22,38,31,0.35);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { margin: 0; }
+        .dark-mode {
+            --bg-page:     #0b1410;
+            --bg-card:     #121e18;
+            --bg-header:   #0a1712;
+            --border:      #223129;
+            --border-stop: #121e18;
+            --text-primary:#eef3ee;
+            --text-muted:  #93a599;
+            --text-faint:  #647a6c;
+            --line-done:   #45b294;
+            --line-empty:  #223129;
+            --dot-future:  #223129;
+            --dot-border:  #34493d;
+            --accent:      #f0a24a;
+            --accent-soft: rgba(240,162,74,0.18);
+            --shadow:      0 1px 3px rgba(0,0,0,0.4), 0 12px 28px -18px rgba(0,0,0,0.65);
+        }
+
+        * { box-sizing: border-box; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
         body {
             background: var(--bg-page);
             color: var(--text-primary);
-            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            transition: background-color 0.25s, color 0.25s;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
         }
-        button { font-family: inherit; }
-        .hidden { display: none !important; }
-        .wrap { max-width: 600px; margin: 0 auto; }
 
-        /* ── Sticky top: header + chips + column heads ── */
-        .top-sticky { position: sticky; top: 0; z-index: 30; }
-        .app-header {
-            background: var(--bg-top); color: var(--on-top);
-            display: flex; align-items: center; gap: 6px;
-            padding: 12px 10px 8px 6px;
+        .num, .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+        .eyebrow {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
         }
-        .icon-btn {
-            width: 40px; height: 40px; flex-shrink: 0;
-            border: 0; background: transparent; color: var(--on-top);
-            border-radius: 50%; font-size: 22px; line-height: 1; cursor: pointer;
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        /* ── Header / destination-board ── */
+        .header-bar {
+            background:
+                    radial-gradient(120% 220% at 0% 0%, rgba(31,111,92,0.35), transparent 60%),
+                    linear-gradient(155deg, #142a20, var(--bg-header) 70%);
+            border-bottom: 1px solid #06120c;
+            position: sticky; top: 0; z-index: 20;
+        }
+        .header-bar::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px);
+            opacity: .5;
+        }
+        .back-btn {
+            color: rgba(255,255,255,0.72);
+            font-size: 20px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 32px; height: 32px;
+            border-radius: 9px;
+            cursor: pointer;
             display: flex; align-items: center; justify-content: center;
+            line-height: 1;
+            flex-shrink: 0;
         }
-        .icon-btn:active { background: rgba(255,255,255,0.12); }
-        .title-wrap { flex: 1; min-width: 0; }
+        .back-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
+
+        /* ── Track page logo ── */
+        .track-logo-circle {
+            width: 68px;
+            height: 68px;
+            min-width: 68px;
+            border-radius: 50%;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.14);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+        .track-logo-circle img {
+            width: 58px;
+            height: 58px;
+            object-fit: contain;
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .track-logo-circle {
+                width: 60px;
+                height: 60px;
+                min-width: 60px;
+            }
+            .track-logo-circle img {
+                width: 51px;
+                height: 51px;
+            }
+        }
+
         #routeTitle {
-            font-size: 18px; font-weight: 600; letter-spacing: 0.005em;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 0.03em;
+            color: #ffc069;
+            text-shadow: 0 0 10px rgba(255,180,84,0.45), 0 0 1px rgba(255,180,84,0.6);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .live-pill {
-            display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-            font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
-            color: #3ddc84; border: 1px solid rgba(61,220,132,0.4);
-            background: rgba(61,220,132,0.12); border-radius: 999px; padding: 3px 8px;
+        #lastUpdated {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 11px;
+            color: rgba(191,214,201,0.55);
+            margin-top: 3px;
+            letter-spacing: 0.02em;
         }
-        .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; animation: livePulse 1.4s ease-in-out infinite; }
-        @keyframes livePulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
 
-        .menu-wrap { position: relative; }
-        .menu {
-            position: absolute; right: 0; top: 44px; min-width: 200px;
-            background: var(--bg-card); color: var(--text-primary);
-            border: 1px solid var(--border); border-radius: 12px;
-            box-shadow: 0 14px 34px rgba(0,0,0,0.45); padding: 6px; z-index: 50;
+        /* ── Progress bar ── */
+        .progress-track {
+            height: 8px;
+            background: var(--line-empty);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 14px;
+            position: relative;
         }
-        .menu button {
-            display: block; width: 100%; text-align: left; border: 0; background: transparent;
-            color: inherit; font-size: 14.5px; padding: 11px 12px; border-radius: 8px; cursor: pointer;
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--line-done), var(--accent));
+            border-radius: 5px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
-        .menu button:active, .menu button:hover { background: var(--accent-soft); }
-
-        .chip-row {
-            background: var(--bg-top);
-            display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
-            padding: 6px 12px 12px;
+        .progress-fill::after {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0 6px, transparent 6px 14px);
+            opacity: 0.45;
         }
-        .chip-row::-webkit-scrollbar { display: none; }
-        .chip {
-            flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px;
-            border: 1px solid var(--chip-bd); background: var(--chip-bg); color: var(--on-top);
-            border-radius: 999px; padding: 9px 16px; font-size: 14.5px; font-weight: 500;
-            cursor: pointer; white-space: nowrap;
+
+        /* ── Timeline line segments (road) ── */
+        .line-seg {
+            width: 3px;
+            flex: 1;
+            border-radius: 2px;
+            min-height: 22px;
+            transition: background-color 0.5s ease, opacity 0.5s ease;
         }
-        .chip:active { transform: scale(0.97); }
-        .chip.on { background: rgba(95,184,255,0.25); border-color: rgba(95,184,255,0.7); }
-        .chip-static { cursor: default; }
-
-        .col-head {
-            background: var(--bg-colhead); color: var(--text-primary);
-            display: grid; grid-template-columns: 78px 1fr 78px; align-items: center;
-            padding: 11px 12px; font-size: 15px; font-weight: 600;
+        .line-done  {
+            background-color: var(--line-done);
+            background-image: repeating-linear-gradient(to bottom, rgba(255,255,255,0.5) 0 5px, transparent 5px 11px);
         }
-        .col-head span { white-space: nowrap; }
-        .col-head span:nth-child(2) { text-align: center; font-size: 13.5px; font-weight: 500; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
-        .col-head span:last-child { text-align: right; }
+        .line-empty { background: var(--line-empty); opacity: 0.7; }
 
-        /* ── Panels shown under the chips ── */
-        .panel { margin: 12px 12px 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; }
-
-        /* ── Notices ── */
-        .banner {
-            display: flex; align-items: center; gap: 10px; margin: 10px 12px 0;
-            padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4;
+        /* ── Dots (stop / mile markers) ── */
+        .dot {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--dot-border);
+            background: var(--dot-future);
+            flex-shrink: 0;
+            transition: all 0.4s ease;
         }
-        .banner-yellow { background: rgba(245,165,36,0.14); color: var(--warn); border: 1px solid rgba(245,165,36,0.35); }
-
-        /* ── ETA summary (your stop / destination) ── */
-        .eta-summary { display: flex; gap: 10px; margin: 10px 12px 0; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; }
-        .eta-sum-item { flex: 1; min-width: 0; }
-        .eta-sum-label { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .eta-sum-value { font-size: 17px; font-weight: 700; margin-top: 3px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-        .eta-sum-value small { display: block; margin-top: 1px; font-size: 12px; font-weight: 500; color: var(--accent); }
-        .eta-sum-note { padding: 6px 16px 0; font-size: 11px; color: var(--text-faint); }
-
-        /* ── Timeline ── */
-        .list-wrap { padding-bottom: 12px; }
-        .srow {
-            display: grid; grid-template-columns: 78px 28px 1fr 78px;
-            padding: 0 12px; min-height: 76px; position: relative;
+        .dot-done {
+            background: var(--line-done);
+            border-color: var(--line-done);
         }
-        .row-enter { animation: fadeSlideIn .4s ease both; }
-        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        .tcol { padding-top: 15px; line-height: 1.25; }
-        .tcol.dep { text-align: right; }
-        .t-main { font-size: 15.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
-        .t-sub  { font-size: 12.5px; margin-top: 3px; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .t-main.t-done { color: var(--ok); }
-        .t-sub.t-done { color: var(--text-muted); }
-        .t-main.t-none { color: var(--text-faint); }
-        .t-main.t-here, .t-sub.t-here { color: var(--ok); font-weight: 600; }
-        .t-main.t-stale, .t-sub.t-stale { opacity: .55; }
-        .t-sub.t-soon { color: var(--ok); font-weight: 600; }
-        .t-sub.t-halt { color: var(--text-muted); }
-
-        .rail { position: relative; }
-        .rail .seg { position: absolute; left: 50%; transform: translateX(-50%); width: 12px; background: var(--rail); }
-        .rail .seg.up   { top: 0; height: 27px; }
-        .rail .seg.down { top: 27px; bottom: 0; }
-        .rail .seg.done { background: var(--rail-done); }
-        .rail .seg.none { visibility: hidden; }
-        .rail .dot {
-            position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-            width: 18px; height: 18px; border-radius: 50%;
-            background: var(--dot); border: 3px solid var(--bg-page); z-index: 2;
+        .dot-current {
+            width: 18px; height: 18px;
+            background: var(--bg-card);
+            border: 2.5px solid var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-soft);
+            animation: ringPulse 2s ease-in-out infinite;
         }
-        .rail .dot.end  { width: 22px; height: 22px; top: 16px; border-width: 4px; }
-        .rail .dot.done { background: var(--dot-done); }
-        .rail .dot.cur  { background: var(--ok); box-shadow: 0 0 0 5px rgba(61,220,132,0.28); }
+        .dot-endpoint {
+            border-radius: 4px;
+        }
 
+        /* ── Bus icon ── */
+        /* The bus marker: the app logo on a black circle (same look as the logo in the header),
+           centred on the road line / stop dot. Bigger than before so it is easy to spot. */
         .bus-icon {
-            position: absolute; left: 50%; transform: translateX(-50%); z-index: 6;
-            width: 34px; height: 34px; border-radius: 50%; background: #fff;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 46px;
+            height: 46px;
+            margin: -23px 0 0 -23px;          /* centres it on the line without using transform (the float animation uses it) */
+            border-radius: 50%;
+            background: #000;
+            border: 2px solid #fff;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.45), 0 0 0 4px rgba(226,137,47,0.30);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            z-index: 4;
+            animation: busFloat 1s ease-in-out infinite alternate,
+                       busPulse 2s ease-in-out infinite;
+        }
+        .bus-icon img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            display: block;
+        }
+        .dark-mode .bus-icon {
+            box-shadow: 0 3px 12px rgba(0,0,0,0.7), 0 0 0 4px rgba(240,162,74,0.40);
+        }
+
+        /* ── Stop rows ── */
+        .stop-row {
+            display: flex;
+            align-items: stretch;
+            padding: 0 18px;
+            border-bottom: 1px solid var(--border-stop);
+            transition: background-color 0.3s, opacity 0.3s;
+        }
+        .stop-row:last-child { border-bottom: none; }
+        .stop-row.row-current { background: var(--accent-soft); }
+        .stop-row.row-passed { opacity: 0.58; }
+        /* Entrance animation — applied only on the very first render.
+           Kept off the base .stop-row rule so the 3s live-refresh
+           doesn't replay a slide-in on every row each tick. */
+        .stop-row.row-enter {
+            animation: fadeSlideIn 0.4s ease both;
+        }
+
+        /* ── Badges ── */
+        .badge {
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-left: auto;
+            white-space: nowrap;
+            transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
+        }
+        .badge-passed  { background: rgba(120,132,124,0.14); color: var(--text-faint); }
+        .badge-here    { background: var(--accent-soft); color: var(--accent); animation: badgePulse 2s ease-in-out infinite; font-weight: 700; }
+        .badge-arriving{ background: rgba(240,162,74,0.16); color: #b5651d; }
+        .dark-mode .badge-arriving { color: #f6b96a; }
+        .badge-eta     { background: rgba(120,132,124,0.12); color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+        .badge-src     { background: rgba(31,111,92,0.14); color: var(--line-done); font-size: 10.5px; font-family: 'Oswald', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+        .badge-you     { background: rgba(99,102,241,0.14); color: #4f46e5; font-size: 10.5px; font-family: 'Oswald', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+        .dark-mode .badge-you  { color: #a5b4fc; }
+        .badge-dest    { background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-family: 'Oswald', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+        .dark-mode .badge-src  { color: #6fd6b4; }
+
+        /* ── Live badge (sits on the dark header board) ──
+           display is controlled by track.js toggling Tailwind's
+           "hidden" / "flex" utility classes, not by this rule */
+        .live-badge {
+            align-items: center;
+            gap: 5px;
+            background: rgba(69,178,148,0.18);
+            color: #6fe3bf;
+            font-size: 11.5px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 5px 11px;
+            border-radius: 20px;
+            border: 1px solid rgba(111,227,191,0.25);
+        }
+        .live-dot {
+            width: 7px; height: 7px;
+            background: #4fe3ba;
+            border-radius: 50%;
+            animation: livePulse 1.4s ease-in-out infinite;
+            box-shadow: 0 0 6px rgba(79,227,186,0.8);
+        }
+
+        /* ── Theme toggle (fixed for dark header) ── */
+        .theme-btn {
+            width: 32px; height: 32px;
+            border-radius: 9px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.06);
+            cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.45); border: 2px solid var(--ok);
-            animation: busFloat 2.2s ease-in-out infinite;
+            font-size: 15px;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
-        .bus-icon img { width: 22px; height: 22px; object-fit: contain; }
-        .bus-icon.at   { top: 9px; }
-        .bus-icon.btw  { bottom: -17px; }
-        @keyframes busFloat { 0%,100% { margin-top: 0; } 50% { margin-top: -3px; } }
+        .theme-btn:hover  { background: rgba(255,255,255,0.12); transform: scale(1.06); }
+        .theme-btn:active { transform: scale(0.95); }
 
-        .scol { padding: 14px 0 14px 12px; min-width: 0; }
-        .sname { font-size: 17px; font-weight: 500; line-height: 22px; overflow-wrap: anywhere; color: var(--text-primary); }
-        .smeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 4px; font-size: 13.5px; color: var(--text-muted); }
-        .srow.passed .sname { color: var(--text-faint); }
-        .srow.passed .smeta { color: var(--text-faint); }
-        .srow.current .sname { color: var(--ok); font-weight: 600; }
-
-        .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 2px 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); white-space: nowrap; }
-        .badge-here    { color: var(--ok);  border-color: rgba(61,220,132,.55); background: rgba(61,220,132,.12); }
-        .badge-arriving{ color: var(--accent); border-color: rgba(95,184,255,.55); background: var(--accent-soft); }
-        .badge-src     { color: var(--accent); border-color: rgba(95,184,255,.55); }
-        .badge-dest    { color: var(--warn); border-color: rgba(245,165,36,.55); }
-        .badge-you     { color: #d9a8ff; border-color: rgba(217,168,255,.55); }
-
-        /* ── Bottom status sheet ── */
-        .sheet {
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-            background: var(--bg-sheet); box-shadow: var(--shadow);
-            border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px);
+        /* ── Stat cards ── */
+        .stat-card {
+            background: var(--bg-page);
+            border-radius: 10px;
+            padding: 12px 14px;
+            flex: 1;
         }
-        .sheet-inner { max-width: 600px; margin: 0 auto; }
-        .sheet-handle { display: flex; justify-content: center; width: 100%; padding: 10px 0 4px; border: 0; background: transparent; cursor: pointer; }
-        .sheet-handle span { width: 54px; height: 5px; border-radius: 3px; background: var(--text-faint); opacity: .7; }
-        .sheet-head { display: flex; align-items: center; gap: 12px; padding: 4px 16px 14px; }
-        .sheet-status { flex: 1; min-width: 0; cursor: pointer; }
-        .status-title { font-size: 19px; font-weight: 600; line-height: 1.25; color: var(--ok); overflow-wrap: anywhere; }
-        .status-title.tone-amber { color: var(--warn); }
-        .status-title.tone-gray  { color: var(--text-muted); }
-        .status-sub { font-size: 14px; margin-top: 3px; color: var(--text-muted); }
-        .fab {
-            width: 58px; height: 58px; flex-shrink: 0; border: 0; border-radius: 50%;
-            background: var(--fab-bg); color: var(--fab-fg); cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.35); transition: transform .15s, opacity .2s;
+        .stat-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 10.5px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-faint);
+            margin-bottom: 5px;
         }
-        .fab:active { transform: scale(0.94); }
-        .fab:disabled { cursor: default; opacity: .75; }
-        .fab.spinning svg { animation: reloadSpin .8s linear infinite; }
-        @keyframes reloadSpin { to { transform: rotate(360deg); } }
-
-        .sheet-body { padding: 0 14px 14px; max-height: 58vh; overflow-y: auto; }
-        .trip-card { background: var(--bg-sheet-in); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
-        .trip-top { padding: 16px 16px 14px; }
-        .trip-ends { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; font-weight: 500; }
-        .trip-ends span { min-width: 0; overflow-wrap: anywhere; }
-        .trip-ends span:last-child { text-align: right; }
-        .trip-bar { display: flex; align-items: center; gap: 0; margin-top: 12px; }
-        .trip-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
-        .trip-dot.end { background: var(--bg-sheet-in); border: 3px solid var(--ok); width: 16px; height: 16px; }
-        .progress-track { flex: 1; height: 4px; border-radius: 2px; background: var(--rail); overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--ok); border-radius: 2px; transition: width .6s ease; width: 0; }
-        .trip-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12.5px; color: var(--text-muted); }
-        .trip-meta b { color: var(--text-primary); font-weight: 600; }
-        .trip-grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
-        .trip-cell { text-align: center; padding: 14px 8px 15px; min-width: 0; }
-        .trip-cell + .trip-cell { border-left: 1px solid var(--border); }
-        .cell-label { font-size: 15px; font-weight: 500; color: var(--text-primary); }
-        .cell-name  { font-size: 15.5px; margin-top: 8px; overflow-wrap: anywhere; color: var(--text-primary); }
-        .cell-sub   { font-size: 14.5px; margin-top: 8px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-        .status-banner { text-align: center; font-size: 16px; font-weight: 500; padding: 14px 12px; color: #fff; background: #1b8a4b; }
-        .status-banner.tone-amber { background: #b8740c; }
-        .status-banner.tone-gray  { background: #4a5563; }
-        .status-banner.tone-blue  { background: #1f6fb8; }
-
-        .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
-        .act {
-            display: flex; align-items: center; justify-content: center; gap: 9px;
-            border: 0; border-radius: 999px; padding: 15px 10px; font-size: 16px; font-weight: 500; cursor: pointer;
-            background: var(--act-bg); color: var(--text-primary);
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
         }
-        .act:active { transform: scale(0.98); }
+        #currentStopDisplay { font-family: 'Inter', sans-serif; font-weight: 700; }
 
-        .toast {
-            position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 60;
-            max-width: min(92vw, 460px); background: #111; color: #fff; border: 1px solid #333;
-            padding: 11px 16px; border-radius: 12px; font-size: 14px; line-height: 1.35; text-align: center;
-            box-shadow: 0 10px 28px rgba(0,0,0,0.5);
+        /* ── Section label ── */
+        .section-label {
+            padding: 13px 18px 10px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'Oswald', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.09em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-label::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 1px;
+            background: var(--accent);
+            display: inline-block;
         }
 
-        @media (max-width: 400px) {
-            .col-head { grid-template-columns: 66px 1fr 66px; padding: 10px 12px; font-size: 14.5px; }
-            .srow { grid-template-columns: 66px 26px 1fr 66px; }
-            .t-main { font-size: 14.5px; }
-            .t-sub  { font-size: 11.5px; }
-            .sname  { font-size: 16px; }
-            .chip   { padding: 8px 13px; font-size: 14px; }
-            #routeTitle { font-size: 16.5px; }
-            .status-title { font-size: 17.5px; }
+        /* ── Banner ── */
+        .banner {
+            padding: 12px 16px;
+            border-bottom: 1px solid;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .banner-yellow {
+            background: rgba(226,137,47,0.09);
+            border-color: rgba(226,137,47,0.22);
+            color: #a3611b;
+        }
+        .dark-mode .banner-yellow {
+            background: rgba(240,162,74,0.09);
+            border-color: rgba(240,162,74,0.18);
+            color: #f0a24a;
+        }
+
+        /* ── Keyframes ── */
+        @keyframes ringPulse {
+            0%,100% { box-shadow: 0 0 0 4px var(--accent-soft); }
+            50%      { box-shadow: 0 0 0 8px transparent; }
+        }
+        @keyframes busFloat {
+            0%   { transform: translateY(0px); }
+            100% { transform: translateY(-4px); }
+        }
+        @keyframes busPulse {
+            0%,100% { filter: drop-shadow(0 2px 4px rgba(226,137,47,0.4)); }
+            50%     { filter: drop-shadow(0 4px 10px rgba(226,137,47,0.7)); }
+        }
+        @keyframes livePulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50%     { opacity: 0.4; transform: scale(0.85); }
+        }
+        @keyframes badgePulse {
+            0%,100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation: none !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
     </style>
 </head>
 <body id="appBody">
 
-<!-- ── TOP: header, quick actions, column heads ── -->
-<div class="top-sticky" id="topSticky">
-    <div class="app-header">
-        <button class="icon-btn" onclick="goBack()" aria-label="Go back">←</button>
-        <div class="title-wrap"><div id="routeTitle">Loading route...</div></div>
-        <div class="live-pill hidden" id="liveBadge"><span class="live-dot"></span>LIVE</div>
-        <div class="menu-wrap">
-            <button class="icon-btn" id="menuBtn" onclick="toggleMenu(event)" aria-label="More options" aria-haspopup="true">⋮</button>
-            <div class="menu hidden" id="menu" role="menu">
-                <button type="button" id="themeBtn" onclick="toggleTheme(); closeMenu()">☀️ Light mode</button>
-                <button type="button" onclick="manualReload(); closeMenu()">↻ Refresh now</button>
-                <button type="button" onclick="shareBus(); closeMenu()">🔗 Share bus link</button>
-            </div>
-        </div>
+<!-- ── STICKY HEADER — styled like an LED bus destination board ── -->
+<div class="header-bar px-4 py-3 flex items-center gap-3" style="position:relative;">
+    <button onclick="goBack()" class="back-btn" aria-label="Go back">←</button>
+
+    <div class="track-logo-circle" aria-label="Where Is My Bus logo">
+        <img src="/images/bus.png" alt="Where Is My Bus">
     </div>
 
-    <div class="chip-row">
-        <div class="chip chip-static">🚌 <span id="busNumberDisplay">—</span></div>
-        <button type="button" class="chip" id="alarmChip" onclick="toggleAlarm()">⏰ Alarm</button>
-        <button type="button" class="chip" id="myLocChip" onclick="toggleMyLocPanel()">📍 My location</button>
-        <button type="button" class="chip" onclick="findBus()">🎯 Find bus</button>
+    <div class="flex-1 min-w-0" style="position:relative; z-index:1;">
+        <div id="routeTitle">Loading route...</div>
+        <div id="lastUpdated">Fetching location...</div>
     </div>
 
-    <div class="col-head"><span>Arrival</span><span id="dayLabel">Today</span><span>Departure</span></div>
+    <div class="live-badge hidden" id="liveBadge" style="position:relative; z-index:1;">
+        <span class="live-dot"></span> Live
+    </div>
+
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
+            aria-label="Toggle dark mode" style="position:relative; z-index:1;">🌙</button>
 </div>
 
-<div class="wrap">
-    <!-- ── MY LOCATION (optional): show it here, or send it to a friend ── -->
-    <div class="panel hidden" id="myLocCard">
+<!-- ── INFO CARD ── -->
+<div style="padding:12px 12px 0;">
+    <div class="card" style="padding:16px;">
+
+        <div style="display:flex; justify-content:space-between; gap:8px;">
+            <div class="stat-card">
+                <div class="stat-label">Bus</div>
+                <div class="stat-value" id="busNumberDisplay">—</div>
+            </div>
+            <div class="stat-card" style="text-align:center;">
+                <div class="stat-label">Current stop</div>
+                <div class="stat-value" style="color:var(--accent); font-size:14px;" id="currentStopDisplay">—</div>
+            </div>
+            <div class="stat-card" style="text-align:right;">
+                <div class="stat-label">Remaining</div>
+                <div class="stat-value" id="remainingDisplay">—</div>
+            </div>
+        </div>
+
+        <div class="progress-track">
+            <div class="progress-fill" id="progressBar" style="width:0%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:6px;">
+            <span class="eyebrow" style="font-size:10.5px; font-weight:500; color:var(--text-muted);" id="progressStart">—</span>
+            <span class="num" style="font-size:12px; font-weight:700; color:var(--accent);" id="progressPct">0%</span>
+            <span class="eyebrow" style="font-size:10.5px; font-weight:500; color:var(--text-muted);" id="progressEnd">—</span>
+        </div>
+    </div>
+</div>
+
+<!-- ── MY LOCATION (optional): show it here, or send it to a friend ── -->
+<div style="padding:12px 12px 0;">
+    <div class="card" id="myLocCard" style="padding:12px 16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
             <div style="min-width:0;">
                 <div style="font-weight:700; font-size:14px; color:var(--text-primary);">📍 My location</div>
@@ -352,9 +505,9 @@
             </button>
         </div>
 
-        <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border, #e5e7eb);">
             <button type="button" id="shareLocBtn" onclick="shareMyLocation()"
-                    style="width:100%; border:1.5px solid #3aa88c; background:transparent; color:#3aa88c; border-radius:10px; padding:9px 14px; font-weight:700; font-size:13px; cursor:pointer;">
+                    style="width:100%; border:1.5px solid #1f6f5c; background:transparent; color:#1f6f5c; border-radius:10px; padding:9px 14px; font-weight:700; font-size:13px; cursor:pointer;">
                 📤 Send my location to a friend
             </button>
             <div style="font-size:11.5px; line-height:1.4; color:var(--text-muted); margin-top:6px;">
@@ -369,70 +522,19 @@
             </div>
         </div>
     </div>
+</div>
 
-    <!-- ── ROUTE TIMELINE ── -->
-    <div class="list-wrap">
+<!-- ── ROUTE TIMELINE ── -->
+<div style="padding:12px 12px 24px;">
+    <div class="card" style="overflow:hidden;">
+        <div class="section-label">Route stops</div>
         <div id="stopList">
-            <div style="padding:40px 16px; text-align:center; font-size:14px; color:var(--text-faint);">Loading stops...</div>
-        </div>
-    </div>
-</div>
-
-<!-- ── BOTTOM STATUS SHEET ── -->
-<div class="sheet" id="sheet">
-    <div class="sheet-inner">
-        <button type="button" class="sheet-handle" onclick="toggleSheet()" aria-label="Show or hide trip details"><span></span></button>
-        <div class="sheet-head">
-            <div class="sheet-status" onclick="toggleSheet()">
-                <div class="status-title tone-gray" id="statusTitle">Waiting for bus location…</div>
-                <div class="status-sub" id="lastUpdated">Fetching location...</div>
-            </div>
-            <button type="button" class="fab" id="reloadBtn" onclick="manualReload()" aria-label="Refresh bus location" title="Refresh">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
-                    <polyline points="21 3 21 9 15 9"/>
-                </svg>
-            </button>
-        </div>
-
-        <div class="sheet-body hidden" id="sheetBody">
-            <div class="trip-card">
-                <div class="trip-top">
-                    <div class="trip-ends"><span id="progressStart">—</span><span id="progressEnd">—</span></div>
-                    <div class="trip-bar">
-                        <span class="trip-dot"></span>
-                        <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
-                        <span class="trip-dot end"></span>
-                    </div>
-                    <div class="trip-meta">
-                        <span>Now <b id="currentStopDisplay">—</b></span>
-                        <span><b id="progressPct">0%</b> done</span>
-                        <span>Left <b id="remainingDisplay">—</b></span>
-                    </div>
-                </div>
-                <div class="trip-grid">
-                    <div class="trip-cell">
-                        <div class="cell-label">Next Stop</div>
-                        <div class="cell-name" id="nextStopName">—</div>
-                        <div class="cell-sub" id="nextStopSub">—</div>
-                    </div>
-                    <div class="trip-cell">
-                        <div class="cell-label">Crossed</div>
-                        <div class="cell-name" id="crossedName">—</div>
-                        <div class="cell-sub" id="crossedSub">—</div>
-                    </div>
-                </div>
-                <div class="status-banner tone-gray" id="statusBanner">Waiting for bus location</div>
-            </div>
-            <div class="sheet-actions">
-                <button type="button" class="act" onclick="toggleMyLocPanel(true)">📍 My location</button>
-                <button type="button" class="act" onclick="shareBus()">🔗 Share</button>
+            <div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">
+                Loading stops...
             </div>
         </div>
     </div>
 </div>
-
-<div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
@@ -441,36 +543,25 @@
 <script>
     const body     = document.getElementById("appBody");
     const themeBtn = document.getElementById("themeBtn");
-    // Dark unless the passenger explicitly chose light
-    let isDark     = localStorage.getItem("wimb_theme") !== "light";
+    let isDark     = localStorage.getItem("wimb_theme") === "dark";
 
     function applyTheme() {
-        body.classList.toggle("light-mode", !isDark);
-        themeBtn.textContent = isDark ? "☀️ Light mode" : "🌙 Dark mode";
-        const m = document.querySelector('meta[name="theme-color"]');
-        if (m) m.setAttribute("content", "#22344a");
+        if (isDark) {
+            body.classList.add("dark-mode");
+            themeBtn.textContent = "☀️";
+        } else {
+            body.classList.remove("dark-mode");
+            themeBtn.textContent = "🌙";
+        }
     }
+
     function toggleTheme() {
         isDark = !isDark;
         localStorage.setItem("wimb_theme", isDark ? "dark" : "light");
         applyTheme();
     }
+
     applyTheme();
-
-    // "Today - Oct 17, Sat" under the column heads
-    try {
-        const d = new Date();
-        document.getElementById("dayLabel").textContent =
-            "Today - " + d.toLocaleDateString([], { month: "short", day: "numeric" }) + ", " +
-            d.toLocaleDateString([], { weekday: "short" });
-    } catch (_) {}
-
-    function toggleMenu(ev) {
-        if (ev) ev.stopPropagation();
-        document.getElementById("menu").classList.toggle("hidden");
-    }
-    function closeMenu() { document.getElementById("menu").classList.add("hidden"); }
-    document.addEventListener("click", () => closeMenu());
 </script>
 </body>
 </html>
