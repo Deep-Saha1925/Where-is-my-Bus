@@ -624,7 +624,7 @@ function formatEtaMins(mins) {
    area once; after that the passenger scrolls freely and live updates
    never move the page again. */
 ['wheel', 'touchstart', 'touchmove', 'keydown', 'mousedown'].forEach(ev =>
-  window.addEventListener(ev, () => { userMovedView = true; }, { passive: true })
+    window.addEventListener(ev, () => { userMovedView = true; }, { passive: true })
 );
 
 function scrollBusToCenter() {
@@ -719,26 +719,59 @@ async function shareBus() {
   catch (_) { showToast(url, 6000); }
 }
 
-/* ─── ARRIVAL TIMES WE ACTUALLY SAW ─────────────────────────────────
-   There is no timetable, so "when did the bus get to this stop" is recorded from live fixes:
-   the first fix that shows the bus at / beyond a stop stamps that stop. Kept per ride for this tab,
-   so stops passed before the page was opened simply show "—".                              */
-let passTimes = {}, passKey = null, prevCurIdx = null;
-function updatePassTimes(curIdx) {
+/* ─── ARRIVAL + DEPARTURE TIMES WE ACTUALLY SAW ────────────────────
+   There is no timetable, so "when did the bus reach / leave this stop" is recorded from live fixes:
+     arrival   = first fix that shows the bus at (or beyond) the stop
+     departure = first fix that shows the bus has left it
+   Saved per ride in this browser (survives reloads / reopening the page). Stops passed before the page
+   was first opened have no record, so they show "—".   passTimes[i] = { a: arrivalMs, d: departureMs } */
+let passTimes = {}, passKey = null, prevCur = null, prevAt = null;
+function savePassTimes() {
+  try { localStorage.setItem(passKey, JSON.stringify(passTimes)); } catch (_) {}
+}
+function updatePassTimes(stops, hasPos, atIdx, passedThrough) {
   if (rideId == null) return;
   const key = "wimb_p:" + rideId;
   if (passKey !== key) {
-    passKey = key; prevCurIdx = null;
-    try { passTimes = JSON.parse(sessionStorage.getItem(key) || "{}") || {}; } catch (_) { passTimes = {}; }
+    passKey = key; prevCur = null; prevAt = null; passTimes = {};
+    try {
+      passTimes = JSON.parse(localStorage.getItem(key) || "{}") || {};
+      // forget other rides' records so this doesn't grow forever
+      Object.keys(localStorage).forEach(k => { if (k.startsWith("wimb_p:") && k !== key) localStorage.removeItem(k); });
+    } catch (_) { passTimes = {}; }
   }
-  if (curIdx == null || curIdx < 0 || lastLocTs == null) return;
-  if (prevCurIdx == null) { prevCurIdx = curIdx; return; }          // first look: earlier stops are unknown
-  if (curIdx < prevCurIdx) { prevCurIdx = curIdx; return; }
-  if (curIdx > prevCurIdx) {
-    for (let i = prevCurIdx + 1; i <= curIdx; i++) if (passTimes[i] == null) passTimes[i] = lastLocTs;
-    prevCurIdx = curIdx;
-    try { sessionStorage.setItem(key, JSON.stringify(passTimes)); } catch (_) {}
+  if (!hasPos || lastLocTs == null) return;
+  const ts  = lastLocTs;
+  const cur = atIdx !== -1 ? atIdx : passedThrough;
+  let changed = false;
+  const entry = i => (passTimes[i] = passTimes[i] || {});
+
+  if (prevCur == null) {
+    // First look at this ride in this page load. A stop we saw the bus arrive at in an earlier visit but never saw it
+    // leave: if the bus has gone on, its departure is arrival + the scheduled halt (we weren't watching to catch it).
+    for (let i = 0; i <= passedThrough && i < stops.length; i++) {
+      const e = passTimes[i];
+      if (e && e.a != null && e.d == null) {
+        e.d = Math.min(ts, e.a + Math.max(0, stops[i].slackTimeMin || 0) * 60000);
+        changed = true;
+      }
+    }
+  } else {
+    // The bus moved on: stamp every stop it reached (and, for stops it drove straight past, left) since the last look
+    for (let i = prevCur + 1; i <= cur && i < stops.length; i++) {
+      const e = entry(i);
+      if (e.a == null) { e.a = ts; changed = true; }
+      if (i <= passedThrough && e.d == null) { e.d = ts; changed = true; }
+    }
+    // It was at a stop and now it isn't: that stop's departure
+    if (prevAt != null && prevAt !== atIdx && passedThrough >= prevAt) {
+      const e = entry(prevAt);
+      if (e.d == null) { e.d = ts; changed = true; }
+    }
   }
+  prevCur = (prevCur == null || cur >= prevCur) ? cur : prevCur;
+  prevAt  = atIdx !== -1 ? atIdx : null;
+  if (changed) savePassTimes();
 }
 
 /* ─── ALARM: tell the passenger when the bus is close to their stop ─ */
@@ -818,7 +851,7 @@ function renderTimeline() {
   const totalDist  = displayStops[lastIdx].distanceFromStartKm;
   const progress   = (!hasPos || !totalDist) ? 0 : Math.max(0, Math.min(100, Math.round((progressKm / totalDist) * 100)));
 
-  updatePassTimes(hasPos ? (atIdx !== -1 ? atIdx : passedThrough) : null);
+  updatePassTimes(displayStops, hasPos, atIdx, passedThrough);
 
   const ageSec = ageSeconds();
   wasStale = ageSec != null && ageSec > STALE_AFTER_SEC;
@@ -878,7 +911,9 @@ function renderTimeline() {
   }
   if (hasPos && passedThrough >= 0) {
     setText("crossedName", displayStops[passedThrough].stopName.trim());
-    setText("crossedSub", passTimes[passedThrough] != null ? formatClock(passTimes[passedThrough]) : "—");
+    const ce = passTimes[passedThrough];
+    const ct = ce ? (ce.d != null ? ce.d : ce.a) : null;
+    setText("crossedSub", ct != null ? formatClock(ct) : "—");
   } else {
     setText("crossedName", "—"); setText("crossedSub", "—");
   }
@@ -912,29 +947,37 @@ function renderTimeline() {
 
     const eta  = (hasPos && !isPassed && !isCurrent) ? etaForStop(displayStops, i, passedThrough) : null;
     const halt = Math.max(0, stop.slackTimeMin || 0);
-    const seen = passTimes[i];
+    const rec  = passTimes[i] || {};
+    const seen = rec.a;                                   // arrival we saw (ms) or undefined
 
     // Arrival (left) column
     let arrHtml = "";
     if (isPassed) {
-      arrHtml = seen != null ? `<div class="t-main t-done">${formatClock(seen)}</div>` : `<div class="t-main t-none">—</div>`;
+      arrHtml = seen != null ? `<div class="t-main t-done">${formatClock(seen)}</div><div class="t-sub t-done">Arrived</div>`
+          : `<div class="t-main t-none">—</div>`;
     } else if (isCurrent) {
       arrHtml = `<div class="t-main t-here">${seen != null ? formatClock(seen) : "Here"}</div><div class="t-sub t-here">${seen != null ? "Here" : "At stop"}</div>`;
     } else if (eta) {
       const soon = eta.mins <= 1;
       arrHtml = `<div class="t-main${wasStale ? " t-stale" : ""}">${clockTxt(eta.arriveMs)}</div>` +
-                `<div class="t-sub${soon ? " t-soon" : ""}${wasStale ? " t-stale" : ""}">${soon ? "Now" : "in " + etaText(eta.mins)}</div>`;
+          `<div class="t-sub${soon ? " t-soon" : ""}${wasStale ? " t-stale" : ""}">${soon ? "Now" : "in " + etaText(eta.mins)}</div>`;
     }
 
     // Departure (right) column
     let depHtml = "";
-    if (!isLast && !isPassed) {
+    if (isPassed && !isLast) {
+      // Keep showing when the bus left the stop (and how long it actually waited, if that was noticeable)
+      const stayMin = (rec.a != null && rec.d != null) ? Math.round((rec.d - rec.a) / 60000) : 0;
+      depHtml = rec.d != null
+          ? `<div class="t-main t-done">${formatClock(rec.d)}</div><div class="t-sub t-done">${stayMin >= 1 ? "Halted " + stayMin + " min" : "Departed"}</div>`
+          : `<div class="t-main t-none">—</div>`;
+    } else if (!isLast && !isPassed) {
       if (isCurrent) {
         depHtml = (seen != null && halt > 0 ? `<div class="t-main">${formatClock(seen + halt * 60000)}</div>` : "") +
-                  (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
+            (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
       } else if (eta) {
         depHtml = `<div class="t-main${wasStale ? " t-stale" : ""}">${clockTxt(eta.arriveMs + halt * 60000)}</div>` +
-                  (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
+            (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
       }
     }
 
@@ -1001,7 +1044,7 @@ function renderTimeline() {
     if (destIdx !== srcOnFull) addItem(`🏁 ${escapeHtml(displayStops[destIdx].stopName.trim())}`, destIdx);
     if (items.length) {
       summaryHtml = `<div class="eta-summary">${items.join("")}</div>` +
-        `<div class="eta-sum-note">${wasStale ? "Based on the last known position · " : ""}Estimated from the bus's recent speed and scheduled halts</div>`;
+          `<div class="eta-sum-note">${wasStale ? "Based on the last known position · " : ""}Estimated from the bus's recent speed and scheduled halts</div>`;
     }
   }
 
@@ -1041,12 +1084,12 @@ async function startMyLocation() {
   try {
     myPos = await Geo.request();            // shows the browser's permission prompt
     myWatchId = navigator.geolocation.watchPosition(
-      pos => {
-        myPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        updateMyLocation();
-      },
-      err => setMyLocText(Geo.explainError(err), true),
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+        pos => {
+          myPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          updateMyLocation();
+        },
+        err => setMyLocText(Geo.explainError(err), true),
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
     );
     setMyLocButton(true, false);
     updateMyLocation();
@@ -1083,8 +1126,8 @@ function updateMyLocation() {
   const lines = [];
   if (hit) {
     lines.push(hit.distanceM <= MY_STOP_MAX_M
-      ? `You are near ${hit.point.stopName.trim().toUpperCase()} (${Geo.formatDistance(hit.distanceM)}).`
-      : `You are ${Geo.formatDistance(hit.distanceM)} from the nearest stop on this route.`);
+        ? `You are near ${hit.point.stopName.trim().toUpperCase()} (${Geo.formatDistance(hit.distanceM)}).`
+        : `You are ${Geo.formatDistance(hit.distanceM)} from the nearest stop on this route.`);
   }
   if (busLocation && typeof busLocation.latitude === "number") {
     const toBus = Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude);
@@ -1161,8 +1204,8 @@ async function shareMyLocation() {
       nearestStopName:  hit ? hit.point.stopName.trim().toUpperCase() : null,
       nearestDistanceM: hit ? hit.distanceM : null,
       busDistanceM: (busLocation && typeof busLocation.latitude === "number")
-        ? Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude)
-        : null,
+          ? Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude)
+          : null,
       trackUrl: window.location.href
     });
 
