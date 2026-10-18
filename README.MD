@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -47,10 +47,13 @@
 - 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
-- 📍 Live route timeline (like "Where is my Train") — opens with the bus scrolled to the middle of the screen, then you scroll freely
-- 🚌 Animated bus icon on current stop
-- ⏱️ ETA per stop from bus position
-- 🌙 Dark mode support
+- 📍 Live route timeline in the style of a train tracker — **arrival time on the left, departure time on the right** of every stop, a thick rail with the bus on it, and it opens with the bus scrolled to the middle of the screen, then you scroll freely, see [The Tracking Page](#-the-tracking-page)
+- 🕒 **Arrival and departure for every stop** — upcoming stops show an estimate (*"in 12 min"*), stops the bus has passed keep the time it actually arrived and the time it left (and how long it halted)
+- ⏱️ **ETA per stop** from the bus's *real recent speed* plus each stop's scheduled halt, with a summary of when the bus reaches **your stop** and the **destination**
+- 🔄 **Reload button** on the tracking page; automatic refreshes read from a short-lived cache to spare the server, the button always fetches fresh data
+- ⏰ **Alarm** — get alerted when the bus is about 5 minutes from your stop (page must stay open)
+- 📊 Bottom status sheet — *"Running · next X"* / *"Arrived Y"*, progress bar, **Next stop** and **Crossed** cells, GPS-signal status
+- 🌙 Dark mode by default, light mode from the ⋮ menu (your choice is remembered)
 - 🧭 One-tap header shortcuts to the Driver panel and Admin login — no manual URL typing needed
 
 </td>
@@ -58,12 +61,12 @@
 
 ### 🚗 For Drivers
 - 🏢 Log in with your **bus number + depot + depot code** (no personal account needed) — asked every time the page is opened
-- ↩️ If that bus already has a running ride, an **"Active ride found"** screen offers *Resume This Ride* or *Start New Ride Instead*; resuming reopens the live ride screen with a **Stop Ride** button
+- ↩️ A bus runs one route, so if that bus already has a running ride the app **goes straight back into it** (no "resume or start new" page) — the live ride screen with its **Stop Ride** button
 - ⏳ A neutral **Loading…** screen shows while depots/routes load, so the page never flashes the wrong step
 - 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
 - 📍 **Current stop position** card on the ride screen — "At KOLKATA" / "Between A → B (40%)", stop *n* of *N*, progress bar, and a Live/Simulated badge
-- 🧪 **Simulate location** tab for testing without driving — see [Testing Without a Bus](#-testing-without-a-bus-simulate-location)
+- 🧪 **Simulate location** tab for testing without driving — it always follows the direction **the driver chose** (A → B), even when the route's Excel sheet lists the stops the other way round (B → A), see [Testing Without a Bus](#-testing-without-a-bus-simulate-location)
 - 📡 Live location sent on every GPS tick (never dropped — see below), protected by a per-bus driver token, pushed to passengers instantly over WebSocket
 
 </td>
@@ -129,7 +132,7 @@
 | Technology | Purpose |
 |---|---|
 | HTML5 | Page structure |
-| Tailwind CSS | Layout utilities & dark mode |
+| Tailwind CSS | Layout utilities on the home, login and driver pages (the tracking page uses its own small stylesheet, no Tailwind) |
 | Google Fonts (Oswald, Inter, JetBrains Mono) | Brand type system — Oswald for headers/labels, Inter for body text, JetBrains Mono for IDs/codes/data |
 | Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting |
 | SockJS + stomp.js | WebSocket client for live bus tracking (loaded via cdnjs), with a graceful fallback poll if the connection ever drops |
@@ -334,10 +337,10 @@ Ride starts / ends
 
 - **Handshake endpoint:** `/ws` (public, same access level as the other passenger/driver-facing tracking endpoints)
 - **Fallback polling kept as a safety net** — in case a socket silently dies (a flaky network, a proxy that kills idle connections):
-  - `track.html` checks every **5s**, but *skips* the request while live pushes are arriving (anything newer than 15s). A healthy socket costs nothing extra; a broken one is noticed within seconds instead of the old 20s.
-  - Switching back to the tab (phones put background tabs and their sockets to sleep) fetches the latest position immediately.
-  - A dropped connection reconnects and re-subscribes automatically, keeping stomp.js's own disconnect handling intact.
-  - `admin-buses.html` still falls back to a 30s poll.
+    - `track.html` checks every **5s**, but *skips* the request while live pushes are arriving (anything newer than 15s). A healthy socket costs nothing extra; a broken one is noticed within seconds instead of the old 20s. Even when the socket is down, the check reads the page's short-lived cache first, so the server is asked at most about **once every 15 seconds** per open page (see [The Tracking Page](#-the-tracking-page)).
+    - Switching back to the tab (phones put background tabs and their sockets to sleep) fetches the latest position immediately.
+    - A dropped connection reconnects and re-subscribes automatically, keeping stomp.js's own disconnect handling intact.
+    - `admin-buses.html` still falls back to a 30s poll.
 - **Driver-side sends never drop the newest position.** `driver.js` posts at most once per 3s (once per 1s while simulating). A position arriving inside that window used to be discarded, so passengers only saw it at the next 10s heartbeat — or never, if the bus then stopped. It is now queued and sent as soon as the window ends, using whatever the *latest* position is by then.
 - **Single-instance limitation:** the message broker (`registry.enableSimpleBroker`) is in-memory, same caveat as `ActiveRideCache` above — a message published on one instance won't reach a passenger connected to a different instance. Moving to multiple instances means swapping this for a real broker (e.g. Redis pub/sub relayed to STOMP, or RabbitMQ's STOMP plugin).
 
@@ -368,8 +371,8 @@ exact matches first, then alphabetical → cached → returned
 - **Matching** ignores case, spaces, dashes, underscores, `/` and `.` on both sides, so `wb23a1245`, `WB 23A 1245` and `wb-23a-1245` all find `WB-23A-1245`. Partial numbers match anywhere in the number.
 - **The filtering happens in the database.** The old approach downloaded every active ride and filtered in the browser, which gets slower with every bus that starts running. The repository query only reads *active* rides whose bus number matches, joins the bus in the same query (no extra query per ride), and returns at most **20** rows.
 - **Two small caches, both with short lifetimes:**
-  - `BusSearchCache` (server) — 5s per query, max 500 entries, no extra dependency. It is **cleared whenever a ride starts or ends**, so a bus that just started or stopped never shows up stale.
-  - A per-tab cache in `index.js` — 15s per query, so retyping the same number is instant.
+    - `BusSearchCache` (server) — 5s per query, max 500 entries, no extra dependency. It is **cleared whenever a ride starts or ends**, so a bus that just started or stopped never shows up stale.
+    - A per-tab cache in `index.js` — 15s per query, so retyping the same number is instant.
 - **Old results never linger.** Every new keystroke or search wipes the results area immediately, cancels the previous request (`AbortController`) and bumps a sequence number, so a slow earlier response can never draw over a newer search. Switching tabs cancels any pending bus search too.
 - Public endpoint, same access level as `/api/ride/active`.
 
@@ -387,7 +390,8 @@ Real GPS on a laptop rarely fires, and even when it does it reports your desk, n
 | **🧪 Simulate location** | Pick a stop from the route, or slide toward the next stop. That position is sent exactly like a real GPS fix, and real GPS is **ignored** until you switch back. |
 
 In the Simulate tab:
-- **Stop picker** — "bus is at / just after stop *n*" (all stops of the ride's route).
+- **Stop picker** — "bus is at / just after stop *n*" (the stops between the ride's start and destination).
+- **Always in the ride's direction.** If the driver starts **A → B** but the route's Excel sheet lists the stops **B → A**, the picker, *Next stop* and the Current stop card still run A → B (and *Next stop* never walks the wrong way). The page asks the server for the stops between the ride's two ends, which come back already in the right order, and reorders them itself if that request ever fails. A resumed ride works the same way.
 - **Slider (0–100%)** — interpolates between that stop and the next one.
 - **⏮ Prev stop / Next stop ⏭** — jump to the neighbouring stop and send immediately.
 - **📍 Send this location now** — posts right away, bypassing the throttle.
@@ -426,8 +430,8 @@ refresh goes back to the login step, it does not skip it.
         │
         ▼
 Bus already has a running ride?
-   yes ► "Active ride found" ► Resume This Ride ► live ride screen ► Stop Ride
-         (or "Start New Ride Instead")
+   yes ► straight back into the running ride ► live ride screen ► Stop Ride
+         (a bus runs one route, so there is nothing to choose)
    no  ► new-ride form (route, start, destination)
         │
         ▼
@@ -491,12 +495,81 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 📱 The Tracking Page
+
+`track.html` + `js/track.js` — what a passenger sees after tapping **Track Bus**. It is laid out like a train-tracker app and works the same on a phone and a desktop (content is centred and capped at 600px wide).
+
+```
+┌──────────────────────────────────────────────┐
+│ ←  FALAKATA → ALIPURDUAR      ● LIVE     ⋮   │  header (⋮ = theme, refresh, share link)
+│ [🚌 WB-12-3456] [⏰ Alarm] [📍 My location] [🎯 Find bus] │  chips
+│ Arrival     Today - Oct 18, Sun     Departure│  sticky column heads
+├──────────────────────────────────────────────┤
+│  12:31 PM  ●  Dhaba Shila Bristi    12:33 PM │  passed stop: actual times
+│  Arrived   ┃  0.2 km                Halted 2 min
+│  12:49 PM  ●  Balurghat   ● Here    12:51 PM │  bus is here
+│  Here      🚌 0.7 km                Halt 2 min
+│  1:05 PM   ●  Assam More            1:05 PM  │  upcoming stop: estimates
+│  in 16 min ┃  1.2 km                         │
+├──────────────────────────────────────────────┤
+│ ═  At Balurghat                        ( ↻ ) │  bottom sheet (tap to open)
+│    Updated just now · GPS ±10 m              │
+└──────────────────────────────────────────────┘
+```
+
+### Timeline columns
+| Column | Upcoming stop | Current stop | Passed stop |
+|---|---|---|---|
+| **Arrival** (left) | Estimated clock time and *"in N min"* | Time the bus arrived (or *Here*) | Time the bus actually arrived |
+| **Departure** (right) | Estimated arrival + the stop's scheduled halt, and *"Halt N min"* | Expected departure | Time the bus actually left, and *"Halted N min"* if it waited a minute or more |
+
+There is no timetable in the system, so times are **estimates** (shown with a `~` when the driver's GPS has gone quiet) until the bus has actually been seen at or past a stop.
+
+### How the ETA is worked out
+- **Speed:** learned from the bus's real progress along the route over the last ~6 minutes, blended towards a 30 km/h default and kept between 12 and 55 km/h so a single odd reading can't distort every stop.
+- **Halts:** the scheduled halt (`slack_min` in the route Excel) of every stop between the bus and the target is added.
+- **Stable clock time:** the arrival clock time is fixed to the last GPS fix, so it only changes when the bus reports a new position; the *"in N min"* part counts down between fixes (refreshed every 30 seconds).
+- **No signal / off route:** with no recent GPS the ETAs are dimmed and marked `~`; while the bus is off the route with no known position, no ETAs are shown.
+- The summary strip above the list shows the ETA to **your boarding stop** and to the **destination**.
+
+### Arrival and departure times we actually saw
+The page records, from live fixes, **when the bus first reached each stop and when it left it**, and keeps showing both on every stop the bus has passed. A stop the bus drove straight past between two fixes gets the same time for both. The record is saved in the browser (`localStorage`, key `wimb_p:<rideId>`), so it survives a reload; only the current ride's record is kept. If the page is reopened after the bus has left a stop it had seen it arrive at, the departure is estimated as arrival + the scheduled halt.
+
+> ⚠️ A stop the bus passed **before the passenger first opened the page** has no record and shows "—". Filling those in needs the server to return the ride's location history; see the roadmap below.
+
+### Bottom status sheet
+Collapsed it shows the headline (*Running · next X*, *At X*, *Arrived X*, *Off route*, *Waiting for bus location…*), *"Updated 12s ago"* and the round **reload** button. Tap the handle or the headline to open: start → destination with a progress bar, **Next stop** (distance and ETA), **Crossed** (last stop passed and the time it left), a coloured status banner (*Running · ~32 km/h*, *At a stop*, *No GPS update for 3m*, *Trip complete*) and shortcuts for **My location** and **Share**.
+
+### Reload button and the short-lived cache
+The tracking page used to ask the server for the bus position every few seconds whenever the live socket was quiet. Now automatic refreshes read from a small cache in the browser (`sessionStorage`) instead, so many people watching one bus put much less load on the server. The **↻ button** (bottom sheet, and *Refresh now* in the ⋮ menu) always skips every cache.
+
+| Data | Automatic refreshes reuse it for | Reload button |
+|---|---|---|
+| Bus position (`/api/location/last-loc/{id}`) | 15 seconds — refreshed by every live push too | Fetches fresh (`cache: "no-store"`) |
+| Ride info (`/api/ride/active/all`) | 30 seconds | Fetches fresh |
+| Route stops, route split | 10 minutes (rarely change) | Cleared, re-fetched next time |
+
+The button spins while loading, locks for 3 seconds afterwards so it can't be spammed, nudges the live socket to reconnect if it had dropped, and shows *"Couldn't refresh · showing last known"* if the server can't be reached. A page reopened within 15 seconds paints the cached position immediately without a request. Because admin route edits can take up to 10 minutes to appear on a page that is already open, pressing reload picks them up straight away.
+
+### Alarm
+Tap **⏰ Alarm** to be told when the bus is about **5 minutes** from your boarding stop (or from the destination once the bus is past your stop). It shows a message on the page, vibrates the phone if it can, and sends a browser notification if you allowed them. It is a one-shot alert and **only works while the tracking page stays open** — real background push notifications are still on the roadmap.
+
+### Other controls
+- **⋮ menu:** *Light / Dark mode*, *Refresh now*, *Share bus link*. The theme is remembered in the browser; the page starts in dark mode unless you chose light.
+- **🎯 Find bus:** scrolls the bus back to the middle of the screen.
+- **📍 My location:** opens the existing show-my-location / send-to-a-friend panel, see [Use My Location](#-use-my-location-passenger).
+- **Share:** the phone's share menu with this tracking link (copies the link on browsers without one).
+
+Files: `static/track.html` (layout and both themes), `static/js/track.js` (live data, ETA, cache, reload, alarm, recorded times), `static/js/geo-utils.js` (my-location helpers). Covered by `tests/js/track.test.js`, `track-eta.test.js` and `bus-marker.test.js`.
+
+---
+
 ## 📍 Use My Location (Passenger)
 
 Optional, and only when the passenger taps it: the browser shows its own permission prompt, and nothing happens if it is refused.
 
 - **Home page:** the crosshair button in the **From** field finds the stop nearest to you and puts it in the field (in capital letters, like the autocomplete). It says how far away the stop is, ignores stops more than 20 km away, and flags a rough location (accuracy worse than 2 km) as approximate.
-- **Tracking page, "My location" card, Show:** tap **Show** to see *"You are near BRAVO (350 m). The bus is about 3.2 km from you (straight line)."* Your nearest stop gets a **You are here** badge on the timeline, and the distance keeps updating as you and the bus move. Tap **Stop** to turn it off. Only you see this.
+- **Tracking page, 📍 My location chip → card, Show:** tap **Show** to see *"You are near BRAVO (350 m). The bus is about 3.2 km from you (straight line)."* Your nearest stop gets a **You are here** badge on the timeline, and the distance keeps updating as you and the bus move. Tap **Stop** to turn it off. Only you see this.
 - **Tracking page, 📤 Send my location to a friend:** opens the phone's share menu (WhatsApp, SMS, anything installed) with a ready message: a Google Maps link to your exact position, your nearest stop, how far the bus is from you, and the link to this bus's live tracking page. If the browser has no share menu (most desktops) or blocks it, **WhatsApp** and **Copy message** buttons appear instead. If location wasn't switched on yet, tapping the button asks for it first. Closing the share menu is not treated as an error.
 - **Privacy:** showing your location happens only inside your browser. The page downloads every stop with its coordinates (`GET /api/routes/all-stops`, public) and works out the nearest one itself. Sending to a friend is something you start yourself: the message goes through the app **you** pick, to the person **you** pick. Neither action sends your location to our server, and nothing is stored.
 - **Helpful messages:** denied permission, no GPS signal, timeout, a browser without location support, and a non-https page each give a plain-language message with what to do. Location only works over **https** (or localhost), which your Render site already uses.
@@ -564,10 +637,10 @@ The driver page runs in a browser tab. When the phone locks or the driver switch
 - **`native-gps.js`** gives the driver page one GPS source for both worlds: the browser's `watchPosition`, or, inside the Android app, a background-location plugin that runs a **foreground service** (visible "ride active" notification) so location keeps flowing with the screen off.
 - **`driver-app/`** is a small Capacitor project that wraps the same `/driver` page as an Android app. No server changes: same login, ride and location endpoints. Build steps and phone settings are in [`driver-app/README.md`](driver-app/README.md).
 - **Honest tracking in a browser too:**
-  - A notice on the ride screen says whether background tracking is on (green, in the app) or that the browser pauses GPS when the phone locks (amber).
-  - When the page comes back after more than 20 seconds in the background, the GPS watch is restarted and the pause is noted ("Last pause: 3 min at 14:05").
-  - If the GPS has not produced a new fix for 30 seconds, the status says so ("No new GPS fix for 2 min: passengers see your last known position") instead of claiming "Sharing live location" while the heartbeat re-sends an old point.
-  - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
+    - A notice on the ride screen says whether background tracking is on (green, in the app) or that the browser pauses GPS when the phone locks (amber).
+    - When the page comes back after more than 20 seconds in the background, the GPS watch is restarted and the pause is noted ("Last pause: 3 min at 14:05").
+    - If the GPS has not produced a new fix for 30 seconds, the status says so ("No new GPS fix for 2 min: passengers see your last known position") instead of claiming "Sharing live location" while the heartbeat re-sends an old point.
+    - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
 
 > The Android app has **not been built or tested yet**; follow "First test" in `driver-app/README.md`. The browser-side changes work without it and are covered by tests in `tests/js/native-gps.test.js`.
 
@@ -580,7 +653,7 @@ Three layers, from "always runs" to "opt in":
 | Layer | Command | Needs | What it covers |
 |---|---|---|---|
 | **Java unit tests** | `./mvnw test` | nothing but Maven | Login rate limiter (per IP / depot / bus, lockout expiry), client-IP resolution (spoof-proof `X-Forwarded-For`), the driver login flow through `DriverAuthController` (200 / 400 / 401 / 429), ghost-ride tracker, bus-search cache, bus-number normalisation (including SQL wildcards), startup password check, CORS config |
-| **Browser-script tests** | `npm test` (or `node tests/js/run-all.js`) | Node 20+, no `npm install` | The passenger tracking logic in `track.js`: where the bus is (`locateBus`: at a stop, between stops, off route, GPS-accuracy radius, backwards-wobble filter), timestamp parsing (run in India time on purpose), ETA, distance maths; plus search normalisation and the driver page's distance and route-label helpers |
+| **Browser-script tests** | `npm test` (or `node tests/js/run-all.js`) | Node 20+, no `npm install` | The passenger tracking logic in `track.js`: where the bus is (`locateBus`: at a stop, between stops, off route, GPS-accuracy radius, backwards-wobble filter), timestamp parsing (run in India time on purpose), the per-stop ETA (speed learning, halts), the short-lived cache and the reload path, the recorded arrival / departure times, the bus marker, distance maths; plus search normalisation and the driver page's distance and route-label helpers |
 | **Extra tests (opt in)** | `./mvnw test -Pextra-tests` | Maven, downloads H2 and the build-helper plugin | `RideRepository.searchByBusNumber` against an in-memory H2 database, the real `SecurityConfig` rules (public vs admin, login, CSRF exemptions) through `MockMvc`, and `RideService`'s auto-end / search-hiding logic with Mockito |
 
 ### How the browser tests work
@@ -618,7 +691,7 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 
 - The cleanup job runs every minute (`RIDE_CLEANUP_INTERVAL_MS`, first run 30 seconds after startup). Each run re-checks a ride just before ending it, so a location that landed a moment ago always wins.
 - **After a restart** the in-memory tracker is empty, so it is refilled from each ride's newest stored location. Until then a ride with no known time counts as live, so a restart never hides every bus at once.
-- **The driver can still resume a hidden ride:** `/api/ride/active/all` keeps listing silent rides (with `stale: true` and `silentSeconds`), so the driver's "Active ride found" screen and the admin grid still see them. The admin card shows a red **No signal N min** badge instead of green *Active*.
+- **The driver is still taken back into a hidden ride:** `/api/ride/active/all` keeps listing silent rides (with `stale: true` and `silentSeconds`), so a driver who reopens the page is taken straight back into their ride, and the admin grid still sees it. The admin card shows a red **No signal N min** badge instead of green *Active*.
 - Safety checks: stale time below 30 seconds is raised to 30, and the auto-end time must be larger than the stale time (otherwise it is set to double).
 - Single instance only, like `ActiveRideCache`; with several instances this would need to move to Redis.
 
@@ -640,10 +713,10 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 
 - Every route is a real `Route` record (code, display name, file location) backed by Postgres — not just a derived text string.
 - Admin manages routes from the **Routes tab**, same interaction pattern as Depot Codes:
-  - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
-  - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
-  - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
-  - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
+    - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
+    - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
+    - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
+    - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
 - Drivers now **pick their Route explicitly** before choosing Start Location / Destination (mirrors picking a Depot). The stop pickers are then scoped to only that route's stops — not a global list — which is what makes it safe for the same stop name (a shared junction town, say) to legitimately appear on more than one route without any ambiguity.
 - Registered route file paths are **normalized at load time** (forward slashes, regardless of the OS they were originally saved on) — a route added during local development on Windows still loads correctly once deployed to a Linux container.
 
@@ -787,7 +860,7 @@ Public. Returns the same `ActiveRideResponse` shape as the other ride lists, up 
 ```http
 GET /api/ride/active/all
 ```
-Public — used by `track.html`, the admin grid and the driver's "Active ride found" check. Unlike the passenger searches it **includes silent rides**, marked with `"stale": true` and `"silentSeconds": N` (see [Ghost Rides](#-ghost-rides-auto-end)).
+Public — used by `track.html`, the admin grid and the driver page's check for an already-running ride. Unlike the passenger searches it **includes silent rides**, marked with `"stale": true` and `"silentSeconds": N` (see [Ghost Rides](#-ghost-rides-auto-end)).
 
 #### Cancel Ride
 ```http
@@ -932,8 +1005,8 @@ GET /admin/routes/template
 | Page | Who uses it | Description |
 |---|---|---|
 | `index.html` | Passenger | Three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, header shortcuts to Driver/Admin |
-| `track.html` | Passenger | Live route timeline, ETA, bus position, dark mode |
-| `driver.html` | Driver | Loading screen → bus number + depot + code login → resume screen (if a ride is running) or new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride |
+| `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, dark / light mode, see [The Tracking Page](#-the-tracking-page) |
+| `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride |
 | `login.html` | Admin | Secure login form |
 | `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list) |
 
@@ -1012,12 +1085,12 @@ WIMB/
 │   │   └── admin-buses.html
 │   ├── static/
 │   │   ├── index.html                   # Passenger search, custom stop dropdown, Driver/Admin shortcuts
-│   │   ├── track.html                   # Route timeline
+│   │   ├── track.html                   # Passenger tracking page: header, chips, arrival/departure timeline, bottom status sheet, themes
 │   │   ├── login.html                   # Admin login
 │   │   ├── js/
 │   │   │   ├── index.js                 # autocomplete dropdown + search tabs (incl. bus-number search, caching, stale-result guard)
-│   │   │   ├── track.js                 # live timeline: WebSocket push + 5s fallback poll, reconnect, tab wake-up
-│   │   │   ├── driver.js                # login, resume, GPS sending (no dropped fixes), Simulate location, current-stop card, tracking health
+│   │   │   ├── track.js                 # live timeline: WebSocket push + cached fallback poll, reconnect, tab wake-up, per-stop ETA, reload, alarm, recorded arrival/departure times
+│   │   │   ├── driver.js                # login, auto-resume, GPS sending (no dropped fixes), Simulate location (follows the ride's direction), current-stop card, tracking health
 │   │   │   ├── native-gps.js            # GPS source: browser, or background service inside the Android app
 │   │   │   ├── geo-utils.js             # passenger location helpers: nearest stop, distances, error messages
 │   │   │   └── admin-buses.js
@@ -1185,6 +1258,10 @@ A multi-stage `Dockerfile`:
 - [x] ~~Location history growing forever~~ — done: nightly clean-up of rows older than 30 days
 - [ ] Database migrations (Flyway) instead of `ddl-auto=update` — postponed on purpose
 - [x] ~~Driver GPS dying when the phone locks~~ — done in code: background-GPS Android app scaffold + honest tracking status (app build still to be tested)
+- [x] ~~Tracking page redesign~~ — done: train-tracker style layout, arrival / departure per stop, per-stop ETA from real speed, reload button with short-lived cache, alarm, light / dark themes
+- [x] ~~Driver simulator running the wrong way when the Excel sheet lists a route in reverse~~ — done: always follows the ride's own direction
+- [x] ~~Extra "resume or start new" page for drivers~~ — removed: a bus runs one route, so a running ride is reopened directly
+- [ ] Show arrival / departure times for stops passed **before** a passenger opened the page (needs the server to return the ride's location history)
 - [x] ~~Real automated tests~~ — done: Java + browser-script unit tests, opt-in integration tests, CI
 - [x] ~~Ghost buses (rides left ACTIVE forever)~~ — done: hidden after 5 min, auto-ended after 30 min of silence
 - [x] ~~Brute-force protection for the driver login~~ — done: per-IP / per-depot / per-bus lockouts (HTTP 429)
@@ -1192,7 +1269,7 @@ A multi-stage `Dockerfile`:
 - [ ] Move the login rate-limit counters to Redis when running multiple instances
 - [ ] Move `BusSearchCache` to Redis too when running multiple instances (same caveat as `ActiveRideCache`)
 - [ ] Move `ActiveRideCache` and the WebSocket message broker from in-memory to Redis-backed, once the app runs more than one instance (see the caveats in [Active Ride Cache](#-active-ride-cache) and [Live Updates](#-live-updates-websocket))
-- [ ] Push notifications when bus is nearby
+- [ ] Push notifications when bus is nearby (the in-page ⏰ Alarm works while the tracking page stays open; real background push is still to do)
 - [ ] Per-bus (not just per-depot) driver codes, for finer-grained access control
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
