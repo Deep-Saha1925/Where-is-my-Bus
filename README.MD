@@ -1113,9 +1113,7 @@ WIMB/
 ├── Dockerfile                           # multi-stage build: Maven build → slim JRE runtime
 └── pom.xml
 ```
-
 ---
-
 ## ⚙️ Setup & Run
 
 ### Prerequisites
