@@ -1274,9 +1274,7 @@ A multi-stage `Dockerfile`:
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
 - [ ] Mobile app (Android)
-
 ---
-
 ## 📜 License
 
 **Copyright © 2025–2026 Deep Saha. All rights reserved.**
@@ -1293,7 +1291,6 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 <div align="center">
 
 **Deep Saha**
-
 *Backend & System Design Enthusiast*
 
 Java · Spring Boot · Real-Time Systems · North Bengal
@@ -1301,7 +1298,5 @@ Java · Spring Boot · Real-Time Systems · North Bengal
 [![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=for-the-badge&logo=github)](https://github.com/Deep-Saha1925)
 
 ---
-
 *Built with ❤️ for North Bengal*
-
 </div>
