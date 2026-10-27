@@ -997,7 +997,6 @@ GET /admin/routes/template
 ```
 
 </details>
-
 ---
 
 ## 🖥️ Frontend Pages
