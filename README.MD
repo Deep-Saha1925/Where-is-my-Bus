@@ -765,9 +765,7 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
 
 > On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
-
 ---
-
 ## 🔄 Direction Logic
 ```
 sourceOrder < destinationOrder  →  FORWARD  ▶
@@ -775,9 +773,7 @@ sourceOrder > destinationOrder  →  BACKWARD ◀
 ```
 
 A bus is shown to a passenger **only if it has NOT yet crossed their source stop** — computed by comparing the bus's position on the **full route**, not just the searched segment.
-
 ---
-
 ## 🔗 API Endpoints
 
 <details>
