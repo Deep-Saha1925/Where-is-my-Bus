@@ -1203,7 +1203,6 @@ TTL driver:token:<uuid>         # seconds remaining before that driver's token e
 ```
 
 ---
-
 ## 🚀 Deployment
 
 WIMB is deployed on **[Render](https://render.com)** using **Docker**, since Render has no native Java runtime — the `Dockerfile` at the project root handles the build.
@@ -1244,7 +1243,6 @@ A multi-stage `Dockerfile`:
 ---
 
 ## 🚀 Future Enhancements
-
 - [x] ~~WebSocket live tracking (replace 3s polling)~~ — done: STOMP over SockJS, see [Live Updates](#-live-updates-websocket)
 - [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for depot codes **and** routes
 - [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
@@ -1284,7 +1282,6 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 - Full terms: [LICENSE](LICENSE)
 - Open-source libraries used (they keep their own licenses): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
-
 ---
 ## 👨‍💻 Author
 
