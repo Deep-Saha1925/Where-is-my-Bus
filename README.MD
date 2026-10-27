@@ -575,9 +575,7 @@ Optional, and only when the passenger taps it: the browser shows its own permiss
 - **Helpful messages:** denied permission, no GPS signal, timeout, a browser without location support, and a non-https page each give a plain-language message with what to do. Location only works over **https** (or localhost), which your Render site already uses.
 
 Files: `static/js/geo-utils.js` (shared helpers and the share message), `index.html` / `index.js` (button), `track.html` / `track.js` (card, badge, sharing), `StopPoint.java` and `RouteController` (the stop list endpoint). Covered by `tests/js/geo.test.js` and `StopPointTest`.
-
 ---
-
 ## 🔌 When Redis Is Down
 
 ### The problem
@@ -599,9 +597,7 @@ Running buses stay in search and on the admin grid at their last known position,
 - Memory is lost if the server restarts during the outage. After that, a bus is shown at its last position **in the database**, which can be up to 10 minutes old (locations are copied from Redis to the database every 10 minutes). A ride started less than 10 minutes before such a restart has no database row yet, so it stays hidden until its next update arrives.
 - A token issued while Redis is down exists only in memory, so after a restart in that same outage the driver logs in again.
 - All of this is per server instance, like the other in-memory caches.
-
 ---
-
 ## 🧹 Location History Clean-up
 
 ### How locations are stored
@@ -625,9 +621,7 @@ That table only ever grew. One bus sending every 10 seconds adds thousands of ro
 | `RETENTION_ZONE` | `Asia/Kolkata` | Time zone for the schedule |
 
 To see the table size, run in the Neon SQL editor: `SELECT count(*) FROM location;`
-
 ---
-
 ## 📱 Driver App (Background GPS)
 
 ### The problem
