@@ -830,7 +830,6 @@ X-Driver-Token: a1b2c3d4-...
   "longitude": 89.5355
 }
 ```
-
 #### Update Location
 ```http
 POST /api/ride/location
@@ -929,7 +928,6 @@ Returns code, name, and stop count only — never the server file path.
 ```http
 GET /api/routes/stops?routeCode=APD_FLK
 ```
-
 </details>
 
 <details>
