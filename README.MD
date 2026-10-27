@@ -1288,7 +1288,6 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 - Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
 
 ---
-
 ## 👨‍💻 Author
 
 <div align="center">
