@@ -702,9 +702,7 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 | `RIDE_CLEANUP_INTERVAL_MS` | 60000 | How often the cleanup job runs |
 
 > ⚠️ Keep the stale time well above the driver's send interval (about 10 seconds). Rural routes have dead zones, so very short limits would hide buses that are only briefly out of signal.
-
 ---
-
 ## 🛣️ Multi-Route Support
 
 Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
