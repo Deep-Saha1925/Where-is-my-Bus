@@ -643,9 +643,7 @@ The driver page runs in a browser tab. When the phone locks or the driver switch
     - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
 
 > The Android app has **not been built or tested yet**; follow "First test" in `driver-app/README.md`. The browser-side changes work without it and are covered by tests in `tests/js/native-gps.test.js`.
-
 ---
-
 ## ✅ Automated Tests
 
 Three layers, from "always runs" to "opt in":
