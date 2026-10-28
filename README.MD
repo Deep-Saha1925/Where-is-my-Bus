@@ -575,7 +575,9 @@ Optional, and only when the passenger taps it: the browser shows its own permiss
 - **Helpful messages:** denied permission, no GPS signal, timeout, a browser without location support, and a non-https page each give a plain-language message with what to do. Location only works over **https** (or localhost), which your Render site already uses.
 
 Files: `static/js/geo-utils.js` (shared helpers and the share message), `index.html` / `index.js` (button), `track.html` / `track.js` (card, badge, sharing), `StopPoint.java` and `RouteController` (the stop list endpoint). Covered by `tests/js/geo.test.js` and `StopPointTest`.
+
 ---
+
 ## 🔌 When Redis Is Down
 
 ### The problem
@@ -597,7 +599,9 @@ Running buses stay in search and on the admin grid at their last known position,
 - Memory is lost if the server restarts during the outage. After that, a bus is shown at its last position **in the database**, which can be up to 10 minutes old (locations are copied from Redis to the database every 10 minutes). A ride started less than 10 minutes before such a restart has no database row yet, so it stays hidden until its next update arrives.
 - A token issued while Redis is down exists only in memory, so after a restart in that same outage the driver logs in again.
 - All of this is per server instance, like the other in-memory caches.
+
 ---
+
 ## 🧹 Location History Clean-up
 
 ### How locations are stored
@@ -621,7 +625,9 @@ That table only ever grew. One bus sending every 10 seconds adds thousands of ro
 | `RETENTION_ZONE` | `Asia/Kolkata` | Time zone for the schedule |
 
 To see the table size, run in the Neon SQL editor: `SELECT count(*) FROM location;`
+
 ---
+
 ## 📱 Driver App (Background GPS)
 
 ### The problem
@@ -637,7 +643,9 @@ The driver page runs in a browser tab. When the phone locks or the driver switch
     - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
 
 > The Android app has **not been built or tested yet**; follow "First test" in `driver-app/README.md`. The browser-side changes work without it and are covered by tests in `tests/js/native-gps.test.js`.
+
 ---
+
 ## ✅ Automated Tests
 
 Three layers, from "always runs" to "opt in":
@@ -694,7 +702,9 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 | `RIDE_CLEANUP_INTERVAL_MS` | 60000 | How often the cleanup job runs |
 
 > ⚠️ Keep the stale time well above the driver's send interval (about 10 seconds). Rural routes have dead zones, so very short limits would hide buses that are only briefly out of signal.
+
 ---
+
 ## 🛣️ Multi-Route Support
 
 Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
@@ -755,7 +765,9 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
 
 > On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
+
 ---
+
 ## 🔄 Direction Logic
 ```
 sourceOrder < destinationOrder  →  FORWARD  ▶
@@ -763,7 +775,9 @@ sourceOrder > destinationOrder  →  BACKWARD ◀
 ```
 
 A bus is shown to a passenger **only if it has NOT yet crossed their source stop** — computed by comparing the bus's position on the **full route**, not just the searched segment.
+
 ---
+
 ## 🔗 API Endpoints
 
 <details>
@@ -816,6 +830,7 @@ X-Driver-Token: a1b2c3d4-...
   "longitude": 89.5355
 }
 ```
+
 #### Update Location
 ```http
 POST /api/ride/location
@@ -914,6 +929,7 @@ Returns code, name, and stop count only — never the server file path.
 ```http
 GET /api/routes/stops?routeCode=APD_FLK
 ```
+
 </details>
 
 <details>
@@ -981,6 +997,7 @@ GET /admin/routes/template
 ```
 
 </details>
+
 ---
 
 ## 🖥️ Frontend Pages
@@ -1096,7 +1113,9 @@ WIMB/
 ├── Dockerfile                           # multi-stage build: Maven build → slim JRE runtime
 └── pom.xml
 ```
+
 ---
+
 ## ⚙️ Setup & Run
 
 ### Prerequisites
@@ -1184,6 +1203,7 @@ TTL driver:token:<uuid>         # seconds remaining before that driver's token e
 ```
 
 ---
+
 ## 🚀 Deployment
 
 WIMB is deployed on **[Render](https://render.com)** using **Docker**, since Render has no native Java runtime — the `Dockerfile` at the project root handles the build.
@@ -1224,6 +1244,7 @@ A multi-stage `Dockerfile`:
 ---
 
 ## 🚀 Future Enhancements
+
 - [x] ~~WebSocket live tracking (replace 3s polling)~~ — done: STOMP over SockJS, see [Live Updates](#-live-updates-websocket)
 - [x] ~~Admin Excel upload panel (no restart needed)~~ — done, for depot codes **and** routes
 - [x] ~~Multi-route support per Excel file~~ — done: admin can add/update/delete routes, driver picks one explicitly
@@ -1253,7 +1274,9 @@ A multi-stage `Dockerfile`:
 - [ ] Passenger seat booking
 - [ ] Analytics dashboard for operators
 - [ ] Mobile app (Android)
+
 ---
+
 ## 📜 License
 
 **Copyright © 2025–2026 Deep Saha. All rights reserved.**
@@ -1263,12 +1286,15 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 - Full terms: [LICENSE](LICENSE)
 - Open-source libraries used (they keep their own licenses): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
+
 ---
+
 ## 👨‍💻 Author
 
 <div align="center">
 
 **Deep Saha**
+
 *Backend & System Design Enthusiast*
 
 Java · Spring Boot · Real-Time Systems · North Bengal
@@ -1276,5 +1302,7 @@ Java · Spring Boot · Real-Time Systems · North Bengal
 [![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=for-the-badge&logo=github)](https://github.com/Deep-Saha1925)
 
 ---
+
 *Built with ❤️ for North Bengal*
+
 </div>
