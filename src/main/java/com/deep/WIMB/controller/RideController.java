@@ -6,6 +6,7 @@
  */
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.config.InputRules;
 import com.deep.WIMB.dto.ActiveRideResponse;
 import com.deep.WIMB.dto.LocationUpdateRequest;
 import com.deep.WIMB.dto.StartRideRequest;
@@ -50,10 +51,17 @@ public class RideController {
     public Ride startRide(@RequestBody StartRideRequest request,
                           @RequestHeader(value = "X-Driver-Token", required = false) String driverToken) {
 
+        // Same normalisation the login used, so the token's bus and the request's bus compare equal
+        String requestedBus = InputRules.busNumber(request.getBusNumber());
         String tokenBus = driverTokenService.resolveBusNumber(driverToken);
-        if (tokenBus == null || !tokenBus.equalsIgnoreCase(request.getBusNumber())) {
-            throw new DriverNotVerifiedException("Driver not verified for bus " + request.getBusNumber());
+        if (tokenBus == null || !tokenBus.equalsIgnoreCase(requestedBus)) {
+            // Never echo the caller-supplied bus number back (reflected-content risk)
+            throw new DriverNotVerifiedException("Driver not verified for this bus");
         }
+        request.setBusNumber(requestedBus);
+        request.setRouteKey(InputRules.safeText(request.getRouteKey(), "routeKey", 200));
+        request.setRouteCode(InputRules.routeCodeOrNull(request.getRouteCode()));
+        InputRules.coordinates(request.getLatitude(), request.getLongitude());
 
         StartRideRequest newRequest = rideService.updateRequest(request);
         return rideService.startRide(newRequest);
@@ -77,6 +85,7 @@ public class RideController {
         if (tokenBus == null || !activeRideCache.isActiveForBus(request.getRideId(), tokenBus)) {
             throw new DriverNotVerifiedException("Driver not verified for this ride");
         }
+        InputRules.coordinates(request.getLatitude(), request.getLongitude());
 
         return locationService.addLocation(
                 request.getRideId(),
