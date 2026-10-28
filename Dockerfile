@@ -21,5 +21,11 @@ COPY --from=build /app/target/*.jar app.jar
 # Runtime data files (depot codes, route Excel files) read via relative "data/" path
 COPY data data
 
+# Run as an unprivileged user, not root: if the app is ever compromised the attacker
+# doesn't get root inside the container.
+RUN addgroup --system wimb && adduser --system --ingroup wimb wimb \
+    && chown -R wimb:wimb /app
+USER wimb
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
