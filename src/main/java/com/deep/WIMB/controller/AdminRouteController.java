@@ -307,6 +307,70 @@ public class AdminRouteController {
         return ResponseEntity.ok(response);
     }
 
+    /** Adds ONE bus number to an existing route (appends, never replaces) —
+     *  the dropdown form in the Schedule tab. Duplicates are checked
+     *  case-insensitively and reported rather than silently ignored. */
+    @PostMapping("/buses/add")
+    public ResponseEntity<?> addBusNumber(
+            @RequestParam("routeCode") String routeCode,
+            @RequestParam("busNumber") String busNumber
+    ) {
+        String code = cleanCell(routeCode).toUpperCase(Locale.ROOT);
+        String bus = cleanCell(busNumber).toUpperCase(Locale.ROOT);
+
+        if (code.isEmpty() || bus.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Route and bus number are both required"));
+        }
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+
+        List<String> buses = new ArrayList<>(route.getBusNumbers() == null ? List.of() : route.getBusNumbers());
+        boolean alreadyPresent = buses.stream().anyMatch(b -> b.equalsIgnoreCase(bus));
+        if (!alreadyPresent) {
+            buses.add(bus);
+            route.setBusNumbers(buses);
+            routeRepository.save(route);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", alreadyPresent
+                ? bus + " is already on " + code + " — nothing to add"
+                : "Added " + bus + " to " + code);
+        response.put("added", !alreadyPresent);
+        response.put("routeName", route.getRouteName());
+        response.put("busNumbers", buses);
+        return ResponseEntity.ok(response);
+    }
+
+    /** Removes ONE bus number from a route's roster (the chip's × button). */
+    @DeleteMapping("/{routeCode}/buses")
+    public ResponseEntity<?> removeBusNumber(
+            @PathVariable String routeCode,
+            @RequestParam("busNumber") String busNumber
+    ) {
+        String code = cleanCell(routeCode).toUpperCase(Locale.ROOT);
+        String bus = cleanCell(busNumber);
+
+        Route route = routeRepository.findByRouteCode(code).orElse(null);
+        if (route == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Route not found: " + code));
+        }
+
+        List<String> buses = new ArrayList<>(route.getBusNumbers() == null ? List.of() : route.getBusNumbers());
+        boolean removed = buses.removeIf(b -> b.equalsIgnoreCase(bus));
+        if (!removed) {
+            return ResponseEntity.status(404).body(Map.of("error", bus + " is not on " + code));
+        }
+        route.setBusNumbers(buses);
+        routeRepository.save(route);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Removed " + bus + " from " + code,
+                "busNumbers", buses));
+    }
+
     // Generates a ready-to-edit example .xlsx for the bulk bus-roster upload above.
     @GetMapping("/buses/template")
     public ResponseEntity<byte[]> downloadBusRosterTemplate() throws Exception {
