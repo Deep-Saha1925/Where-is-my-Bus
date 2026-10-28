@@ -19,9 +19,8 @@ import java.util.Set;
  * Checks the admin credentials once at startup so a weak or placeholder password is noticed
  * immediately instead of sitting in production unnoticed.
  *
- * By default it only logs a loud warning (so local development is never blocked). Set
- * ENFORCE_STRONG_ADMIN_PASSWORD=true (wimb.security.enforce-strong-admin-password) in
- * production and the application refuses to start until the password is fixed.
+ * By default it now REFUSES TO START with a weak password (secure by default). For local
+ * development only, set ENFORCE_STRONG_ADMIN_PASSWORD=false to downgrade this to a warning.
  *
  * Secret values are never logged -- only what is wrong with them.
  */
@@ -43,7 +42,7 @@ public class StartupConfigValidator {
     @Value("${wimb.admin.password:}")
     private String adminPassword;
 
-    @Value("${wimb.security.enforce-strong-admin-password:false}")
+    @Value("${wimb.security.enforce-strong-admin-password:true}")
     private boolean enforce;
 
     @PostConstruct
