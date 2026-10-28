@@ -9,7 +9,6 @@ package com.deep.WIMB.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
@@ -54,17 +53,10 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
-    // RouteExcelLoader writes the live stops.json to the external, writable
-    // "data/" directory (same runtime-data folder as depot-codes.xlsx and
-    // data/routes/) so it can be regenerated without a rebuild. Without this
-    // mapping, a request for /data/stops.json falls through to Spring Boot's
-    // default classpath:/static/** handler and serves the *build-time*
-    // src/main/resources/static/data/stops.json instead — a completely
-    // different, never-updated file. This mapping makes "/data/**" resolve
-    // to the real runtime folder first, ahead of the default static handler.
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/data/**")
-                .addResourceLocations("file:data/");
-    }
+    // SECURITY: there used to be a "/data/**" -> "file:data/" resource handler here.
+    // It published the ENTIRE runtime data folder to anyone on the internet
+    // (e.g. GET /data/depot-codes.xlsx = every depot's driver login code, and
+    // GET /data/routes/*.xlsx). It was removed on purpose. The only thing the
+    // public pages need from /data is stops.json, which StopsDataController
+    // serves live from memory -- nothing else should ever be exposed.
 }
