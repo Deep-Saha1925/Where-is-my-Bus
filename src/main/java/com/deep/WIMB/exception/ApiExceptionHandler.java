@@ -33,13 +33,30 @@ public class ApiExceptionHandler {
                 .body(Map.of("error", ex.getReason() != null ? ex.getReason() : "Request failed"));
     }
 
-    // Previously this had no logging at all -- every 500 was silently
-    // swallowed into a JSON response with no trace printed anywhere,
-    // which is exactly what made this bug invisible in the console.
+    // Deliberate, short business errors thrown by the services (e.g. "Ride already ended")
+    // are shown to the caller. Anything that looks technical -- SQL, Hibernate, Redis,
+    // class names, stack fragments -- is logged server-side and replaced by a generic
+    // message, so internals (table names, hosts, queries) never reach the browser.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGeneric(Exception ex) {
         log.error("Unhandled exception in controller layer", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : "Unexpected server error"));
+                .body(Map.of("error", publicMessage(ex)));
+    }
+
+    private static String publicMessage(Exception ex) {
+        Class<?> type = ex.getClass();
+        boolean deliberate = type == RuntimeException.class
+                || type == IllegalStateException.class
+                || type == IllegalArgumentException.class;
+        String msg = ex.getMessage();
+        if (deliberate && msg != null && msg.length() <= 120 && msg.indexOf('\n') < 0) {
+            String lower = msg.toLowerCase();
+            boolean technical = lower.contains("sql") || lower.contains("jdbc") || lower.contains("hibernate")
+                    || lower.contains("redis") || lower.contains("exception") || lower.contains("org.")
+                    || lower.contains("java.") || lower.contains("com.deep");
+            if (!technical) return msg;
+        }
+        return "Unexpected server error";
     }
 }
