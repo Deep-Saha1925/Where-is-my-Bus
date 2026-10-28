@@ -6,6 +6,7 @@
  */
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.config.InputRules;
 import com.deep.WIMB.dto.LocationBroadcast;
 import com.deep.WIMB.dto.LocationUpdateRequest;
 import com.deep.WIMB.exception.DriverNotVerifiedException;
@@ -39,6 +40,7 @@ public class LocationController {
         if (tokenBus == null || !activeRideCache.isActiveForBus(request.getRideId(), tokenBus)) {
             throw new DriverNotVerifiedException("Driver not verified for this ride");
         }
+        InputRules.coordinates(request.getLatitude(), request.getLongitude());
 
         return locationService.addLocation(
                 request.getRideId(),
