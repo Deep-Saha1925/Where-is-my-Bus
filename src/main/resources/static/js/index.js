@@ -6,6 +6,17 @@
  */
 const MAX_RECENT = 5;
 
+/* ── XSS protection: every value that comes from the server or a driver is escaped
+   before it is placed into HTML. jsArg() makes a value safe inside an onclick="" call. ── */
+function escapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value == null ? "" : value)));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     loadStops();
     loadDepots();
@@ -69,12 +80,12 @@ function setupStopAutocomplete(inputId, dropdownId, list) {
     let currentMatches = [];
 
     function highlight(text, query) {
-        if (!query) return text;
+        if (!query) return escapeHtml(text);
         const idx = text.toUpperCase().indexOf(query.toUpperCase());
-        if (idx === -1) return text;
-        return text.slice(0, idx)
-            + "<mark>" + text.slice(idx, idx + query.length) + "</mark>"
-            + text.slice(idx + query.length);
+        if (idx === -1) return escapeHtml(text);
+        return escapeHtml(text.slice(0, idx))
+            + "<mark>" + escapeHtml(text.slice(idx, idx + query.length)) + "</mark>"
+            + escapeHtml(text.slice(idx + query.length));
     }
 
     function renderDropdown(query) {
@@ -212,9 +223,9 @@ function renderRecentChips() {
     section.style.display = "block";
     chips.innerHTML = recent.map((r, i) => `
     <div class="recent-chip"
-         onclick="applyRecent('${r.source}', '${r.destination}')">
+         onclick="applyRecent(${jsArg(r.source)}, ${jsArg(r.destination)})">
       <i class="fa-solid fa-clock-rotate-left" style="font-size:11px; opacity:0.7"></i>
-      ${r.source} → ${r.destination}
+      ${escapeHtml(r.source)} → ${escapeHtml(r.destination)}
       <span class="remove-chip"
             onclick="event.stopPropagation(); removeRecent(${i})">✕</span>
     </div>
@@ -252,17 +263,17 @@ async function loadQuickResults() {
         quickList.innerHTML = buses.map((bus, i) => `
       <div class="quick-card fade-up"
            style="animation-delay:${i * 80}ms"
-           onclick="track('${routeKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
+           onclick="track(${jsArg(routeKey)}, ${Number(bus.rideId)}, ${jsArg(bus.routeCode || "")})">
         <div class="bus-icon-wrap">🚌</div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:700; color:var(--text-primary);">
-            ${bus.busNumber}
+            ${escapeHtml(bus.busNumber)}
           </div>
           <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-            <span class="route-src">${source}</span>
+            <span class="route-src">${escapeHtml(source)}</span>
             <i class="fa-solid fa-arrow-right"
                style="margin:0 4px; font-size:10px; color:var(--text-faint);"></i>
-            <span class="route-dest">${destination}</span>
+            <span class="route-dest">${escapeHtml(destination)}</span>
           </div>
         </div>
         <div style="text-align:right; flex-shrink:0;">
@@ -313,7 +324,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
           <div class="bus-icon-wrap">🚌</div>
           <div>
             <div style="font-size:16px; font-weight:700; color:var(--text-primary);">
-              ${bus.busNumber}
+              ${escapeHtml(bus.busNumber)}
             </div>
             <div style="font-size:11px; color:var(--text-faint); margin-top:1px;">
               Ride #${bus.rideId}
@@ -333,13 +344,13 @@ function renderBusCards(buses, routeKey, opts = {}) {
       </div>
 
       <div class="route-pill">
-        <span class="route-src">${src}</span>
+        <span class="route-src">${escapeHtml(src)}</span>
         <i class="fa-solid fa-arrow-right"
            style="font-size:10px; color:var(--text-faint); margin:0 2px;"></i>
-        <span class="route-dest">${dest}</span>
+        <span class="route-dest">${escapeHtml(dest)}</span>
       </div>
 
-      <button class="track-btn" onclick="track('${cardKey}', ${bus.rideId}, '${bus.routeCode || ""}')">
+      <button class="track-btn" onclick="track(${jsArg(cardKey)}, ${Number(bus.rideId)}, ${jsArg(bus.routeCode || "")})">
         <i class="fa-solid fa-location-dot"></i>
         Track Bus
       </button>
@@ -726,25 +737,25 @@ async function searchDepotRoutes() {
             if (r.time) {
                 return `
                   <div class="depot-route-card timetable-row" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
-                    <div class="timetable-time">${r.time}</div>
+                    <div class="timetable-time">${escapeHtml(r.time)}</div>
                     <div class="timetable-info">
-                      <div class="timetable-route-name">${r.routeName}</div>
-                      <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; ${r.stopsBetween} stop${r.stopsBetween > 1 ? "s" : ""} &middot; ${r.distanceKm.toFixed(1)} km</div>
+                      <div class="timetable-route-name">${escapeHtml(r.routeName)}</div>
+                      <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; ${Number(r.stopsBetween)} stop${r.stopsBetween > 1 ? "s" : ""} &middot; ${Number(r.distanceKm).toFixed(1)} km</div>
                     </div>
                   </div>
                 `;
             }
 
             const busNote = (r.busNumbers && r.busNumbers.length)
-                ? `Buses: ${r.busNumbers.join(", ")}`
+                ? `Buses: ${escapeHtml(r.busNumbers.join(", "))}`
                 : "buses run periodically";
 
             return `
               <div class="depot-route-card timetable-row timetable-row--fallback" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
                 <div class="timetable-time"><i class="fa-solid fa-clock"></i></div>
                 <div class="timetable-info">
-                  <div class="timetable-route-name">${r.routeName}</div>
-                  <div class="timetable-meta">${r.sourceDepot} → ${r.destinationDepot} &middot; no fixed timetable registered yet &middot; ${busNote}</div>
+                  <div class="timetable-route-name">${escapeHtml(r.routeName)}</div>
+                  <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; no fixed timetable registered yet &middot; ${busNote}</div>
                 </div>
               </div>
             `;
