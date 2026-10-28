@@ -337,6 +337,41 @@
         .upload-btn:active { transform: scale(0.99); }
         .upload-status { font-size: 12.5px; min-height: 18px; margin-top: 10px; }
 
+        /* dropdown pickers + chips (single-entry forms) */
+        .pick-select {
+            width: 100%; font-size: 13px; color: var(--text-primary);
+            padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+            background: var(--bg-page); margin-bottom: 10px; cursor: pointer;
+        }
+        .pick-select:focus, .pick-text:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        .pick-text {
+            flex: 1; min-width: 0; font-size: 13px; color: var(--text-primary);
+            padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+            background: var(--bg-page); margin-bottom: 10px;
+        }
+        .inline-row { display: flex; gap: 8px; align-items: flex-start; }
+        .mini-btn {
+            padding: 10px 16px; border-radius: 10px; border: none; background: var(--accent);
+            color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 10px; white-space: nowrap;
+        }
+        .mini-btn:hover { filter: brightness(0.92); }
+        .upload-btn.danger { background: transparent; color: #ef4444; border: 1px solid #ef4444; }
+        .upload-btn.danger:hover { background: rgba(239,68,68,0.08); filter: none; }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 8px; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px;
+            border-radius: 999px; background: var(--accent-soft); color: var(--text-primary);
+            font-size: 12px; font-weight: 600; white-space: nowrap;
+        }
+        .chip.static { padding-right: 10px; }
+        .chip button {
+            border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+            font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 999px;
+        }
+        .chip button:hover { color: #ef4444; background: rgba(239,68,68,0.12); }
+        .chip-empty { font-size: 12px; color: var(--text-faint); }
+        .hidden { display: none !important; }
+
         .replace-warning {
             display: flex; gap: 8px; align-items: flex-start;
             font-size: 12px; color: var(--text-muted);
@@ -496,12 +531,39 @@
 <div id="tab-depots" class="tab-panel" style="display:none;">
     <div class="depot-layout">
 
+        <!-- Single depot: pick from dropdown to edit, or choose "New depot" — no Excel needed -->
+        <div class="panel-card">
+            <div class="panel-card-header">
+                <div class="panel-icon">✏️</div>
+                <div>
+                    <div class="panel-title">Add or edit one depot</div>
+                    <div class="panel-sub">No file needed — pick a depot to change it, or add a new one</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <label class="brand-label-sm">Depot</label>
+                <select id="depotPickSelect" class="pick-select" onchange="onDepotFormPick()"></select>
+
+                <label class="brand-label-sm">Depot name</label>
+                <input type="text" id="depotNameInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. ALIPURDUAR"/>
+
+                <label class="brand-label-sm">Code</label>
+                <input type="text" id="depotCodeInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="The code drivers enter to start a ride"/>
+
+                <div style="display:flex; gap:8px;">
+                    <button onclick="saveSingleDepot()" class="upload-btn" id="depotSaveBtn">Add depot</button>
+                    <button onclick="deleteSingleDepot()" class="upload-btn danger hidden" id="depotDeleteBtn">Delete</button>
+                </div>
+                <div id="depotSingleStatus" class="upload-status"></div>
+            </div>
+        </div>
+
         <!-- Instructions + example -->
         <div class="panel-card">
             <div class="panel-card-header">
                 <div class="panel-icon">📋</div>
                 <div>
-                    <div class="panel-title">How to prepare the file</div>
+                    <div class="panel-title">Bulk upload: how to prepare the file</div>
                     <div class="panel-sub">Any Excel format works — .xlsx, .xls or .xlsm</div>
                 </div>
             </div>
@@ -573,9 +635,9 @@
             <div class="panel-card-body">
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
-                        <thead><tr><th>Depot</th><th>Code</th></tr></thead>
+                        <thead><tr><th>Depot</th><th>Code</th><th>Actions</th></tr></thead>
                         <tbody id="depotTableBody">
-                        <tr><td colspan="2" class="table-empty">Loading...</td></tr>
+                        <tr><td colspan="3" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -643,24 +705,26 @@
                 <div style="display:flex; gap:10px; margin-top:10px; margin-bottom:2px;">
                     <div style="flex:1;">
                         <label class="brand-label-sm">Source depot</label>
-                        <input type="text" id="routeSourceDepotInput" class="file-input" style="border-style:solid;" placeholder="e.g. ALIPURDUAR"/>
+                        <select id="routeSourceDepotInput" class="pick-select" onchange="onDepotPick('routeSourceDepotInput')"></select>
+                        <input type="text" id="routeSourceDepotInput__other" class="pick-text hidden" style="width:100%;" placeholder="Type depot name"/>
                     </div>
                     <div style="flex:1;">
                         <label class="brand-label-sm">Destination depot</label>
-                        <input type="text" id="routeDestDepotInput" class="file-input" style="border-style:solid;" placeholder="e.g. COOCHBEHAR"/>
+                        <select id="routeDestDepotInput" class="pick-select" onchange="onDepotPick('routeDestDepotInput')"></select>
+                        <input type="text" id="routeDestDepotInput__other" class="pick-text hidden" style="width:100%;" placeholder="Type depot name"/>
                     </div>
                 </div>
                 <div style="font-size:11px; color:var(--text-faint); margin-top:2px; margin-bottom:10px;">
                     Which way THIS route runs. Matters most when you register a route for each direction on the
                     same road (e.g. APD_COB and COB_APD) — the depot search uses this, not the stop order in
-                    your Excel file, to tell them apart. Leave blank to guess from the file's first/last stop.
+                    your Excel file, to tell them apart. Depots come from the Depot Codes tab — choose "Other" to type one that isn't listed.
+                    Leave blank to guess from the file's first/last stop.
                 </div>
 
                 <label class="brand-label-sm">Bus numbers (optional)</label>
-                <input type="text" id="routeBusesInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
-                       placeholder="e.g. WB-23A-1245, WB-23A-1290"/>
-                <div style="font-size:11px; color:var(--text-faint); margin-top:-6px; margin-bottom:10px;">
-                    Comma-separated. This just powers the passenger's "buses between depots" search —
+                <div id="routeBusesPicker"></div>
+                <div style="font-size:11px; color:var(--text-faint); margin-top:-4px; margin-bottom:10px;">
+                    Pick a bus already used on another route, or type a new number. This just powers the passenger's "buses between depots" search —
                     it's a roster, not live tracking, so it's fine to leave blank or update it later.
                 </div>
 
@@ -745,6 +809,31 @@
 <div id="tab-busroster" class="tab-panel" style="display:none;">
     <div class="depot-layout">
 
+        <!-- Quick add: one bus onto a route, from dropdowns -->
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">🚌</div>
+                <div>
+                    <div class="panel-title">Add a bus to a route</div>
+                    <div class="panel-sub">Choose the route, then pick a known bus or type a new one — no file needed</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <label class="brand-label-sm">Route</label>
+                <select id="busRouteSelect" class="pick-select" onchange="onBusRouteChange()"></select>
+                <div id="busRouteCurrent" style="margin-bottom:4px;"></div>
+
+                <label class="brand-label-sm">Bus number</label>
+                <select id="busKnownSelect" class="pick-select"><option value="">Pick a known bus…</option></select>
+                <div class="inline-row">
+                    <input type="text" id="busNewInput" class="pick-text" placeholder="…or type a new bus number, e.g. WB-23A-1245"
+                           onkeydown="if(event.key==='Enter'){addBusEntry();}"/>
+                    <button class="mini-btn" onclick="addBusEntry()">Add Bus</button>
+                </div>
+                <div id="busAddStatus" class="upload-status" style="margin-top:0;"></div>
+            </div>
+        </div>
+
         <!-- Timetable: manual add-one-row form + single bulk file upload -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
@@ -756,16 +845,16 @@
             </div>
             <div class="panel-card-body">
 
-                <label class="brand-label-sm">Route code</label>
-                <input type="text" id="scheduleRouteCodeInput" class="file-input" style="border-style:solid; margin-bottom:6px;"
-                       placeholder="e.g. APD_FLK" oninput="lookupScheduleRouteName()"/>
+                <label class="brand-label-sm">Route</label>
+                <select id="scheduleRouteCodeInput" class="pick-select" onchange="lookupScheduleRouteName()"></select>
                 <div id="scheduleRouteNameHint" style="font-size:12px; margin-bottom:10px; min-height:16px;"></div>
 
                 <label class="brand-label-sm">Departure time</label>
-                <input type="text" id="scheduleTimeInput" class="file-input" style="border-style:solid; margin-bottom:10px;"
-                       placeholder="e.g. 06:00"/>
+                <input type="time" id="scheduleTimeInput" class="pick-text" style="width:100%; display:block;"
+                       onkeydown="if(event.key==='Enter'){addScheduleEntry();}"/>
 
                 <button onclick="addScheduleEntry()" class="upload-btn">Add Departure</button>
+                <div style="font-size:11px; color:var(--text-faint); margin-top:6px;">The route stays selected, so you can add several times in a row.</div>
                 <div id="scheduleAddStatus" class="upload-status"></div>
 
                 <hr style="border:none; border-top:1px solid var(--border); margin:22px 0;"/>
@@ -872,6 +961,11 @@
             // If CSRF fetch fails, just ignore — Spring will reject if needed
         });
 
+    /* ── SHARED STATE for the dropdown pickers ── */
+    let depotsCache = {};      // { "ALIPURDUAR": "101", ... } — feeds every depot dropdown
+    let sharedRoutes = [];     // latest /admin/routes result — feeds route + known-bus dropdowns
+    const busPickers = {};     // containerId -> { items: [bus numbers chosen so far] }
+
     /* ── DEPOT CODES ── */
     async function loadDepotTable() {
         const tbody = document.getElementById("depotTableBody");
@@ -879,6 +973,8 @@
         try {
             const res = await fetch("/admin/depots");
             const depots = await res.json(); // { "ALIPURDUAR": "101", ... }
+            depotsCache = depots;
+            refreshDepotSelects();
             const entries = Object.entries(depots);
 
             countSub.textContent = entries.length
@@ -886,19 +982,23 @@
                 : "No depots loaded yet";
 
             if (!entries.length) {
-                tbody.innerHTML = `<tr><td colspan="2" class="table-empty">No depot codes uploaded yet — use the form above</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No depots yet — add one with the form above</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = entries.map(([name, code]) => `
         <tr>
-          <td>${name}</td>
-          <td class="code-cell">${code}</td>
+          <td>${esc(name)}</td>
+          <td class="code-cell">${esc(code)}</td>
+          <td style="white-space:nowrap;">
+            <button class="row-update-btn" data-name="${esc(name)}" onclick="editDepotFromTable(this.dataset.name)">Edit</button>
+            <button class="row-delete-btn" data-name="${esc(name)}" onclick="deleteDepotByName(this.dataset.name)">Delete</button>
+          </td>
         </tr>`).join("");
         } catch (err) {
             console.error("Failed to load depot codes:", err);
             countSub.textContent = "Failed to load";
-            tbody.innerHTML = `<tr><td colspan="2" class="table-empty" style="color:#ef4444;">Failed to load depot codes</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load depot codes</td></tr>`;
         }
     }
 
@@ -1025,6 +1125,7 @@
             const res = await fetch("/admin/routes");
             const routes = await res.json(); // [{ routeCode, routeName, stopCount, busNumbers, departureTimes, sourceDepot, destinationDepot, ... }]
             routesCache = routes;
+            onRoutesLoaded(routes);
 
             countSub.textContent = routes.length
                 ? `${routes.length} route${routes.length > 1 ? "s" : ""} registered`
@@ -1071,26 +1172,20 @@
         const r = routesCache.find(x => x.routeCode === routeCode);
         if (!row || !r) return;
 
-        const currentBuses = (r.busNumbers || []).join(", ");
-
         row.innerHTML = `
       <td class="code-cell">${esc(routeCode)}</td>
       <td colspan="5">
         <input type="text" id="editName-${esc(routeCode)}" value="${esc(r.routeName)}"
                class="file-input" style="border-style:solid; margin-bottom:6px;" placeholder="Route name"/>
-        <div style="display:flex; gap:8px; margin-bottom:6px;">
-          <input type="text" id="editSource-${esc(routeCode)}" value="${esc(r.sourceDepot || '')}"
-                 class="file-input" style="border-style:solid; flex:1;" placeholder="Source depot, e.g. ALIPURDUAR"/>
-          <input type="text" id="editDest-${esc(routeCode)}" value="${esc(r.destinationDepot || '')}"
-                 class="file-input" style="border-style:solid; flex:1;" placeholder="Destination depot, e.g. COOCHBEHAR"/>
+        <div style="display:flex; gap:8px; margin-bottom:2px;">
+          ${depotPickHtml('editSource-' + routeCode, r.sourceDepot)}
+          ${depotPickHtml('editDest-' + routeCode, r.destinationDepot)}
         </div>
         <div style="font-size:11px; color:var(--text-faint); margin-bottom:6px;">
           This is which way THIS route runs, used by the depot search to tell a there-route apart from its
           back-route on the same road. It's independent of stop order in the Excel file.
         </div>
-        <input type="text" id="editBuses-${esc(routeCode)}" value="${esc(currentBuses)}"
-               class="file-input" style="border-style:solid; margin-bottom:6px;"
-               placeholder="Bus numbers, comma-separated (optional)"/>
+        <div id="editBuses-${esc(routeCode)}" style="margin-bottom:6px;"></div>
         <input type="file" id="editFile-${esc(routeCode)}" accept=".xlsx,.xls,.xlsm" class="file-input"/>
         <div style="font-size:11px; color:var(--text-faint); margin-top:4px;">
           Leave the file blank to keep the current stops. Departure times are edited in the 🚐 Schedule tab.
@@ -1102,13 +1197,11 @@
         <button class="row-delete-btn" onclick="loadRouteTable()">Cancel</button>
       </td>
     `;
+        createBusPicker(`editBuses-${routeCode}`, r.busNumbers || []);
     }
 
     async function saveRouteEdit(routeCode) {
         const nameInput = document.getElementById(`editName-${routeCode}`);
-        const sourceInput = document.getElementById(`editSource-${routeCode}`);
-        const destInput = document.getElementById(`editDest-${routeCode}`);
-        const busesInput = document.getElementById(`editBuses-${routeCode}`);
         const fileInput = document.getElementById(`editFile-${routeCode}`);
         const statusEl = document.getElementById(`editStatus-${routeCode}`);
 
@@ -1124,9 +1217,9 @@
 
         const formData = new FormData();
         formData.append("routeName", routeName);
-        formData.append("busNumbers", busesInput.value.trim());
-        formData.append("sourceDepot", sourceInput.value.trim());
-        formData.append("destinationDepot", destInput.value.trim());
+        formData.append("busNumbers", busPickerValue(`editBuses-${routeCode}`));
+        formData.append("sourceDepot", getDepotPickValue(`editSource-${routeCode}`));
+        formData.append("destinationDepot", getDepotPickValue(`editDest-${routeCode}`));
         if (fileInput.files.length) {
             formData.append("file", fileInput.files[0]);
         }
@@ -1184,9 +1277,6 @@
         const codeInput = document.getElementById("routeCodeInput");
         const nameInput = document.getElementById("routeNameInput");
         const fileInput = document.getElementById("routeFileInput");
-        const busesInput = document.getElementById("routeBusesInput");
-        const sourceDepotInput = document.getElementById("routeSourceDepotInput");
-        const destDepotInput = document.getElementById("routeDestDepotInput");
         const statusEl = document.getElementById("routeUploadStatus");
 
         const routeCode = codeInput.value.trim();
@@ -1210,9 +1300,9 @@
         formData.append("routeCode", routeCode);
         formData.append("routeName", routeName);
         formData.append("file", fileInput.files[0]);
-        formData.append("busNumbers", busesInput.value.trim());
-        formData.append("sourceDepot", sourceDepotInput.value.trim());
-        formData.append("destinationDepot", destDepotInput.value.trim());
+        formData.append("busNumbers", busPickerValue("routeBusesPicker"));
+        formData.append("sourceDepot", getDepotPickValue("routeSourceDepotInput"));
+        formData.append("destinationDepot", getDepotPickValue("routeDestDepotInput"));
         formData.append("_csrf", document.getElementById("csrfToken").value);
 
         try {
@@ -1236,9 +1326,13 @@
             codeInput.value = "";
             nameInput.value = "";
             fileInput.value = "";
-            busesInput.value = "";
-            sourceDepotInput.value = "";
-            destDepotInput.value = "";
+            lastSuggestedName = "";
+            createBusPicker("routeBusesPicker", []);
+            ["routeSourceDepotInput", "routeDestDepotInput"].forEach(id => {
+                document.getElementById(id).value = "";
+                document.getElementById(id + "__other").value = "";
+                onDepotPick(id, true);
+            });
             loadRouteTable();
         } catch (err) {
             console.error(err);
@@ -1358,6 +1452,7 @@
             const res = await fetch("/admin/routes");
             const routes = await res.json();
             scheduleRoutesCache = routes;
+            onRoutesLoaded(routes);
 
             const withSchedule = routes.filter(r =>
                 (r.busNumbers && r.busNumbers.length) || (r.departureTimes && r.departureTimes.length));
@@ -1373,12 +1468,9 @@
 
             tbody.innerHTML = routes.map(r => {
                 const hasTimes = !!(r.departureTimes && r.departureTimes.length);
-                const buses = (r.busNumbers && r.busNumbers.length)
-                    ? esc(r.busNumbers.join(", "))
-                    : `<span style="color:var(--text-faint);">\u2014 none registered \u2014</span>`;
-                const departures = hasTimes
-                    ? esc(r.departureTimes.join(", "))
-                    : `<span style="color:var(--text-faint);">\u2014 none registered \u2014</span>`;
+                // Each bus / time is its own chip with an × — remove one without opening the row editor
+                const buses = `<div class="chip-row" style="margin:0;">${chipsHtml(r.busNumbers, "removeBusChip", r.routeCode)}</div>`;
+                const departures = `<div class="chip-row" style="margin:0;">${chipsHtml(r.departureTimes, "removeDepartureChip", r.routeCode)}</div>`;
                 return `
         <tr id="schedRow-${esc(r.routeCode)}">
           <td class="code-cell">${esc(r.routeCode)}</td>
@@ -1532,23 +1624,17 @@
     loadLastDepartureFile();
 
     function lookupScheduleRouteName() {
-        const codeInput = document.getElementById("scheduleRouteCodeInput");
+        const select = document.getElementById("scheduleRouteCodeInput");
         const hint = document.getElementById("scheduleRouteNameHint");
-        const code = codeInput.value.trim().toUpperCase();
+        if (!select || !hint) return;
 
-        if (!code) {
-            hint.textContent = "";
+        const match = sharedRoutes.find(r => r.routeCode === select.value);
+        if (!match) {
+            hint.innerHTML = sharedRoutes.length ? "" : `<span style="color:var(--text-faint);">No routes registered yet — add one in the Routes tab first</span>`;
             return;
         }
-
-        const match = scheduleRoutesCache.find(r => r.routeCode.toUpperCase() === code);
-        if (match) {
-            hint.textContent = `✓ ${match.routeName}`;
-            hint.style.color = "#059669";
-        } else {
-            hint.textContent = "No route found with this code — check the Routes tab";
-            hint.style.color = "#ef4444";
-        }
+        hint.innerHTML = `<div style="font-size:11px; color:var(--text-faint); margin-bottom:4px;">Departures on ${esc(match.routeName)} now</div>
+            <div class="chip-row">${chipsHtml(match.departureTimes, "removeDepartureChip", match.routeCode)}</div>`;
     }
 
     async function addScheduleEntry() {
@@ -1557,10 +1643,10 @@
         const statusEl = document.getElementById("scheduleAddStatus");
 
         const routeCode = codeInput.value.trim();
-        const departureTime = timeInput.value.trim();
+        const departureTime = timeInput.value.trim(); // <input type="time"> always gives 24h HH:mm
 
         if (!routeCode || !departureTime) {
-            statusEl.textContent = "Please enter both a route code and a departure time";
+            statusEl.textContent = "Please choose a route and a departure time";
             statusEl.style.color = "#ef4444";
             return;
         }
@@ -1602,6 +1688,378 @@
     }
 
     loadBusRosterTable();
+
+
+    /* ═════════ DROPDOWN HELPERS ═════════ */
+
+    /* ── Single-depot form (Depot Codes tab) ── */
+    function refreshDepotFormSelect() {
+        const sel = document.getElementById("depotPickSelect");
+        if (!sel) return;
+        const current = sel.value;
+        const names = Object.keys(depotsCache);
+        sel.innerHTML = `<option value="">➕ New depot…</option>` +
+            names.map(n => `<option value="${esc(n)}">${esc(n)} (code ${esc(depotsCache[n])})</option>`).join("");
+        sel.value = names.includes(current) ? current : "";
+        onDepotFormPick();
+    }
+
+    function onDepotFormPick() {
+        const name = document.getElementById("depotPickSelect").value;
+        const nameInput = document.getElementById("depotNameInput");
+        const codeInput = document.getElementById("depotCodeInput");
+        nameInput.value = name;
+        nameInput.readOnly = !!name;      // existing depot: name is its identity, only the code changes
+        nameInput.style.opacity = name ? "0.7" : "1";
+        codeInput.value = name ? depotsCache[name] : "";
+        document.getElementById("depotSaveBtn").textContent = name ? "Save changes" : "Add depot";
+        document.getElementById("depotDeleteBtn").classList.toggle("hidden", !name);
+    }
+
+    function editDepotFromTable(name) {
+        const sel = document.getElementById("depotPickSelect");
+        sel.value = name;
+        onDepotFormPick();
+        sel.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("depotCodeInput").focus();
+    }
+
+    function setStatus(el, text, color) {
+        el.textContent = text;
+        el.style.color = color;
+    }
+
+    async function saveSingleDepot() {
+        const statusEl = document.getElementById("depotSingleStatus");
+        const name = document.getElementById("depotNameInput").value.trim();
+        const code = document.getElementById("depotCodeInput").value.trim();
+
+        if (!name || !code) {
+            setStatus(statusEl, "Please enter both a depot name and a code", "#ef4444");
+            return;
+        }
+        setStatus(statusEl, "Saving...", "var(--text-muted)");
+
+        const formData = new FormData();
+        formData.append("depotName", name);
+        formData.append("code", code);
+        formData.append("_csrf", document.getElementById("csrfToken").value);
+
+        try {
+            const res = await fetch("/admin/depots/save", { method: "POST", body: formData });
+            const data = await res.json();
+            if (!res.ok) {
+                setStatus(statusEl, data.error || "Save failed", "#ef4444");
+                return;
+            }
+            await loadDepotTable();
+            document.getElementById("depotPickSelect").value = name.toUpperCase();
+            onDepotFormPick();
+            setStatus(statusEl, "✅ " + data.message + ` (${data.depotCount} depots total)`, "#059669");
+            loadLastDepotFile();
+        } catch (err) {
+            console.error(err);
+            setStatus(statusEl, "Save failed: " + err.message, "#ef4444");
+        }
+    }
+
+    async function deleteDepotByName(name) {
+        if (!confirm(`Delete depot "${name}"?\n\nDrivers from this depot will no longer be able to start a ride with its code. Routes that already mention it keep the text.`)) {
+            return;
+        }
+        const statusEl = document.getElementById("depotSingleStatus");
+        try {
+            const csrf = document.getElementById("csrfToken").value;
+            const res = await fetch(`/admin/depots?name=${encodeURIComponent(name)}&_csrf=${encodeURIComponent(csrf)}`,
+                { method: "DELETE" });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || "Delete failed");
+                return;
+            }
+            document.getElementById("depotPickSelect").value = "";
+            await loadDepotTable();
+            setStatus(statusEl, "✅ " + data.message, "#059669");
+            loadLastDepotFile();
+        } catch (err) {
+            console.error(err);
+            alert("Delete failed: " + err.message);
+        }
+    }
+
+    function deleteSingleDepot() {
+        const name = document.getElementById("depotPickSelect").value;
+        if (name) deleteDepotByName(name);
+    }
+
+    /* ── Depot dropdown used for a route's source / destination ── */
+    function depotOptionsHtml(selected, hasOther) {
+        const names = Object.keys(depotsCache);
+        const sel = (selected || "").trim().toUpperCase();
+        const inList = !sel || names.includes(sel);
+        let html = `<option value="">— Not set (guess from file) —</option>`;
+        html += names.map(n => `<option value="${esc(n)}"${n === sel ? " selected" : ""}>${esc(n)}</option>`).join("");
+        html += `<option value="__other__"${!inList ? " selected" : ""}>Other (type manually)…</option>`;
+        return html;
+    }
+
+    function fillDepotSelect(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const wasOther = el.value === "__other__";
+        const prev = wasOther ? "" : el.value;
+        el.innerHTML = depotOptionsHtml(prev);
+        if (wasOther) el.value = "__other__";
+        onDepotPick(id, true);
+    }
+
+    function refreshDepotSelects() {
+        fillDepotSelect("routeSourceDepotInput");
+        fillDepotSelect("routeDestDepotInput");
+        refreshDepotFormSelect();
+    }
+
+    function onDepotPick(id, silent) {
+        const el = document.getElementById(id);
+        const other = document.getElementById(id + "__other");
+        if (!el || !other) return;
+        other.classList.toggle("hidden", el.value !== "__other__");
+        if (el.value === "__other__" && !silent) other.focus();
+        if (!silent) suggestRouteName();
+    }
+
+    function getDepotPickValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return "";
+        if (el.value === "__other__") {
+            const other = document.getElementById(id + "__other");
+            return other ? other.value.trim() : "";
+        }
+        return el.value;
+    }
+
+    /* "ALIPURDUAR" + "COOCHBEHAR" -> "Alipurduar ⇄ Coochbehar", only into an empty (or previously suggested) name box */
+    let lastSuggestedName = "";
+    function titleCase(t) { return t.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
+    function suggestRouteName() {
+        const nameInput = document.getElementById("routeNameInput");
+        if (!nameInput) return;
+        const src = getDepotPickValue("routeSourceDepotInput");
+        const dst = getDepotPickValue("routeDestDepotInput");
+        if (!src || !dst) return;
+        if (nameInput.value.trim() === "" || nameInput.value === lastSuggestedName) {
+            lastSuggestedName = `${titleCase(src)} ⇄ ${titleCase(dst)}`;
+            nameInput.value = lastSuggestedName;
+        }
+    }
+
+    /* Edit-row version: select + manual box in one string, ids = baseId / baseId__other */
+    function depotPickHtml(id, selected) {
+        const names = Object.keys(depotsCache);
+        const sel = (selected || "").trim().toUpperCase();
+        const custom = sel && !names.includes(sel);
+        return `
+          <div style="flex:1; min-width:0;">
+            <select id="${id}" class="pick-select" onchange="onDepotPick('${id}', true)">${depotOptionsHtml(selected)}</select>
+            <input type="text" id="${id}__other" class="pick-text ${custom ? "" : "hidden"}" style="width:100%;"
+                   value="${custom ? esc(selected) : ""}" placeholder="Type depot name"/>
+          </div>`;
+    }
+
+    /* ── Bus picker: chips + known-bus dropdown + type-a-new-one ── */
+    function allKnownBuses() {
+        const set = new Map();
+        sharedRoutes.forEach(r => (r.busNumbers || []).forEach(b => {
+            if (b && !set.has(b.toUpperCase())) set.set(b.toUpperCase(), b);
+        }));
+        return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+    }
+
+    function createBusPicker(id, initial) {
+        busPickers[id] = { items: (initial || []).slice() };
+        renderBusPicker(id);
+    }
+
+    function renderBusPicker(id) {
+        const box = document.getElementById(id);
+        const st = busPickers[id];
+        if (!box || !st) return;
+
+        const typedEl = document.getElementById(id + "__new");
+        const typed = typedEl ? typedEl.value : "";
+
+        const chosen = new Set(st.items.map(b => b.toUpperCase()));
+        const known = allKnownBuses().filter(b => !chosen.has(b.toUpperCase()));
+
+        const chips = st.items.length
+            ? st.items.map((b, i) => `<span class="chip">${esc(b)}<button type="button" title="Remove"
+                  onclick="busPickerRemove('${id}', ${i})">×</button></span>`).join("")
+            : `<span class="chip-empty">No buses added yet</span>`;
+
+        box.innerHTML = `
+          <div class="chip-row">${chips}</div>
+          <select class="pick-select" onchange="busPickerSelect('${id}', this)">
+            <option value="">${known.length ? "Pick a bus used on another route…" : "No other known buses yet"}</option>
+            ${known.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("")}
+          </select>
+          <div class="inline-row">
+            <input type="text" id="${id}__new" class="pick-text" placeholder="…or type a new bus number"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();busPickerAddTyped('${id}');}"/>
+            <button type="button" class="mini-btn" onclick="busPickerAddTyped('${id}')">Add</button>
+          </div>`;
+        document.getElementById(id + "__new").value = typed;
+    }
+
+    function busPickerAdd(id, bus) {
+        const st = busPickers[id];
+        const clean = (bus || "").trim().toUpperCase();
+        if (!st || !clean) return;
+        if (!st.items.some(b => b.toUpperCase() === clean)) st.items.push(clean);
+    }
+    function busPickerSelect(id, selectEl) {
+        busPickerAdd(id, selectEl.value);
+        renderBusPicker(id);
+    }
+    function busPickerAddTyped(id) {
+        const input = document.getElementById(id + "__new");
+        // allow "A, B, C" pasted in one go
+        (input.value || "").split(",").forEach(piece => busPickerAdd(id, piece));
+        input.value = "";
+        renderBusPicker(id);
+        document.getElementById(id + "__new").focus();
+    }
+    function busPickerRemove(id, index) {
+        busPickers[id].items.splice(index, 1);
+        renderBusPicker(id);
+    }
+    /* Anything still typed but not yet "Add"-ed is included, so a forgotten click doesn't lose a bus */
+    function busPickerValue(id) {
+        const typedEl = document.getElementById(id + "__new");
+        if (typedEl && typedEl.value.trim()) busPickerAddTyped(id);
+        return busPickers[id] ? busPickers[id].items.join(", ") : "";
+    }
+
+    /* ── Route dropdowns (Schedule tab) + chip lists ── */
+    function chipsHtml(items, removeFn, routeCode) {
+        if (!items || !items.length) return `<span class="chip-empty">— none registered —</span>`;
+        return items.map(v => `<span class="chip">${esc(v)}<button type="button" title="Remove"
+              data-route="${esc(routeCode)}" data-val="${esc(v)}"
+              onclick="${removeFn}(this.dataset.route, this.dataset.val)">×</button></span>`).join("");
+    }
+
+    function routeOptionsHtml() {
+        return `<option value="">Select a route…</option>` +
+            sharedRoutes.map(r => `<option value="${esc(r.routeCode)}">${esc(r.routeCode)} — ${esc(r.routeName)}</option>`).join("");
+    }
+
+    function refreshRouteSelects() {
+        ["scheduleRouteCodeInput", "busRouteSelect"].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const prev = el.value;
+            el.innerHTML = routeOptionsHtml();
+            if (sharedRoutes.some(r => r.routeCode === prev)) el.value = prev;
+        });
+        lookupScheduleRouteName();
+        onBusRouteChange();
+    }
+
+    function onRoutesLoaded(routes) {
+        sharedRoutes = routes || [];
+        refreshRouteSelects();
+        if (busPickers["routeBusesPicker"]) renderBusPicker("routeBusesPicker");
+    }
+
+    /* ── "Add a bus to a route" card (Schedule tab) ── */
+    function onBusRouteChange() {
+        const code = document.getElementById("busRouteSelect").value;
+        const route = sharedRoutes.find(r => r.routeCode === code);
+        const current = document.getElementById("busRouteCurrent");
+        const known = document.getElementById("busKnownSelect");
+
+        if (!route) {
+            current.innerHTML = "";
+        } else {
+            current.innerHTML = `<div style="font-size:11px; color:var(--text-faint); margin-bottom:4px;">Buses on this route now</div>
+                <div class="chip-row">${chipsHtml(route.busNumbers, "removeBusChip", route.routeCode)}</div>`;
+        }
+        const onRoute = new Set(((route && route.busNumbers) || []).map(b => b.toUpperCase()));
+        known.innerHTML = `<option value="">Pick a known bus…</option>` +
+            allKnownBuses().filter(b => !onRoute.has(b.toUpperCase()))
+                .map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
+    }
+
+    async function addBusEntry() {
+        const statusEl = document.getElementById("busAddStatus");
+        const code = document.getElementById("busRouteSelect").value;
+        const typed = document.getElementById("busNewInput").value.trim();
+        const picked = document.getElementById("busKnownSelect").value;
+        const bus = typed || picked;
+
+        if (!code) { setStatus(statusEl, "Please choose a route first", "#ef4444"); return; }
+        if (!bus)  { setStatus(statusEl, "Pick a known bus or type a new bus number", "#ef4444"); return; }
+
+        setStatus(statusEl, "Saving...", "var(--text-muted)");
+        const formData = new FormData();
+        formData.append("routeCode", code);
+        formData.append("busNumber", bus);
+        formData.append("_csrf", document.getElementById("csrfToken").value);
+
+        try {
+            const res = await fetch("/admin/routes/buses/add", { method: "POST", body: formData });
+            const data = await res.json();
+            if (!res.ok) { setStatus(statusEl, data.error || "Failed to add", "#ef4444"); return; }
+
+            setStatus(statusEl, (data.added ? "✅ " : "⚠️ ") + data.message, data.added ? "#059669" : "#d97706");
+            document.getElementById("busNewInput").value = "";
+            document.getElementById("busKnownSelect").value = "";
+            loadRouteTable();
+            loadBusRosterTable();
+        } catch (err) {
+            console.error(err);
+            setStatus(statusEl, "Failed to add: " + err.message, "#ef4444");
+        }
+    }
+
+    async function removeBusChip(routeCode, bus) {
+        try {
+            const csrf = document.getElementById("csrfToken").value;
+            const res = await fetch(
+                `/admin/routes/${encodeURIComponent(routeCode)}/buses?busNumber=${encodeURIComponent(bus)}&_csrf=${encodeURIComponent(csrf)}`,
+                { method: "DELETE" });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || "Remove failed"); return; }
+            loadRouteTable();
+            loadBusRosterTable();
+        } catch (err) {
+            console.error(err);
+            alert("Remove failed: " + err.message);
+        }
+    }
+
+    /* One departure removed via its chip: re-saves the remaining times with the existing PUT endpoint */
+    async function removeDepartureChip(routeCode, time) {
+        const route = sharedRoutes.find(r => r.routeCode === routeCode);
+        if (!route) return;
+        const remaining = (route.departureTimes || []).filter(t => t !== time);
+
+        const formData = new FormData();
+        formData.append("departureTimes", remaining.join(", "));
+        formData.append("_csrf", document.getElementById("csrfToken").value);
+        try {
+            const res = await fetch(`/admin/routes/${encodeURIComponent(routeCode)}/departures`,
+                { method: "PUT", body: formData });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || "Remove failed"); return; }
+            loadRouteTable();
+            loadBusRosterTable();
+        } catch (err) {
+            console.error(err);
+            alert("Remove failed: " + err.message);
+        }
+    }
+
+    createBusPicker("routeBusesPicker", []);
 
     /* ── TABS ── */
     function switchTab(tab) {
