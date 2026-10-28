@@ -6,6 +6,7 @@
  */
 package com.deep.WIMB.controller;
 
+import com.deep.WIMB.config.InputRules;
 import com.deep.WIMB.service.ClientIpResolver;
 import com.deep.WIMB.service.DriverAccessService;
 import com.deep.WIMB.service.DriverTokenService;
@@ -53,6 +54,10 @@ public class DriverAuthController {
                 || busNumber.length() > MAX_FIELD_LENGTH) {
             return ResponseEntity.status(400).body(Map.of("error", "Invalid request"));
         }
+
+        // Reject anything that isn't a plain bus number BEFORE it can be turned into a token
+        // (and later stored/shown to passengers and the admin).
+        busNumber = InputRules.busNumber(busNumber);
 
         String ip = clientIpResolver.resolve(request);
 
