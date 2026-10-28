@@ -38,6 +38,46 @@ public class AdminDepotController {
         return driverAccessService.getAllDepotCodes();
     }
 
+    /** Add one depot, or change an existing depot's code — the dropdown form
+     *  in the Depot Codes tab, so a single change doesn't need an Excel file. */
+    @PostMapping("/save")
+    public ResponseEntity<?> saveDepot(@RequestParam("depotName") String depotName,
+                                       @RequestParam("code") String code) {
+        String name = depotName == null ? "" : depotName.trim();
+        String c = code == null ? "" : code.trim();
+        if (name.isEmpty() || c.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Depot name and code are both required"));
+        }
+        try {
+            boolean existed = driverAccessService.upsertDepot(name, c);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("message", existed
+                    ? "Code for " + name.toUpperCase(Locale.ROOT) + " updated"
+                    : "Depot " + name.toUpperCase(Locale.ROOT) + " added");
+            response.put("created", !existed);
+            response.put("depotCount", driverAccessService.getDepotNames().size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Save failed: " + e.getMessage()));
+        }
+    }
+
+    /** Remove one depot. The name is a query param (not a path segment) so
+     *  names containing dots or slashes can't be mangled by URL handling. */
+    @DeleteMapping
+    public ResponseEntity<?> deleteDepot(@RequestParam("name") String name) {
+        try {
+            if (!driverAccessService.removeDepot(name)) {
+                return ResponseEntity.status(404).body(Map.of("error", "Depot not found: " + name));
+            }
+            return ResponseEntity.ok(Map.of(
+                    "message", "Depot " + name.trim().toUpperCase(Locale.ROOT) + " removed",
+                    "depotCount", driverAccessService.getDepotNames().size()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Delete failed: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/upload")
     public ResponseEntity<?> uploadDepotFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
