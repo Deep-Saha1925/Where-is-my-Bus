@@ -4,6 +4,17 @@
  * Proprietary and confidential. See the LICENSE file in the project root.
  * Unauthorized copying, modification, distribution, hosting or use is prohibited.
  */
+/* ── XSS protection: every value that comes from the server or a driver is escaped
+   before it is placed into HTML. jsArg() makes a value safe inside an onclick="" call. ── */
+function escapeHtml(value) {
+    return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value == null ? "" : value)));
+}
+
 /* ── SEARCH / FILTER ── */
 let allRides = []; // store full list for filtering
 
@@ -68,7 +79,7 @@ function renderCards(rides) {
       <div class="bus-card-header">
         <div class="bus-number">
           <div class="bus-icon-circle">🚌</div>
-          ${ride.busNumber}
+          ${escapeHtml(ride.busNumber)}
         </div>
         ${ride.stale
         ? `<div class="status-badge" style="background:#fdecec; color:#b42318;">
@@ -81,9 +92,9 @@ function renderCards(rides) {
       </div>
 
       <div class="route-row">
-        <span class="route-src">${source}</span>
+        <span class="route-src">${escapeHtml(source)}</span>
         <span class="route-arr">→</span>
-        <span class="route-dest">${destination}</span>
+        <span class="route-dest">${escapeHtml(destination)}</span>
       </div>
 
       <div class="meta-row">
@@ -94,7 +105,7 @@ function renderCards(rides) {
     }
       </div>
 
-      <button class="view-btn" onclick="trackBus('${ride.routeKey}', ${ride.rideId}, '${ride.routeCode || ""}')">
+      <button class="view-btn" onclick="trackBus(${jsArg(ride.routeKey)}, ${Number(ride.rideId)}, ${jsArg(ride.routeCode || "")})">
         <span>📍</span> View on Map
       </button>
     </div>`;
