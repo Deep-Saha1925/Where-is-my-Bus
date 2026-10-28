@@ -6,11 +6,15 @@
  */
 package com.deep.WIMB.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.StompWebSocketEndpointRegistration;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+
+import java.util.Arrays;
 
 /**
  * Replaces passenger/admin polling (track.js was hitting /api/location/last-loc
@@ -34,11 +38,23 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    // Same list as the REST CORS setting (CORS_ALLOWED_ORIGINS). Empty = same-origin only,
+    // which is right for production. It used to be "*", letting ANY website open a live
+    // socket to this server from a visitor's browser.
+    private final String[] allowedOrigins;
+
+    public WebSocketConfig(@Value("${wimb.cors.allowed-origins:}") String origins) {
+        this.allowedOrigins = Arrays.stream(origins.split(","))
+                .map(String::trim).filter(o -> !o.isEmpty()).toArray(String[]::new);
+    }
+
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*") // same public data as /api/ride/active/all already serves
-                .withSockJS();
+        StompWebSocketEndpointRegistration endpoint = registry.addEndpoint("/ws");
+        if (allowedOrigins.length > 0) {
+            endpoint.setAllowedOriginPatterns(allowedOrigins);
+        }
+        endpoint.withSockJS();
     }
 
     @Override
