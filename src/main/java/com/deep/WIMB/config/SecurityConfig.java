@@ -17,6 +17,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
 @EnableWebSecurity
@@ -45,7 +47,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AdminLoginThrottle adminLoginThrottle) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         // ── Public pages (passengers & drivers) ──
@@ -59,7 +61,8 @@ public class SecurityConfig {
                                 "/driver.html",
                                 "/csrf-token",
                                 "/js/**",
-                                "/data/**",
+                                // ONLY the live stop list -- never the whole data folder
+                                "/data/stops.json",
                                 "/images/**",
                                 "/css/**"
                         ).permitAll()
@@ -104,9 +107,27 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login.html")        // our custom login page
                         .loginProcessingUrl("/do-login") // Spring processes this URL
-                        .defaultSuccessUrl("/admin/active/all-buses", true)
-                        .failureUrl("/login.html?error=true")
+                        .successHandler((req, res, auth) -> {
+                            adminLoginThrottle.reset(req);
+                            res.sendRedirect(req.getContextPath() + "/admin/active/all-buses");
+                        })
+                        .failureHandler((req, res, ex) -> {
+                            adminLoginThrottle.recordFailure(req);
+                            res.sendRedirect(req.getContextPath() + "/login.html?error=true");
+                        })
                         .permitAll()
+                )
+
+                // Locks an IP out of /do-login after repeated wrong passwords
+                .addFilterBefore(adminLoginThrottle, UsernamePasswordAuthenticationFilter.class)
+
+                // Safe browser-hardening headers that can't break the existing pages.
+                // (A full script-src CSP would need the inline onclick handlers removed first.)
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"))
+                        .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicy(pp -> pp.policy("geolocation=(self), camera=(), microphone=(), payment=()"))
                 )
 
                 .logout(logout -> logout
