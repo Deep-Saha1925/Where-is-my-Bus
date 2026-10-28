@@ -10,10 +10,12 @@ import com.deep.WIMB.model.AdminUpload;
 import com.deep.WIMB.repository.AdminUploadRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
@@ -137,6 +139,62 @@ public class DriverAccessService {
         }
 
         return parsed;
+    }
+
+    /** Adds a depot, or changes the code of an existing one, without the admin
+     *  having to re-upload a whole spreadsheet for a single row. The list is
+     *  still persisted as an .xlsx in the database (same storage as a normal
+     *  upload), so "Download this file" and a restart both keep working.
+     *  @return true if the depot already existed (code updated), false if new */
+    public synchronized boolean upsertDepot(String depotName, String code) {
+        String key = depotName.trim().toUpperCase();
+        Map<String, String> updated = new LinkedHashMap<>(depotCodes);
+        boolean existed = updated.containsKey(key);
+        updated.put(key, code.trim());
+        persistMap(updated);
+        return existed;
+    }
+
+    /** Removes one depot. @return false if it wasn't in the list. */
+    public synchronized boolean removeDepot(String depotName) {
+        String key = depotName.trim().toUpperCase();
+        if (!depotCodes.containsKey(key)) return false;
+        Map<String, String> updated = new LinkedHashMap<>(depotCodes);
+        updated.remove(key);
+        persistMap(updated);
+        return true;
+    }
+
+    /** Rebuilds the stored workbook from the in-memory map and saves it. */
+    private void persistMap(Map<String, String> map) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Depot Codes");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("depot_name");
+            header.createCell(1).setCellValue("code");
+            int r = 1;
+            for (Map.Entry<String, String> e : map.entrySet()) {
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(e.getKey());
+                row.createCell(1).setCellValue(e.getValue());
+            }
+            sheet.setColumnWidth(0, 5000);
+            sheet.setColumnWidth(1, 3000);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+
+            AdminUpload existing = adminUploadRepository.findByKind(AdminUpload.KIND_DEPOT_CODES).orElse(null);
+            String fileName = existing != null && existing.getFileName() != null && !existing.getFileName().isBlank()
+                    ? existing.getFileName() : "depot-codes.xlsx";
+            // Always an .xlsx now, whatever format the previous upload was in.
+            if (!fileName.toLowerCase().endsWith(".xlsx")) fileName = "depot-codes.xlsx";
+            storeBytes(out.toByteArray(), fileName,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            depotCodes = new LinkedHashMap<>(map);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save depot list: " + e.getMessage(), e);
+        }
     }
 
     public boolean isValid(String depotName, String code) {
