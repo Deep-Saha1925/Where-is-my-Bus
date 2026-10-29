@@ -64,6 +64,9 @@ class RideServiceGhostRidesTest {
 
     @BeforeEach
     void configureTracker() {
+        // A Mockito mock of a method returning List gives an EMPTY list, which the service reads as "cached: no results".
+        // A real cache miss is null.
+        when(busSearchCache.get(any())).thenReturn(null);
         TestFields.set(activityTracker, "staleAfterSeconds", 300L);      // hidden after 5 min
         TestFields.set(activityTracker, "autoEndAfterSeconds", 1800L);   // ended after 30 min
     }
