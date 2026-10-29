@@ -77,14 +77,28 @@ test("projectOnSegment: clamps to the ends and finds the middle", () => {
   assert.ok(side.distM > 900 && side.distM < 1200, `got ${side.distM}`);
 });
 
-/* ─── calcETA ─────────────────────────────────────────────────── */
-test("calcETA: behind the bus -> null, close -> Arriving, minutes, hours", () => {
+/* ─── etaForStop / etaText ────────────────────────────────────── */
+test("etaForStop: behind or at the bus -> null; ahead -> arrival time from the last fix at 30 km/h", () => {
+  const { eval: run, sandbox } = freshPage();
+  sandbox.__stops = [
+    { distanceFromStartKm: 0,  slackTimeMin: 0 },
+    { distanceFromStartKm: 5,  slackTimeMin: 0 },
+    { distanceFromStartKm: 10, slackTimeMin: 0 },
+  ];
+  run("lastLocTs = Date.now(); busPos = { progressKm: 5 };");   // bus is exactly at stop 1, no speed history yet
+  assert.equal(run("etaForStop(__stops, 1, 0)"), null);         // bus is at the stop
+  assert.equal(run("etaForStop(__stops, 0, -1)"), null);        // bus already passed it
+  const e = run("etaForStop(__stops, 2, 1)");                   // 5 km ahead at the default 30 km/h = 10 min
+  assert.ok(Math.abs(e.mins - 10) <= 1, `got ${e.mins}`);
+  run("busPos = null;");
+  assert.equal(run("etaForStop(__stops, 2, 1)"), null);         // no position -> no ETA
+});
+
+test("etaText: minutes, whole hours, hours and minutes", () => {
   const { eval: run } = freshPage();
-  assert.equal(run("calcETA(5, 5)"), null);          // bus is at the stop
-  assert.equal(run("calcETA(4, 5)"), null);          // bus already passed
-  assert.equal(run("calcETA(5.4, 5)"), "Arriving");  // 0.4 km at 30 km/h = under a minute
-  assert.equal(run("calcETA(10, 5)"), "10 min");     // 5 km at 30 km/h
-  assert.equal(run("calcETA(45, 5)"), "1h 20m");     // 40 km at 30 km/h
+  assert.equal(run("etaText(10)"), "10 min");
+  assert.equal(run("etaText(120)"), "2h");
+  assert.equal(run("etaText(80)"), "1h 20m");
 });
 
 /* ─── locateBus ───────────────────────────────────────────────── */
