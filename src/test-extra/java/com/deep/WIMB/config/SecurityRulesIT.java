@@ -16,6 +16,7 @@ import com.deep.WIMB.service.DriverTokenService;
 import com.deep.WIMB.service.LocationService;
 import com.deep.WIMB.service.LoginRateLimiter;
 import com.deep.WIMB.service.RideService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -56,6 +57,13 @@ class SecurityRulesIT {
     @MockitoBean LoginRateLimiter loginRateLimiter;
     @MockitoBean ClientIpResolver clientIpResolver;
 
+    @BeforeEach
+    void resolveAClientIp() {
+        // ClientIpResolver is mocked, and a mock returns null. The admin login throttle uses that value as a
+        // map key, and ConcurrentHashMap rejects null keys (NullPointerException) -- the real resolver never returns null.
+        when(clientIpResolver.resolve(any())).thenReturn("203.0.113.5");
+    }
+
     private int statusOf(RequestBuilder request) throws Exception {
         return mvc.perform(request).andReturn().getResponse().getStatus();
     }
@@ -79,13 +87,12 @@ class SecurityRulesIT {
 
     @Test
     void driverLoginNeedsNeitherAnAdminSessionNorACsrfToken() throws Exception {
-        when(clientIpResolver.resolve(any())).thenReturn("203.0.113.5");
         when(loginRateLimiter.check(any(), any(), any())).thenReturn(new LoginRateLimiter.Verdict(false, 0));
         when(driverAccessService.isValid(any(), any())).thenReturn(false);
 
         int status = statusOf(post("/api/driver/verify")
                 .contentType("application/json")
-                .content("{\"depotName\":\"X\",\"code\":\"1\",\"busNumber\":\"B\"}"));
+                .content("{\"depotName\":\"X\",\"code\":\"1\",\"busNumber\":\"WB-1\"}"));
 
         assertEquals(401, status, "reaches the controller (wrong code), not blocked by security or CSRF");
     }
