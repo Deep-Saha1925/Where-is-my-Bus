@@ -43,8 +43,9 @@ function busAt(page, latitude) {
   page.eval("applyLocation(__loc)");
 }
 
-const MARKER = '<span class="bus-icon"><img src="/images/logo.png" alt="Bus"></span>';
-const countOf = (html) => html.split(MARKER).length - 1;
+// The timeline draws the marker as <span class="bus-icon at|btw"><img src="/images/bus.png" ...></span>
+const MARKER = /<span class="bus-icon (?:at|btw)"><img src="\/images\/bus\.png" alt="Bus"><\/span>/g;
+const countOf = (html) => (html.match(MARKER) || []).length;
 
 test("bus marker: at a stop, the logo is drawn once, inside its circle", () => {
   const { page, el } = trackingPage();
@@ -60,17 +61,17 @@ test("bus marker: between two stops, the logo is drawn once on the road, with no
   assert.doesNotMatch(html, /bus-icon[^>]*top:calc/, "the circle centres itself; an inline top would push it off the line");
 });
 
-test("bus marker: the circle is black, round and bigger than the old 28px icon", () => {
+test("bus marker: the circle is round, white-filled and bigger than the old 28px icon", () => {
   const css = fs.readFileSync(path.join(STATIC, "track.html"), "utf8");
   const rule = css.match(/\.bus-icon\s*\{([^}]*)\}/)[1];
   assert.match(rule, /border-radius:\s*50%/);
-  assert.match(rule, /background:\s*#000/);
+  assert.match(rule, /background:\s*#fff/);
   const size = Number(rule.match(/width:\s*(\d+)px/)[1]);
-  assert.ok(size >= 40, `circle is ${size}px, should be clearly bigger than 28px`);
+  assert.ok(size >= 32, `circle is ${size}px, should be clearly bigger than 28px`);
   assert.doesNotMatch(rule, /left:\s*-22px/, "must be centred on the line, not hung off to the left");
 });
 
-test("bus marker: the logo file the page points at really exists in the web folder", () => {
-  assert.ok(fs.existsSync(path.join(STATIC, "images", "logo.png")),
-    "static/images/logo.png is missing: the root images/ folder is not served by the app");
+test("bus marker: the image file the page points at really exists in the web folder", () => {
+  assert.ok(fs.existsSync(path.join(STATIC, "images", "bus.png")),
+    "static/images/bus.png is missing: the root images/ folder is not served by the app");
 });
