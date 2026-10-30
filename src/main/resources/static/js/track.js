@@ -223,7 +223,7 @@ async function loadRoute(src, dest) {
     console.error("Failed to load route:", err);
     container.innerHTML =
         `<div style="padding:32px 16px; text-align:center; font-size:14px; color:var(--text-faint);">` +
-        `Could not load stops (${escapeHtml(err.message)})</div>`;
+        `${tr("Could not load stops")} (${escapeHtml(err.message)})</div>`;
   }
 }
 
@@ -349,7 +349,7 @@ async function manualReload() {
     if (btn) btn.classList.remove("spinning");
     if (label) {
       if (ok && busLocation) updateLastUpdatedLabel();
-      else label.innerText = ok ? "No location yet" : "Couldn't refresh · showing last known";
+      else label.innerText = ok ? tr("No location yet") : tr("Couldn't refresh · showing last known");
     }
     setTimeout(() => { reloading = false; if (btn) btn.disabled = false; }, RELOAD_COOLDOWN_MS);
   }, wait);
@@ -410,12 +410,19 @@ function parseTs(ts) {
 
 function timeAgo(ts) {
   const ms = typeof ts === "number" ? ts : parseTs(ts);
-  if (isNaN(ms)) return "just now";
+  if (isNaN(ms)) return tr("just now");
   const diff = Math.floor((Date.now() - ms) / 1000);
-  if (diff < 10)   return "just now";
-  if (diff < 60)   return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m ago`;
+  if (diff < 10)   return tr("just now");
+  return tr("{t} ago", { t: timeSpan(ms) });
+}
+
+// "5s", "3m", "1h 5m" (no "ago")
+function timeSpan(ts) {
+  const ms = typeof ts === "number" ? ts : parseTs(ts);
+  const diff = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (diff < 60)   return tr("{n}s", { n: diff });
+  if (diff < 3600) return tr("{n}m", { n: Math.floor(diff / 60) });
+  return tr("{h}h {m}m", { h: Math.floor(diff / 3600), m: Math.floor((diff % 3600) / 60) });
 }
 
 function ageSeconds() {
@@ -607,7 +614,7 @@ function etaForStop(stops, i, behindIdx) {
 }
 
 function formatClock(ms) {
-  try { return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+  try { return new Date(ms).toLocaleTimeString(I18N.locale(), { hour: "numeric", minute: "2-digit" }); }
   catch (_) { return ""; }
 }
 
@@ -666,9 +673,9 @@ function showToast(msg, ms) {
 
 // "5 min", "1h 5m"
 function etaText(mins) {
-  if (mins < 60) return `${mins} min`;
+  if (mins < 60) return tr("{n} min", { n: mins });
   const h = Math.floor(mins / 60), m = mins % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
+  return m ? tr("{h}h {m}m", { h, m }) : tr("{h}h", { h });
 }
 
 /* Bottom sheet: collapsed shows just the status + reload; tap to open the trip details */
@@ -701,21 +708,21 @@ function toggleMyLocPanel(forceOpen) {
 
 function findBus() {
   userMovedView = false;
-  if (!scrollBusToCenter()) showToast("Bus location isn't available yet");
+  if (!scrollBusToCenter()) showToast(tr("Bus location isn't available yet"));
 }
 
 /* Share the tracking link (native share sheet, else copy) */
 async function shareBus() {
   const bus   = (document.getElementById("busNumberDisplay") || {}).innerText || "";
   const route = (document.getElementById("routeTitle") || {}).innerText || "";
-  const text  = `Track bus ${bus !== "—" ? bus : ""} ${route}`.replace(/\s+/g, " ").trim();
+  const text  = tr("Track bus {bus} {route}", { bus: bus !== "—" ? bus : "", route }).replace(/\s+/g, " ").trim();
   const url   = window.location.href;
   try {
-    if (navigator.share) { await navigator.share({ title: "Where Is My Bus", text, url }); return; }
+    if (navigator.share) { await navigator.share({ title: tr("Where Is My Bus"), text, url }); return; }
   } catch (err) {
     if (err && err.name === "AbortError") return;
   }
-  try { await navigator.clipboard.writeText(`${text}\n${url}`); showToast("Link copied"); }
+  try { await navigator.clipboard.writeText(`${text}\n${url}`); showToast(tr("Link copied")); }
   catch (_) { showToast(url, 6000); }
 }
 
@@ -781,7 +788,7 @@ function updateAlarmChip() {
   const chip = document.getElementById("alarmChip");
   if (!chip) return;
   chip.classList.toggle("on", alarmOn);
-  chip.innerText = alarmOn ? "⏰ Alarm on" : "⏰ Alarm";
+  chip.innerText = alarmOn ? tr("⏰ Alarm on") : tr("⏰ Alarm");
 }
 function toggleAlarm() {
   alarmOn = !alarmOn;
@@ -790,20 +797,20 @@ function toggleAlarm() {
     try {
       if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     } catch (_) {}
-    showToast(`Alarm set — you'll be alerted when the bus is about ${ALARM_MINS} min from your stop. Keep this page open.`, 4500);
+    showToast(tr("Alarm set — you'll be alerted when the bus is about {n} min from your stop. Keep this page open.", { n: ALARM_MINS }), 4500);
     renderTimeline();
   } else {
-    showToast("Alarm off");
+    showToast(tr("Alarm off"));
   }
 }
 function fireAlarm(stopName, mins) {
   alarmOn = false;
   updateAlarmChip();
-  const msg = mins <= 1 ? `The bus is at ${stopName}` : `Bus reaches ${stopName} in about ${mins} min`;
+  const msg = mins <= 1 ? tr("The bus is at {stop}", { stop: stopName }) : tr("Bus reaches {stop} in about {n} min", { stop: stopName, n: mins });
   showToast("⏰ " + msg, 8000);
   try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); } catch (_) {}
   try {
-    if ("Notification" in window && Notification.permission === "granted") new Notification("Where Is My Bus", { body: msg });
+    if ("Notification" in window && Notification.permission === "granted") new Notification(tr("Where Is My Bus"), { body: msg });
   } catch (_) {}
 }
 function checkAlarm(stops, srcIdx, destIdx, passedThrough, atIdx) {
@@ -825,7 +832,7 @@ function renderTimeline() {
 
   if (!displayStops.length) {
     container.innerHTML =
-        `<div style="padding:40px 16px; text-align:center; font-size:14px; color:var(--text-faint);">Loading stops...</div>`;
+        `<div style="padding:40px 16px; text-align:center; font-size:14px; color:var(--text-faint);">${tr("Loading stops...")}</div>`;
     return;
   }
 
@@ -868,30 +875,30 @@ function renderTimeline() {
     if (atIdx !== -1)        currentText = displayStops[atIdx].stopName.trim();
     else if (nextIdx !== -1) currentText = `→ ${displayStops[nextIdx].stopName.trim()}`;
   } else if (busPos && busPos.offRoute) {
-    currentText = "Off route";
+    currentText = tr("Off route");
   }
   setText("currentStopDisplay", currentText);
 
   // headline + banner
-  let title = "Waiting for bus location…", tone = "gray", bannerTxt = "Waiting for bus location", bannerTone = "gray";
+  let title = tr("Waiting for bus location…"), tone = "gray", bannerTxt = tr("Waiting for bus location"), bannerTone = "gray";
   if (hasPos) {
-    const speedTxt = speedKmh != null ? ` · ~${Math.round(currentSpeedKmh())} km/h` : "";
+    const speedTxt = speedKmh != null ? " · ~" + tr("{n} km/h", { n: Math.round(currentSpeedKmh()) }) : "";
     if (atIdx !== -1) {
       const nm = displayStops[atIdx].stopName.trim();
-      if (atIdx === lastIdx) { title = `Arrived ${nm}`; bannerTxt = "Trip complete"; bannerTone = "blue"; }
-      else                   { title = `At ${nm}`;      bannerTxt = "At a stop";      bannerTone = "blue"; }
+      if (atIdx === lastIdx) { title = tr("Arrived {stop}", { stop: nm }); bannerTxt = tr("Trip complete"); bannerTone = "blue"; }
+      else                   { title = tr("At {stop}", { stop: nm });      bannerTxt = tr("At a stop");      bannerTone = "blue"; }
       tone = "green";
     } else if (nextIdx !== -1) {
-      title = `Running · next ${displayStops[nextIdx].stopName.trim()}`;
-      tone = "green"; bannerTxt = `Running${speedTxt}`; bannerTone = "green";
+      title = tr("Running · next {stop}", { stop: displayStops[nextIdx].stopName.trim() });
+      tone = "green"; bannerTxt = tr("Running") + speedTxt; bannerTone = "green";
     }
-    if (notYetArrived) { bannerTxt = "On its way to your boarding stop"; bannerTone = "blue"; }
+    if (notYetArrived) { bannerTxt = tr("On its way to your boarding stop"); bannerTone = "blue"; }
   } else if (busPos && busPos.offRoute) {
-    title = "Off route"; tone = "amber"; bannerTxt = "Bus is away from the route"; bannerTone = "amber";
+    title = tr("Off route"); tone = "amber"; bannerTxt = tr("Bus is away from the route"); bannerTone = "amber";
   }
   if (wasStale && lastLocTs != null) {
     tone = "amber"; bannerTone = "amber";
-    bannerTxt = `No GPS update for ${timeAgo(lastLocTs).replace(/ ago$/, "")} · last known position`;
+    bannerTxt = tr("No GPS update for {t} · last known position", { t: timeSpan(lastLocTs) });
   }
   const tEl = document.getElementById("statusTitle");
   tEl.innerText = title; tEl.className = "status-title tone-" + tone;
@@ -907,7 +914,7 @@ function renderTimeline() {
     setText("nextStopSub", `${km.toFixed(1)} km${e ? " - " + (wasStale ? "~" : "") + formatClock(e.arriveMs) : ""}`);
   } else {
     setText("nextStopName", hasPos && atIdx === lastIdx ? "—" : "—");
-    setText("nextStopSub", hasPos && atIdx === lastIdx ? "End of route" : "—");
+    setText("nextStopSub", hasPos && atIdx === lastIdx ? tr("End of route") : "—");
   }
   if (hasPos && passedThrough >= 0) {
     setText("crossedName", displayStops[passedThrough].stopName.trim());
@@ -922,16 +929,15 @@ function renderTimeline() {
   let bannerHtml = "";
   if (wasStale) {
     bannerHtml += `<div class="banner banner-yellow"><span style="font-size:18px">📡</span>
-      <span>No recent GPS update from the driver (last seen ${timeAgo(lastLocTs)}). Showing the last known position.</span></div>`;
+      <span>${tr("No recent GPS update from the driver (last seen {t}). Showing the last known position.", { t: timeAgo(lastLocTs) })}</span></div>`;
   }
   if (busPos && busPos.offRoute) {
     bannerHtml += `<div class="banner banner-yellow"><span style="font-size:18px">⚠️</span>
-      <span>Bus location is about ${busPos.offKm.toFixed(1)} km away from this route — the GPS fix may be
-      inaccurate or the bus is on a diversion.${busPos.noPosition ? "" : " Showing the last position on the route."}</span></div>`;
+      <span>${tr("Bus location is about {n} km away from this route — the GPS fix may be inaccurate or the bus is on a diversion.", { n: busPos.offKm.toFixed(1) })}${busPos.noPosition ? "" : " " + tr("Showing the last position on the route.")}</span></div>`;
   }
   if (notYetArrived) {
     bannerHtml += `<div class="banner banner-yellow"><span style="font-size:18px">🚌</span>
-      <span>Bus is on its way — not yet reached your boarding stop</span></div>`;
+      <span>${tr("Bus is on its way — not yet reached your boarding stop")}</span></div>`;
   }
 
   /* ── stop rows ── */
@@ -953,14 +959,14 @@ function renderTimeline() {
     // Arrival (left) column
     let arrHtml = "";
     if (isPassed) {
-      arrHtml = seen != null ? `<div class="t-main t-done">${formatClock(seen)}</div><div class="t-sub t-done">Arrived</div>`
+      arrHtml = seen != null ? `<div class="t-main t-done">${formatClock(seen)}</div><div class="t-sub t-done">${tr("Arrived")}</div>`
           : `<div class="t-main t-none">—</div>`;
     } else if (isCurrent) {
-      arrHtml = `<div class="t-main t-here">${seen != null ? formatClock(seen) : "Here"}</div><div class="t-sub t-here">${seen != null ? "Here" : "At stop"}</div>`;
+      arrHtml = `<div class="t-main t-here">${seen != null ? formatClock(seen) : tr("Here")}</div><div class="t-sub t-here">${seen != null ? tr("Here") : tr("At stop")}</div>`;
     } else if (eta) {
       const soon = eta.mins <= 1;
       arrHtml = `<div class="t-main${wasStale ? " t-stale" : ""}">${clockTxt(eta.arriveMs)}</div>` +
-          `<div class="t-sub${soon ? " t-soon" : ""}${wasStale ? " t-stale" : ""}">${soon ? "Now" : "in " + etaText(eta.mins)}</div>`;
+          `<div class="t-sub${soon ? " t-soon" : ""}${wasStale ? " t-stale" : ""}">${soon ? tr("Now") : tr("in {t}", { t: etaText(eta.mins) })}</div>`;
     }
 
     // Departure (right) column
@@ -969,15 +975,15 @@ function renderTimeline() {
       // Keep showing when the bus left the stop (and how long it actually waited, if that was noticeable)
       const stayMin = (rec.a != null && rec.d != null) ? Math.round((rec.d - rec.a) / 60000) : 0;
       depHtml = rec.d != null
-          ? `<div class="t-main t-done">${formatClock(rec.d)}</div><div class="t-sub t-done">${stayMin >= 1 ? "Halted " + stayMin + " min" : "Departed"}</div>`
+          ? `<div class="t-main t-done">${formatClock(rec.d)}</div><div class="t-sub t-done">${stayMin >= 1 ? tr("Halted {n} min", { n: stayMin }) : tr("Departed")}</div>`
           : `<div class="t-main t-none">—</div>`;
     } else if (!isLast && !isPassed) {
       if (isCurrent) {
         depHtml = (seen != null && halt > 0 ? `<div class="t-main">${formatClock(seen + halt * 60000)}</div>` : "") +
-            (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
+            (halt > 0 ? `<div class="t-sub t-halt">${tr("Halt {n} min", { n: halt })}</div>` : "");
       } else if (eta) {
         depHtml = `<div class="t-main${wasStale ? " t-stale" : ""}">${clockTxt(eta.arriveMs + halt * 60000)}</div>` +
-            (halt > 0 ? `<div class="t-sub t-halt">Halt ${halt} min</div>` : "");
+            (halt > 0 ? `<div class="t-sub t-halt">${tr("Halt {n} min", { n: halt })}</div>` : "");
       }
     }
 
@@ -985,13 +991,13 @@ function renderTimeline() {
     const isPassengerSrc  = stop.stopName.trim().toUpperCase() === srcName;
     const isPassengerDest = stop.stopName.trim().toUpperCase() === destName;
     let chips = "";
-    if (isCurrent)                      chips += `<span class="badge badge-here">● Here</span>`;
-    else if (isNext)                    chips += `<span class="badge badge-arriving">Next</span>`;
-    else if (eta && eta.mins <= 1)      chips += `<span class="badge badge-arriving">Arriving</span>`;
-    if (isPassengerSrc)                 chips += `<span class="badge badge-src">📍 Your stop</span>`;
-    if (isPassengerDest)                chips += `<span class="badge badge-dest">🏁 Your dest</span>`;
+    if (isCurrent)                      chips += `<span class="badge badge-here">● ${tr("Here")}</span>`;
+    else if (isNext)                    chips += `<span class="badge badge-arriving">${tr("Next")}</span>`;
+    else if (eta && eta.mins <= 1)      chips += `<span class="badge badge-arriving">${tr("Arriving")}</span>`;
+    if (isPassengerSrc)                 chips += `<span class="badge badge-src">📍 ${tr("Your stop")}</span>`;
+    if (isPassengerDest)                chips += `<span class="badge badge-dest">🏁 ${tr("Your dest")}</span>`;
     if (i === myNearestIdx && myNearestM !== null && myNearestM <= MY_STOP_MAX_M) {
-      chips += `<span class="badge badge-you">You are here</span>`;
+      chips += `<span class="badge badge-you">${tr("You are here")}</span>`;
     }
 
     const upDone   = hasPos && i - 1 <= passedThrough && !isFirst && (i <= passedThrough + 1);
@@ -1032,11 +1038,11 @@ function renderTimeline() {
       const e = etaForStop(displayStops, idx, passedThrough);
       let val;
       if (e) {
-        val = (e.mins <= 1 ? "Now" : etaText(e.mins)) + `<small>${clockTxt(e.arriveMs)}</small>`;
+        val = (e.mins <= 1 ? tr("Now") : etaText(e.mins)) + `<small>${clockTxt(e.arriveMs)}</small>`;
       } else if (idx === atIdx) {
-        val = `Here<small>at the stop</small>`;
+        val = `${tr("Here")}<small>${tr("at the stop")}</small>`;
       } else {
-        val = `Passed`;
+        val = tr("Passed");
       }
       items.push(`<div class="eta-sum-item"><div class="eta-sum-label">${label}</div><div class="eta-sum-value">${val}</div></div>`);
     };
@@ -1044,7 +1050,7 @@ function renderTimeline() {
     if (destIdx !== srcOnFull) addItem(`🏁 ${escapeHtml(displayStops[destIdx].stopName.trim())}`, destIdx);
     if (items.length) {
       summaryHtml = `<div class="eta-summary">${items.join("")}</div>` +
-          `<div class="eta-sum-note">${wasStale ? "Based on the last known position · " : ""}Estimated from the bus's recent speed and scheduled halts</div>`;
+          `<div class="eta-sum-note">${wasStale ? tr("Based on the last known position") + " · " : ""}${tr("Estimated from the bus's recent speed and scheduled halts")}</div>`;
     }
   }
 
@@ -1069,7 +1075,7 @@ function setMyLocButton(sharing, busy) {
   const btn = document.getElementById("myLocBtn");
   if (!btn) return;
   btn.disabled    = !!busy;
-  btn.textContent = busy ? "…" : (sharing ? "Stop" : "Show");
+  btn.textContent = busy ? "…" : (sharing ? tr("Stop") : tr("Show"));
   btn.style.background = sharing ? "#6b7280" : "#1f6f5c";
 }
 
@@ -1080,7 +1086,7 @@ function toggleMyLocation() {
 
 async function startMyLocation() {
   setMyLocButton(false, true);
-  setMyLocText("Finding your location…");
+  setMyLocText(tr("Finding your location…"));
   try {
     myPos = await Geo.request();            // shows the browser's permission prompt
     myWatchId = navigator.geolocation.watchPosition(
@@ -1109,7 +1115,7 @@ function stopMyLocation() {
   myNearestIdx = -1;
   myNearestM = null;
   setMyLocButton(false, false);
-  setMyLocText("Show your location to see how far the bus is from you. It stays on your device.");
+  setMyLocText(tr("Show your location to see how far the bus is from you. It stays on your device."));
   renderTimeline();
 }
 
@@ -1126,14 +1132,14 @@ function updateMyLocation() {
   const lines = [];
   if (hit) {
     lines.push(hit.distanceM <= MY_STOP_MAX_M
-        ? `You are near ${hit.point.stopName.trim().toUpperCase()} (${Geo.formatDistance(hit.distanceM)}).`
-        : `You are ${Geo.formatDistance(hit.distanceM)} from the nearest stop on this route.`);
+        ? tr("You are near {stop} ({d}).", { stop: hit.point.stopName.trim().toUpperCase(), d: Geo.formatDistance(hit.distanceM) })
+        : tr("You are {d} from the nearest stop on this route.", { d: Geo.formatDistance(hit.distanceM) }));
   }
   if (busLocation && typeof busLocation.latitude === "number") {
     const toBus = Geo.distanceM(myPos.latitude, myPos.longitude, busLocation.latitude, busLocation.longitude);
-    lines.push(`The bus is about ${Geo.formatDistance(toBus)} from you (straight line).`);
+    lines.push(tr("The bus is about {d} from you (straight line).", { d: Geo.formatDistance(toBus) }));
   } else {
-    lines.push("Waiting for the bus's location…");
+    lines.push(tr("Waiting for the bus's location…"));
   }
   setMyLocText(lines.join(" "));
   renderTimeline();
@@ -1170,9 +1176,9 @@ function hideShareFallback() {
 async function copyShareMessage() {
   try {
     await navigator.clipboard.writeText(lastShareText);
-    setShareNote("Copied. Paste it into any chat.", false);
+    setShareNote(tr("Copied. Paste it into any chat."), false);
   } catch (err) {
-    window.prompt("Copy this message:", lastShareText);   // browsers that block the clipboard
+    window.prompt(tr("Copy this message:"), lastShareText);   // browsers that block the clipboard
   }
 }
 
@@ -1189,7 +1195,7 @@ async function shareMyLocation() {
   try {
     // Needs a position: use the one already shown, or ask the browser once (it prompts for permission)
     if (!myPos) {
-      setShareNote("Finding your location…", false);
+      setShareNote(tr("Finding your location…"), false);
       myPos = await Geo.request();
       updateMyLocation();
       setShareNote("");
@@ -1211,8 +1217,8 @@ async function shareMyLocation() {
 
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "My location", text });
-        setShareNote("Sent.", false);
+        await navigator.share({ title: tr("My location"), text });
+        setShareNote(tr("Sent."), false);
       } catch (shareErr) {
         if (shareErr && shareErr.name === "AbortError") return;   // the passenger closed the share menu
         showShareFallback(text);                                    // sharing blocked: offer the manual options
@@ -1224,7 +1230,7 @@ async function shareMyLocation() {
     if (isLocationError(err)) {
       setShareNote(Geo.explainError(err), true);
     } else {
-      setShareNote("Couldn't share your location. Please try again.", true);
+      setShareNote(tr("Couldn't share your location. Please try again."), true);
     }
   } finally {
     btn.disabled = false;
