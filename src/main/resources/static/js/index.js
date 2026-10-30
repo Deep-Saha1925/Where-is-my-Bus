@@ -99,7 +99,7 @@ function setupStopAutocomplete(inputId, dropdownId, list) {
         }
 
         if (!currentMatches.length) {
-            dropdown.innerHTML = `<div class="stop-dropdown-empty">No matching stops</div>`;
+            dropdown.innerHTML = `<div class="stop-dropdown-empty">${tr("No matching stops")}</div>`;
             dropdown.classList.add("open");
             return;
         }
@@ -256,7 +256,7 @@ async function loadQuickResults() {
         }
 
         quickResults.style.display = "block";
-        quickCount.textContent     = `${buses.length} active`;
+        quickCount.textContent     = tr("{n} active", { n: buses.length });
         quickRoute.textContent     = `${source} → ${destination}`;
 
         const routeKey = `${source}_${destination}`;
@@ -283,7 +283,7 @@ async function loadQuickResults() {
           <div style="font-size:11px; color:#10b981; margin-top:4px;
                       display:flex; align-items:center;
                       justify-content:flex-end; gap:4px;">
-            <span class="live-dot-sm"></span> Live
+            <span class="live-dot-sm"></span> ${tr("Live")}
           </div>
         </div>
       </div>
@@ -301,7 +301,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
     const resultsCount  = document.getElementById("resultsCount");
 
     resultsHeader.style.display = "flex";
-    resultsCount.textContent    = `${buses.length} bus${buses.length > 1 ? "es" : ""} found`;
+    resultsCount.textContent    = tr(buses.length > 1 ? "{n} buses found" : "{n} bus found", { n: buses.length });
     busList.innerHTML           = "";
 
     buses.forEach((bus, i) => {
@@ -327,7 +327,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
               ${escapeHtml(bus.busNumber)}
             </div>
             <div style="font-size:11px; color:var(--text-faint); margin-top:1px;">
-              Ride #${bus.rideId}
+              ${tr("Ride #{id}", { id: bus.rideId })}
             </div>
           </div>
         </div>
@@ -338,7 +338,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
           <div style="font-size:11px; color:#10b981; margin-top:5px;
                       display:flex; align-items:center;
                       justify-content:flex-end; gap:4px;">
-            <span class="live-dot-sm"></span> Live
+            <span class="live-dot-sm"></span> ${tr("Live")}
           </div>
         </div>
       </div>
@@ -352,7 +352,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
 
       <button class="track-btn" onclick="track(${jsArg(cardKey)}, ${Number(bus.rideId)}, ${jsArg(bus.routeCode || "")})">
         <i class="fa-solid fa-location-dot"></i>
-        Track Bus
+        ${tr("Track Bus")}
       </button>
     `;
 
@@ -366,11 +366,11 @@ async function searchBuses() {
     const destination = document.getElementById("destination").value.trim();
 
     if (!source || !destination) {
-        alert("Please select both source and destination");
+        alert(tr("Please select both source and destination"));
         return;
     }
     if (source === destination) {
-        alert("Source and destination cannot be the same");
+        alert(tr("Source and destination cannot be the same"));
         return;
     }
 
@@ -381,7 +381,7 @@ async function searchBuses() {
     const resultsHeader = document.getElementById("resultsHeader");
     const quickResults  = document.getElementById("quickResults");
 
-    setNoResultsText("No active buses", "No buses are currently running on this route");
+    setNoResultsText(tr("No active buses"), tr("No buses are currently running on this route"));
     busList.innerHTML           = "";
     noResults.style.display     = "none";
     resultsHeader.style.display = "none";
@@ -406,7 +406,7 @@ async function searchBuses() {
 
     } catch (err) {
         loading.style.display = "none";
-        alert("Failed to fetch buses");
+        alert(tr("Failed to fetch buses"));
         console.error(err);
     }
 }
@@ -418,10 +418,10 @@ function track(routeKey, rideId, routeCode) {
 }
 
 function calculateETAFromDistance(distanceKm) {
-    if (distanceKm == null) return "Updating";
+    if (distanceKm == null) return tr("Updating");
     const mins = Math.ceil((distanceKm / 30) * 60);
-    if (mins <= 1) return "Arriving";
-    return `${mins} min`;
+    if (mins <= 1) return tr("Arriving");
+    return tr("{n} min", { n: mins });
 }
 
 /* ─── SWAP STOPS ─────────────────────────────────────────────────── */
@@ -463,7 +463,7 @@ function switchSearchTab(tab) {
     document.getElementById("noResults").style.display           = "none";
     document.getElementById("loading").style.display             = "none";
     document.getElementById("busList").innerHTML                 = "";
-    setNoResultsText("No active buses", "No buses are currently running on this route");
+    setNoResultsText(tr("No active buses"), tr("No buses are currently running on this route"));
 
     if (isLive) {
         renderRecentChips();
@@ -502,23 +502,23 @@ async function useMyLocation() {
     const btn = document.getElementById("geoBtn");
     btn.disabled = true;
     btn.classList.add("busy");
-    setGeoNote("Finding your location…");
+    setGeoNote(tr("Finding your location…"));
 
     try {
         const [position, points] = await Promise.all([Geo.request(), loadStopPoints()]);
         const hit = Geo.nearest(position.latitude, position.longitude, points);
 
         if (!hit) {
-            setGeoNote("No stop locations are available yet.", "error");
+            setGeoNote(tr("No stop locations are available yet."), "error");
         } else if (hit.distanceM > MAX_NEAREST_STOP_M) {
-            setGeoNote(`The nearest stop is ${Geo.formatDistance(hit.distanceM)} away, too far to use as your boarding stop.`, "error");
+            setGeoNote(tr("The nearest stop is {d} away, too far to use as your boarding stop.", { d: Geo.formatDistance(hit.distanceM) }), "error");
         } else {
             const stopName = hit.point.name.toUpperCase();
             document.getElementById("source").value = stopName;
             const rough = position.accuracy > 2000
-                ? ` Your location is approximate (about ${Geo.formatDistance(position.accuracy)}), so check it.`
+                ? " " + tr("Your location is approximate (about {d}), so check it.", { d: Geo.formatDistance(position.accuracy) })
                 : "";
-            setGeoNote(`📍 Nearest stop: ${stopName} (${Geo.formatDistance(hit.distanceM)} away). Your location stays on your device.${rough}`, "ok");
+            setGeoNote("📍 " + tr("Nearest stop: {stop} ({d} away). Your location stays on your device.", { stop: stopName, d: Geo.formatDistance(hit.distanceM) }) + rough, "ok");
             const dest = document.getElementById("destination");
             if (!dest.value.trim()) dest.focus();
         }
@@ -541,9 +541,9 @@ let busSearchSeq   = 0;               // bumps on every new search / tab switch
 let busSearchAbort = null;            // AbortController of the request in flight
 
 function setNoResultsText(title, sub) {
-    const t = document.getElementById("noResultsTitle");
+    const tEl = document.getElementById("noResultsTitle");
     const s = document.getElementById("noResultsSub");
-    if (t) t.textContent = title;
+    if (tEl) tEl.textContent = title;
     if (s) s.textContent = sub;
 }
 
@@ -569,7 +569,7 @@ function clearBusResults() {
     document.getElementById("resultsHeader").style.display = "none";
     document.getElementById("noResults").style.display     = "none";
     document.getElementById("loading").style.display       = "none";
-    setNoResultsText("No active buses", "No buses are currently running on this route");
+    setNoResultsText(tr("No active buses"), tr("No buses are currently running on this route"));
 }
 
 function getCachedBusSearch(query) {
@@ -587,8 +587,8 @@ function showBusResults(matches, raw) {
     if (!matches.length) {
         document.getElementById("busList").innerHTML = "";
         setNoResultsText(
-            `No running bus found for "${raw}"`,
-            "The bus may not have started its ride yet. Check the number, or search by route instead."
+            tr('No running bus found for "{q}"', { q: raw }),
+            tr("The bus may not have started its ride yet. Check the number, or search by route instead.")
         );
         document.getElementById("noResults").style.display = "block";
         return;
@@ -619,7 +619,7 @@ async function searchByBusNumber(quiet = false) {
     const query = normalizeBusNumber(raw);
 
     if (!query) {
-        if (!quiet) alert("Please enter a bus number");
+        if (!quiet) alert(tr("Please enter a bus number"));
         return;
     }
 
@@ -654,7 +654,7 @@ async function searchByBusNumber(quiet = false) {
         if (err.name === "AbortError" || mySeq !== busSearchSeq) return;
         document.getElementById("loading").style.display = "none";
         console.error(err);
-        if (!quiet) alert("Failed to search for the bus");
+        if (!quiet) alert(tr("Failed to search for the bus"));
     } finally {
         if (busSearchAbort === controller) busSearchAbort = null;
     }
@@ -681,11 +681,11 @@ async function searchDepotRoutes() {
     const destination  = document.getElementById("depotDestination").value.trim();
 
     if (!source || !destination) {
-        alert("Please select both depots");
+        alert(tr("Please select both depots"));
         return;
     }
     if (source === destination) {
-        alert("Source and destination depots cannot be the same");
+        alert(tr("Source and destination depots cannot be the same"));
         return;
     }
 
@@ -731,7 +731,7 @@ async function searchDepotRoutes() {
         rows.sort((a, b) => timeSortKey(a.time) - timeSortKey(b.time));
 
         resultsHeader.style.display = "flex";
-        resultsCount.textContent    = `${rows.length} departure${rows.length > 1 ? "s" : ""} found`;
+        resultsCount.textContent    = tr(rows.length > 1 ? "{n} departures found" : "{n} departure found", { n: rows.length });
 
         routeList.innerHTML = rows.map((r, i) => {
             if (r.time) {
@@ -740,22 +740,22 @@ async function searchDepotRoutes() {
                     <div class="timetable-time">${escapeHtml(r.time)}</div>
                     <div class="timetable-info">
                       <div class="timetable-route-name">${escapeHtml(r.routeName)}</div>
-                      <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; ${Number(r.stopsBetween)} stop${r.stopsBetween > 1 ? "s" : ""} &middot; ${Number(r.distanceKm).toFixed(1)} km</div>
+                      <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; ${tr(r.stopsBetween > 1 ? "{n} stops" : "{n} stop", { n: Number(r.stopsBetween) })} &middot; ${Number(r.distanceKm).toFixed(1)} km</div>
                     </div>
                   </div>
                 `;
             }
 
             const busNote = (r.busNumbers && r.busNumbers.length)
-                ? `Buses: ${escapeHtml(r.busNumbers.join(", "))}`
-                : "buses run periodically";
+                ? tr("Buses: {list}", { list: escapeHtml(r.busNumbers.join(", ")) })
+                : tr("buses run periodically");
 
             return `
               <div class="depot-route-card timetable-row timetable-row--fallback" style="margin-bottom:10px; animation-delay:${i * 60}ms;">
                 <div class="timetable-time"><i class="fa-solid fa-clock"></i></div>
                 <div class="timetable-info">
                   <div class="timetable-route-name">${escapeHtml(r.routeName)}</div>
-                  <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; no fixed timetable registered yet &middot; ${busNote}</div>
+                  <div class="timetable-meta">${escapeHtml(r.sourceDepot)} → ${escapeHtml(r.destinationDepot)} &middot; ${tr("no fixed timetable registered yet")} &middot; ${busNote}</div>
                 </div>
               </div>
             `;
@@ -763,7 +763,7 @@ async function searchDepotRoutes() {
 
     } catch (err) {
         loading.style.display = "none";
-        alert("Failed to fetch routes");
+        alert(tr("Failed to fetch routes"));
         console.error(err);
     }
 }
