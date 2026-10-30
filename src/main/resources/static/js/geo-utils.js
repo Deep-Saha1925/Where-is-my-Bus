@@ -35,19 +35,19 @@ const Geo = (() => {
 
   function formatDistance(meters) {
     if (!(meters >= 0)) return "—";
-    if (meters < 1000) return `${Math.round(meters / 10) * 10 || Math.round(meters)} m`;
-    return `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)} km`;
+    if (meters < 1000) return tr("{n} m", { n: Math.round(meters / 10) * 10 || Math.round(meters) });
+    return tr("{n} km", { n: (meters / 1000).toFixed(meters < 10000 ? 1 : 0) });
   }
 
   // A plain-language reason for a failed location request, with what to do about it.
   function explainError(err) {
     const code = err && (err.code !== undefined ? err.code : null);
-    if (code === "UNSUPPORTED") return "This browser can't share its location.";
-    if (code === "INSECURE") return "Location only works on a secure (https) connection.";
-    if (code === 1) return "Location is turned off for this site. Allow it in your browser (lock icon next to the address, then Location) and tap again.";
-    if (code === 2) return "Your location couldn't be found. Check that location/GPS is turned on, then try again.";
-    if (code === 3) return "Finding your location took too long. Try again, ideally with a clear view of the sky.";
-    return "Couldn't get your location. Please try again.";
+    if (code === "UNSUPPORTED") return tr("This browser can't share its location.");
+    if (code === "INSECURE") return tr("Location only works on a secure (https) connection.");
+    if (code === 1) return tr("Location is turned off for this site. Allow it in your browser (lock icon next to the address, then Location) and tap again.");
+    if (code === 2) return tr("Your location couldn't be found. Check that location/GPS is turned on, then try again.");
+    if (code === 3) return tr("Finding your location took too long. Try again, ideally with a clear view of the sky.");
+    return tr("Couldn't get your location. Please try again.");
   }
 
   // Asks the browser for the current position (this is what shows the permission prompt).
@@ -84,18 +84,18 @@ const Geo = (() => {
     // null/undefined must count as "unknown": in JavaScript null >= 0 is true, which printed "0 m"
     const known = (n) => typeof n === "number" && n >= 0;
 
-    const lines = [`📍 My location: ${mapsLink(details.latitude, details.longitude)}`];
+    const lines = ["📍 " + tr("My location: {url}", { url: mapsLink(details.latitude, details.longitude) })];
     if (details.nearestStopName && known(details.nearestDistanceM) && details.nearestDistanceM <= 5000) {
-      lines.push(`Near ${details.nearestStopName} (${formatDistance(details.nearestDistanceM)} away).`);
+      lines.push(tr("Near {stop} ({d} away).", { stop: details.nearestStopName, d: formatDistance(details.nearestDistanceM) }));
     }
     if (known(details.accuracy) && details.accuracy > 1000) {
-      lines.push(`(Approximate location, about ${formatDistance(details.accuracy)}.)`);
+      lines.push(tr("(Approximate location, about {d}.)", { d: formatDistance(details.accuracy) }));
     }
     if (known(details.busDistanceM)) {
-      lines.push(`The bus is about ${formatDistance(details.busDistanceM)} from me.`);
+      lines.push(tr("The bus is about {d} from me.", { d: formatDistance(details.busDistanceM) }));
     }
     if (details.trackUrl) {
-      lines.push(`🚌 Track the bus live: ${details.trackUrl}`);
+      lines.push("🚌 " + tr("Track the bus live: {url}", { url: details.trackUrl }));
     }
     return lines.join("\n");
   }
