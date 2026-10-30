@@ -75,9 +75,9 @@ document.addEventListener("visibilitychange", () => {
   // start the GPS watch again. (The Android app's foreground service keeps running, nothing to restart.)
   if (!GpsSource.isNative() && hiddenMs > 20000 && rideWatchId) {
     restartGpsWatch();
-    lastPauseNote = `Last pause: ${formatAge(hiddenMs)} at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    lastPauseNote = tr("Last pause: {t} at {time}", { t: formatAge(hiddenMs), time: new Date().toLocaleTimeString(I18N.locale(), { hour: "2-digit", minute: "2-digit" }) });
     updateBackgroundNotice();
-    setTrackingStatus(`📱 Screen was off for ${formatAge(hiddenMs)}: GPS restarted. Keep the screen on for continuous tracking.`);
+    setTrackingStatus("📱 " + tr("Screen was off for {t}: GPS restarted. Keep the screen on for continuous tracking.", { t: formatAge(hiddenMs) }));
   }
   sendLocation(true);
 });
@@ -93,13 +93,13 @@ window.addEventListener("beforeunload", e => {
 /* ------------------ TRACKING HEALTH (fix age, background notice) ------------------ */
 function formatAge(ms) {
   const sec = Math.max(0, Math.round(ms / 1000));
-  return sec < 90 ? `${sec}s` : `${Math.round(sec / 60)} min`;
+  return sec < 90 ? tr("{n}s", { n: sec }) : tr("{n} min", { n: Math.round(sec / 60) });
 }
 
 // "" while fixes are fresh, otherwise a warning that the position being re-sent is old
 function describeFixAge(ageMs) {
   if (!(ageMs >= STALE_FIX_MS)) return "";
-  return `⚠️ No new GPS fix for ${formatAge(ageMs)}: passengers see your last known position`;
+  return "⚠️ " + tr("No new GPS fix for {t}: passengers see your last known position", { t: formatAge(ageMs) });
 }
 
 function updateBackgroundNotice() {
@@ -111,9 +111,9 @@ function updateBackgroundNotice() {
   }
   box.classList.remove("hidden");
   box.innerText = GpsSource.isNative()
-    ? "✅ Background tracking is on. Location keeps sending with the screen off (see the app notification)."
-    : "📱 Keep this screen on and this page open. Browsers pause GPS when the phone locks or you switch apps."
-        + " For tracking with the screen off, use the WIMB Driver app."
+    ? "✅ " + tr("Background tracking is on. Location keeps sending with the screen off (see the app notification).")
+    : "📱 " + tr("Keep this screen on and this page open. Browsers pause GPS when the phone locks or you switch apps.")
+        + " " + tr("For tracking with the screen off, use the WIMB Driver app.")
         + (lastPauseNote ? ` (${lastPauseNote})` : "");
 }
 
@@ -128,7 +128,7 @@ async function loadDepots() {
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.disabled = true;
-    placeholder.textContent = "Select your depot";
+    placeholder.textContent = tr("Select your depot");
     select.appendChild(placeholder);
 
     depots.forEach(depot => {
@@ -146,7 +146,7 @@ async function loadDepots() {
     }
   } catch (err) {
     console.error("Failed to load depots:", err);
-    select.innerHTML = `<option value="" disabled selected>Could not load depots</option>`;
+    select.innerHTML = `<option value="" disabled selected>${tr("Could not load depots")}</option>`;
   }
 }
 
@@ -185,18 +185,18 @@ async function loadRoutes() {
     placeholder.value = "";
     placeholder.disabled = true;
     placeholder.selected = true;
-    placeholder.textContent = routes.length ? "Select your route" : "No routes available";
+    placeholder.textContent = routes.length ? tr("Select your route") : tr("No routes available");
     select.appendChild(placeholder);
 
     routes.forEach(route => {
       const option = document.createElement("option");
       option.value = route.routeCode;
-      option.textContent = `${route.routeName} (${route.stopCount} stops)`;
+      option.textContent = `${route.routeName} (${tr("{n} stops", { n: route.stopCount })})`;
       select.appendChild(option);
     });
   } catch (err) {
     console.error("Failed to load routes:", err);
-    select.innerHTML = `<option value="" disabled selected>Could not load routes</option>`;
+    select.innerHTML = `<option value="" disabled selected>${tr("Could not load routes")}</option>`;
   }
 }
 
@@ -232,8 +232,8 @@ async function onRouteChange() {
   // Reset downstream fields whenever the route changes
   sourceSelect.disabled = true;
   destSelect.disabled = true;
-  fillStopSelect(sourceSelect, [], selectedRouteCode ? "Loading stops..." : "Pick a route first");
-  fillStopSelect(destSelect, [], selectedRouteCode ? "Loading stops..." : "Pick a route first");
+  fillStopSelect(sourceSelect, [], selectedRouteCode ? tr("Loading stops...") : tr("Pick a route first"));
+  fillStopSelect(destSelect, [], selectedRouteCode ? tr("Loading stops...") : tr("Pick a route first"));
 
   if (!selectedRouteCode) return;
 
@@ -248,14 +248,14 @@ async function onRouteChange() {
     if (requestedRoute !== selectedRouteCode) return;
 
     routeStopsCache = stops;
-    fillStopSelect(sourceSelect, stops, stops.length ? "Select start stop" : "No stops on this route");
-    fillStopSelect(destSelect, stops, stops.length ? "Select destination stop" : "No stops on this route");
+    fillStopSelect(sourceSelect, stops, stops.length ? tr("Select start stop") : tr("No stops on this route"));
+    fillStopSelect(destSelect, stops, stops.length ? tr("Select destination stop") : tr("No stops on this route"));
     sourceSelect.disabled = stops.length === 0;
     destSelect.disabled = stops.length === 0;
   } catch (err) {
     console.error("Failed to load stops for route:", err);
-    fillStopSelect(sourceSelect, [], "Could not load stops");
-    fillStopSelect(destSelect, [], "Could not load stops");
+    fillStopSelect(sourceSelect, [], tr("Could not load stops"));
+    fillStopSelect(destSelect, [], tr("Could not load stops"));
   }
 }
 
@@ -301,28 +301,28 @@ async function startRide() {
   const statusEl    = document.getElementById("status");
 
   if (!selectedRouteCode) {
-    alert("Please select a route first");
+    alert(tr("Please select a route first"));
     return;
   }
 
   if (!busNumber || !source || !destination) {
-    alert("Please fill in Bus Number, Source, and Destination");
+    alert(tr("Please fill in Bus Number, Source, and Destination"));
     return;
   }
 
   if (source === destination) {
-    alert("Source and destination must be different");
+    alert(tr("Source and destination must be different"));
     return;
   }
 
-  statusEl.innerText = "Fetching start location...";
+  statusEl.innerText = tr("Fetching start location...");
 
   // STEP 1: Try to get coords from Excel route data first
   let coords = getCoordsFromRoute(source);
 
   // STEP 2: If Excel lookup failed, fall back to GPS
   if (!coords) {
-    statusEl.innerText = "Stop not in route data, trying GPS...";
+    statusEl.innerText = tr("Stop not in route data, trying GPS...");
     try {
       const pos = await getPositionFromGPS();
       coords = {
@@ -331,7 +331,7 @@ async function startRide() {
       };
     } catch (err) {
       statusEl.innerText = "";
-      alert("Could not get location: " + err.message);
+      alert(tr("Could not get location:") + " " + err.message);
       return;
     }
   }
@@ -345,7 +345,7 @@ async function startRide() {
   };
 
   try {
-    statusEl.innerText = "Starting ride...";
+    statusEl.innerText = tr("Starting ride...");
 
     const res = await fetch("/api/ride/start", {
       method: "POST",
@@ -382,7 +382,7 @@ async function startRide() {
     document.getElementById("activeRouteKey").innerText = `${source} → ${destination}`;
     document.getElementById("activeRideId").innerText = rideId;
     document.getElementById("activeBusNumber").innerText = busNumber;
-    statusEl.innerText = `Ride Started ✅ (ID: ${rideId})`;
+    statusEl.innerText = tr("Ride Started ✅ (ID: {id})", { id: rideId });
 
     // Remember the ride so a page refresh / tab kill doesn't silently end tracking
     activeRouteCode = selectedRouteCode;
@@ -418,7 +418,7 @@ function getPositionFromGPS() {
 function startRideTracking() {
   if (rideWatchId !== null) return;
   if (!GpsSource.available()) {
-    alert("This device/browser does not support GPS, so live tracking cannot start.");
+    alert(tr("This device/browser does not support GPS, so live tracking cannot start."));
     return;
   }
 
@@ -451,7 +451,7 @@ function startGpsWatch() {
       },
       err => {
         console.error("Ride GPS error:", err.message);
-        setTrackingStatus("⚠️ GPS problem: " + err.message + (GpsSource.isNative() ? "" : " — check location permission"));
+        setTrackingStatus("⚠️ " + tr("GPS problem:") + " " + err.message + (GpsSource.isNative() ? "" : " — " + tr("check location permission")));
       }
   );
 }
@@ -486,7 +486,7 @@ function stopRideTracking() {
   activeRouteCode = null;
   activeSource = activeDestination = activeRideKey = null;
   const simSel = document.getElementById("simStop");
-  if (simSel) simSel.innerHTML = `<option value="" disabled selected>Loading stops...</option>`;
+  if (simSel) simSel.innerHTML = `<option value="" disabled selected>${tr("Loading stops...")}</option>`;
   setLocationMode("live");
   updateCurrentStop();
 }
@@ -532,9 +532,9 @@ async function sendLocation(isHeartbeat, force = false) {
 
     if (!res.ok) {
       if (res.status === 403) {
-        setTrackingStatus("❌ Session expired or ride ended — passengers can't see you. Stop the ride and start again.");
+        setTrackingStatus("❌ " + tr("Session expired or ride ended — passengers can't see you. Stop the ride and start again."));
       } else {
-        setTrackingStatus(`⚠️ Server error ${res.status} while sending location — retrying`);
+        setTrackingStatus("⚠️ " + tr("Server error {n} while sending location — retrying", { n: res.status }));
       }
       sendFailures++;
       return;
@@ -542,17 +542,17 @@ async function sendLocation(isHeartbeat, force = false) {
 
     sendFailures = 0;
     const t = new Date().toLocaleTimeString();
-    const acc = lastFix.accuracy != null ? ` (GPS ±${Math.round(lastFix.accuracy)} m)` : "";
+    const acc = lastFix.accuracy != null ? " (" + tr("GPS ±{n} m", { n: Math.round(lastFix.accuracy) }) + ")" : "";
     const staleWarning = simOverride ? "" : describeFixAge(lastFixAt ? Date.now() - lastFixAt : 0);
     setTrackingStatus(simOverride
-        ? `🧪 Sending SIMULATED location — last sent ${t}`
+        ? "🧪 " + tr("Sending SIMULATED location — last sent {t}", { t })
         : (staleWarning
-            ? `${staleWarning} (last sent ${t})`
-            : `📡 Sharing live location — last sent ${t}${acc}`));
+            ? staleWarning + " (" + tr("last sent {t}", { t }) + ")"
+            : "📡 " + tr("Sharing live location — last sent {t}", { t }) + acc));
   } catch (err) {
     sendFailures++;
     console.error("Location update failed:", err);
-    setTrackingStatus("⚠️ No internet — location not reaching passengers, retrying…");
+    setTrackingStatus("⚠️ " + tr("No internet — location not reaching passengers, retrying…"));
   }
 }
 
@@ -582,7 +582,7 @@ function setLocationMode(mode) {
     // Back to real GPS: drop the fake position so the next real fix takes over
     simOverride = null;
     lastFix = null;
-    setTrackingStatus("📡 Back on live GPS — waiting for the next fix…");
+    setTrackingStatus("📡 " + tr("Back on live GPS — waiting for the next fix…"));
     updateCurrentStop();
   }
 }
@@ -685,10 +685,10 @@ function updateCurrentStop() {
   const badge = document.getElementById("posMode");
   const n = simStops.length;
 
-  badge.innerText = simOverride ? "🧪 Simulated" : "📡 Live";
+  badge.innerText = simOverride ? "🧪 " + tr("Simulated") : "📡 " + tr("Live");
 
   if (!n || !lastFix) {
-    main.innerText = n ? "Waiting for location…" : "Loading route…";
+    main.innerText = n ? tr("Waiting for location…") : tr("Loading route…");
     sub.innerText = "—";
     bar.style.width = "0%";
     return;
@@ -700,14 +700,14 @@ function updateCurrentStop() {
     const idx = Math.max(0, parseInt(document.getElementById("simStop").value || "0", 10));
     const t = simStops[idx + 1] ? Number(document.getElementById("simSlider").value) / 100 : 0;
     if (t === 0) {
-      main.innerText = `📍 At ${name(simStops[idx])}`;
-      sub.innerText = `Stop ${idx + 1} of ${n}` + (simStops[idx + 1] ? ` · next: ${name(simStops[idx + 1])}` : " · end of route");
+      main.innerText = "📍 " + tr("At {stop}", { stop: name(simStops[idx]) });
+      sub.innerText = tr("Stop {i} of {n}", { i: idx + 1, n }) + (simStops[idx + 1] ? " · " + tr("next: {stop}", { stop: name(simStops[idx + 1]) }) : " · " + tr("end of route"));
     } else if (t === 1) {
-      main.innerText = `📍 At ${name(simStops[idx + 1])}`;
-      sub.innerText = `Stop ${idx + 2} of ${n}`;
+      main.innerText = "📍 " + tr("At {stop}", { stop: name(simStops[idx + 1]) });
+      sub.innerText = tr("Stop {i} of {n}", { i: idx + 2, n });
     } else {
       main.innerText = `🚌 ${name(simStops[idx])} → ${name(simStops[idx + 1])}`;
-      sub.innerText = `${Math.round(t * 100)}% of the way · stop ${idx + 1} of ${n}`;
+      sub.innerText = tr("{p}% of the way", { p: Math.round(t * 100) }) + " · " + tr("Stop {i} of {n}", { i: idx + 1, n });
     }
     bar.style.width = (n > 1 ? ((idx + t) / (n - 1)) * 100 : 100) + "%";
     return;
@@ -720,9 +720,9 @@ function updateCurrentStop() {
     if (d < bestD) { bestD = d; best = i; }
   });
   const AT_STOP_M = 150;
-  const distText = bestD >= 1000 ? `${(bestD / 1000).toFixed(1)} km` : `${Math.round(bestD)} m`;
-  main.innerText = bestD <= AT_STOP_M ? `📍 At ${name(simStops[best])}` : `🚌 Near ${name(simStops[best])}`;
-  sub.innerText = `Stop ${best + 1} of ${n}` + (bestD <= AT_STOP_M ? "" : ` · ${distText} away`);
+  const distText = bestD >= 1000 ? tr("{n} km", { n: (bestD / 1000).toFixed(1) }) : tr("{n} m", { n: Math.round(bestD) });
+  main.innerText = bestD <= AT_STOP_M ? "📍 " + tr("At {stop}", { stop: name(simStops[best]) }) : "🚌 " + tr("Near {stop}", { stop: name(simStops[best]) });
+  sub.innerText = tr("Stop {i} of {n}", { i: best + 1, n }) + (bestD <= AT_STOP_M ? "" : " · " + tr("{d} away", { d: distText }));
   bar.style.width = (n > 1 ? (best / (n - 1)) * 100 : 100) + "%";
 }
 
@@ -744,7 +744,7 @@ function onSimChange(resetSlider) {
   const longitude = to ? from.longitude + (to.longitude - from.longitude) * t : from.longitude;
 
   document.getElementById("simFromLabel").innerText = from.stopName.trim().toUpperCase();
-  document.getElementById("simToLabel").innerText   = to ? to.stopName.trim().toUpperCase() : "(end of route)";
+  document.getElementById("simToLabel").innerText   = to ? to.stopName.trim().toUpperCase() : tr("(end of route)");
   document.getElementById("simPctLabel").innerText  = `${Math.round(t * 100)}%`;
   document.getElementById("simCoords").innerText    = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 
@@ -806,7 +806,7 @@ async function stopRide() {
 
     stopRideTracking();
 
-    document.getElementById("status").innerText = "Ride Stopped ⛔";
+    document.getElementById("status").innerText = tr("Ride Stopped ⛔");
 
     // Go back to bus number entry
     showSection("busNumberSection");
@@ -842,7 +842,7 @@ function toggleDriverCodeVisibility() {
   eye.classList.toggle("hidden", isHidden);
   eyeOff.classList.toggle("hidden", !isHidden);
 
-  btn.setAttribute("aria-label", isHidden ? "Hide driver code" : "Show driver code");
+  btn.setAttribute("aria-label", isHidden ? tr("Hide driver code") : tr("Show driver code"));
   btn.setAttribute("aria-pressed", isHidden ? "true" : "false");
 }
 
@@ -853,21 +853,21 @@ async function checkBus() {
   const code = document.getElementById("driverCode").value.trim();
 
   if (!busNumber) {
-    alert("Please enter a bus number");
+    alert(tr("Please enter a bus number"));
     return;
   }
 
-  document.getElementById("status").innerText = "Checking...";
+  document.getElementById("status").innerText = tr("Checking...");
 
   try {
     if (!depotName) {
       document.getElementById("status").innerText = "";
-      alert("Please select your depot");
+      alert(tr("Please select your depot"));
       return;
     }
     if (!code) {
       document.getElementById("status").innerText = "";
-      alert("Please enter your depot code");
+      alert(tr("Please enter your depot code"));
       return;
     }
 
@@ -880,7 +880,7 @@ async function checkBus() {
     if (!verifyRes.ok) {
       document.getElementById("status").innerText = "";
       // Try to read a real error message; fall back if the body isn't JSON
-      let msg = "Invalid depot or code";
+      let msg = tr("Invalid depot or code");
       try {
         const errData = await safeJson(verifyRes);
         msg = errData.error || msg;
@@ -940,7 +940,7 @@ function resumeRide(routeKey) {
   showSection("activeRideSection");
   document.getElementById("activeRouteKey").innerText = routeKey;
   document.getElementById("activeRideId").innerText = rideId;
-  document.getElementById("status").innerText = `Ride Resumed ✅`;
+  document.getElementById("status").innerText = tr("Ride Resumed ✅");
 
   startRideTracking();
 }
