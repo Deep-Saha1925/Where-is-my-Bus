@@ -76,6 +76,8 @@ public class SecurityConfig {
                                 "/api/ride/cancel/**",
                                 "/api/location/**",
                                 "/api/routes/**",
+                                "/api/routes/**",
+                                "/api/notices/**",      // <-- ADD
                                 "/api/ride/active/all",
                                 "/api/driver/**",
                                 // Live-tracking WebSocket handshake (SockJS). Same
