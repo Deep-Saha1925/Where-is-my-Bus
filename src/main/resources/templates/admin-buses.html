@@ -947,6 +947,76 @@
     </div>
 </div><!-- /tab-busroster -->
 
+<!-- ── NOTICES TAB ── -->
+<div id="tab-notices" class="tab-panel" style="display:none;">
+    <div class="depot-layout">
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">📢</div>
+                <div>
+                    <div class="panel-title">Publish a notice</div>
+                    <div class="panel-sub">Shown as a banner at the top of the passenger page</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <label class="brand-label-sm">Title</label>
+                <input type="text" id="noticeTitle" class="pick-text" maxlength="100" style="width:100%;display:block;"
+                       placeholder="e.g. Route APD_FLK diverted"/>
+
+                <label class="brand-label-sm">Message</label>
+                <textarea id="noticeMessage" class="pick-text" maxlength="500" rows="3"
+                          style="width:100%;display:block;" placeholder="What passengers need to know"></textarea>
+
+                <label class="brand-label-sm">Severity</label>
+                <select id="noticeSeverity" class="pick-select">
+                    <option value="INFO">ℹ️ Info</option>
+                    <option value="WARNING">⚠️ Warning</option>
+                    <option value="CRITICAL">🚨 Critical (can't be dismissed)</option>
+                </select>
+
+                <label class="brand-label-sm">Route code (optional)</label>
+                <input type="text" id="noticeRoute" class="pick-text" maxlength="40" style="width:100%;display:block;"/>
+
+                <label class="brand-label-sm">Bus number (optional)</label>
+                <input type="text" id="noticeBus" class="pick-text" maxlength="40" style="width:100%;display:block;"/>
+
+                <label class="brand-label-sm">Auto-remove after</label>
+                <select id="noticeExpiry" class="pick-select">
+                    <option value="">Never (until I remove it)</option>
+                    <option value="1">1 hour</option>
+                    <option value="6">6 hours</option>
+                    <option value="24" selected>1 day</option>
+                    <option value="72">3 days</option>
+                    <option value="168">7 days</option>
+                </select>
+
+                <button onclick="publishNotice()" class="upload-btn">Publish Notice</button>
+                <div id="noticeStatus" class="upload-status"></div>
+            </div>
+        </div>
+
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">📋</div>
+                <div>
+                    <div class="panel-title">All notices</div>
+                    <div class="panel-sub" id="noticeCountSub">Loading...</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <div style="overflow-x:auto;">
+                    <table class="depot-table">
+                        <thead><tr><th>Notice</th><th>Severity</th><th>Applies to</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody id="noticeTableBody">
+                        <tr><td colspan="5" class="table-empty">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div><!-- /tab-notices -->
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 <script src="/js/admin-buses.js"></script>
