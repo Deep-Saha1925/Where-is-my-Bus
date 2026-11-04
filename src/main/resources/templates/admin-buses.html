@@ -2139,14 +2139,16 @@
         document.getElementById("tab-depots").style.display     = tab === "depots"    ? "" : "none";
         document.getElementById("tab-routes").style.display     = tab === "routes"    ? "" : "none";
         document.getElementById("tab-busroster").style.display  = tab === "busroster" ? "" : "none";
+        document.getElementById("tab-notices").style.display    = tab === "notices"   ? "" : "none";
         document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
         document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
         document.getElementById("tabBtnRoutes").classList.toggle("active", tab === "routes");
         document.getElementById("tabBtnBusRoster").classList.toggle("active", tab === "busroster");
+        document.getElementById("tabBtnNotices").classList.toggle("active", tab === "notices");
         localStorage.setItem("wimb_admin_tab", tab);
     }
     const savedTab = localStorage.getItem("wimb_admin_tab");
-    const validTabs = ["depots", "routes", "busroster"];
+    const validTabs = ["depots", "routes", "busroster", "notices"];
     switchTab(validTabs.includes(savedTab) ? savedTab : "buses");
 
     /* ── THEME ── */
