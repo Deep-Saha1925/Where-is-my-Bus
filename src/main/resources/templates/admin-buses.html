@@ -1018,6 +1018,33 @@
     </div>
 </div><!-- /tab-notices -->
 
+<!-- ── DRIVER REPORTS TAB ── -->
+<div id="tab-reports" class="tab-panel" style="display:none;">
+    <div class="depot-layout">
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">📥</div>
+                <div>
+                    <div class="panel-title">Driver reports</div>
+                    <div class="panel-sub" id="reportCountSub">Loading...</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <select id="reportFilter" class="pick-select" onchange="loadReports()">
+                    <option value="">All statuses</option>
+                    <option value="NEW">New</option>
+                    <option value="UNDER_REVIEW">Under review</option>
+                    <option value="NEED_INFO">Need info</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                </select>
+                <div id="reportStatusMsg" class="upload-status"></div>
+                <div id="reportList" style="margin-top:12px;"><p class="table-empty">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+</div><!-- /tab-reports -->
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 <script src="/js/admin-buses.js"></script>
