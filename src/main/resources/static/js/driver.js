@@ -818,6 +818,7 @@ async function stopRide() {
 
     // Reset the new-ride form so the next ride starts clean
     document.getElementById("routeCode").value = "";
+    syncSearchable("routeCode");
     onRouteChange();
 
     initPreviewGPS();
