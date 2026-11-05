@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -55,6 +55,7 @@
 - 📊 Bottom status sheet — *"Running · next X"* / *"Arrived Y"*, progress bar, **Next stop** and **Crossed** cells, GPS-signal status
 - 🌙 Dark mode by default, light mode from the ⋮ menu (your choice is remembered)
 - 🧭 One-tap header shortcuts to the Driver panel and Admin login — no manual URL typing needed
+- 📢 **Notice banner** at the top of the home page for route or bus problems posted by the admin (diversion, breakdown, strike...), colour-coded by severity, see [Notices & Driver Reports](#-notices--driver-reports)
 
 </td>
 <td width="50%">
@@ -64,6 +65,8 @@
 - ↩️ A bus runs one route, so if that bus already has a running ride the app **goes straight back into it** (no "resume or start new" page) — the live ride screen with its **Stop Ride** button
 - ⏳ A neutral **Loading…** screen shows while depots/routes load, so the page never flashes the wrong step
 - 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
+- ⌨️ **Type to find your route**: the Route field is a search box, so a driver can type part of a name (`sil`) instead of only scrolling; tapping it still shows the full list
+- ⚠️ **Report an issue** button (once logged in): breakdown, road blockage / diversion, new route or stop request, or anything else, sent straight to the admin, with the report's status shown back in the app, see [Notices & Driver Reports](#-notices--driver-reports)
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
 - 📍 **Current stop position** card on the ride screen — "At KOLKATA" / "Between A → B (40%)", stop *n* of *N*, progress bar, and a Live/Simulated badge
 - 🧪 **Simulate location** tab for testing without driving — it always follows the direction **the driver chose** (A → B), even when the route's Excel sheet lists the stops the other way round (B → A), see [Testing Without a Bus](#-testing-without-a-bus-simulate-location)
@@ -82,6 +85,8 @@
 - 🏢 **Depot Codes tab** — upload an Excel file to add/update every depot's driver code, no restart needed
 - 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
+- 📢 **Notices tab** — publish, hide or delete passenger notices, with severity, optional route / bus tag and auto-expiry
+- 📥 **Driver Reports tab** — an inbox of driver reports with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, a "new" counter on the tab, and one-step **Publish as notice**
 
 </td>
 <td width="50%">
@@ -134,7 +139,7 @@
 | HTML5 | Page structure |
 | Tailwind CSS | Layout utilities on the home, login and driver pages (the tracking page uses its own small stylesheet, no Tailwind) |
 | Google Fonts (Oswald, Inter, JetBrains Mono) | Brand type system — Oswald for headers/labels, Inter for body text, JetBrains Mono for IDs/codes/data |
-| Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting |
+| Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting, and a reusable type-to-search picker (`searchable-select.js`) for the driver's route |
 | SockJS + stomp.js | WebSocket client for live bus tracking (loaded via cdnjs), with a graceful fallback poll if the connection ever drops |
 | Font Awesome | Icons (admin map view, header shortcuts, stop dropdown) |
 | Leaflet.js | Live map view of all active buses |
@@ -243,7 +248,7 @@
               (credentials from environment variables)
                          │
                          ▼
-     /admin-buses.html (Active Buses / Depot Codes / Routes tabs)
+     /admin-buses.html (Active Buses / Depot Codes / Routes / Notices / Driver Reports tabs)
 ```
 
 ---
@@ -705,6 +710,88 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 
 ---
 
+## 📢 Notices & Driver Reports
+
+Two linked features that move information between drivers, the admin and passengers:
+
+```
+ DRIVER                         ADMIN                            PASSENGER
+ ⚠️ Report an issue  ───►  📥 Driver Reports tab
+ (breakdown, blockage,        review · status · note
+  new route, other)                  │
+        ▲                            │ Publish as notice (edit, then confirm)
+        │ status only                ▼
+        └──────────────────  📢 Notices tab  ───────────────►  banner on the home page
+                              (or post one directly)
+```
+
+### 1. Notices (admin → passengers)
+
+The admin posts a notice from the **Notices** tab and it appears as a banner at the top of `index.html`.
+
+| Field | Notes |
+|---|---|
+| Title / message | Required. Max 100 / 500 characters. Always shown as plain text (HTML is escaped). |
+| Severity | **Info** (blue), **Warning** (amber) or **Critical** (red). Critical notices cannot be dismissed by a passenger. |
+| Route code / bus number | Optional. Shown as a small tag on the banner; informational only, it does not filter who sees the notice. |
+| Auto-remove after | 1 hour to 7 days, or never. Stored as a **relative number of hours**, so the admin's and the server's time zones can never disagree. |
+
+- **Manage:** hide (keeps it, takes it off the banner), show again, or delete. Status reads *Live*, *Hidden* or *Expired*.
+- **Passenger side:** `js/notices.js` asks `GET /api/notices/active` when the page loads and every 60 seconds. The most severe notices come first, newest first within a severity. Info and Warning notices can be dismissed for the current browser session (`sessionStorage`); nothing else is stored in the browser.
+- **Public endpoint returns only what a passenger needs** (no active flag, no expiry internals).
+
+### 2. Driver reports (driver → admin)
+
+Once a driver is logged in (bus + depot code verified), a floating **⚠️ Report an issue** button opens a short form.
+
+| Report type | Typical use |
+|---|---|
+| 🔧 Breakdown / bus issue | Bus broken down, delayed, unable to run |
+| 🚧 Road blockage / diversion | Road closed, bridge down, flooding, diversion |
+| 🗺️ New route / stop request | Suggest a new route or an extra stop |
+| 💬 Other | Anything else (free text) |
+
+Each report also has an optional **place / route** line and a **details** box (5 to 1000 characters). Text only for now, no photos.
+
+- **Who sent it:** the bus number comes from the driver's `X-Driver-Token`, never from the request body, so a driver cannot file a report as another bus.
+- **Spam limit:** at most **5 reports per bus per hour** (HTTP 429 after that).
+- **Status the driver sees:** *Sent*, *Under review*, *Admin needs more info (contact your depot)*, *Approved*, *Rejected*. The driver sees the status only; the admin's internal note is **never** sent to the driver app.
+
+**Admin workflow** (**Driver Reports** tab):
+
+```
+NEW ──► UNDER_REVIEW ──► NEED_INFO ──► APPROVED
+                    └───────────────►  REJECTED
+```
+- The tab button shows **(N new)** for reports nobody has opened yet, and the list refreshes every minute (it pauses while the admin is typing or has a publish form open).
+- Each card has a status picker, an internal note, **Save** and **Delete**, plus a status filter at the top.
+- **📢 Publish as notice** opens a form pre-filled from the report (title, message, a suggested severity, expiry). The driver's wording is only a draft, so the admin edits it and confirms. The notice then shows on the passenger banner, carries the bus number as its tag, the report becomes **Approved**, and it cannot be published twice.
+- Approving a *new route request* only records the decision. Adding the route is still done in the Routes tab.
+
+### 3. Type-to-search route picker (driver)
+
+`js/searchable-select.js` turns the driver's **Route** `<select>` into a search box. The original `<select>` stays in the page, hidden, and stays the source of truth, so the rest of `driver.js` is unchanged.
+
+- Tap: the full list opens (scrolling still works). Type: the list narrows. Every word you type must match, in any order.
+- Arrow keys + Enter, Escape to close, and tap-to-choose on touch screens (a scroll is not mistaken for a tap).
+- Options are filled in later by `loadRoutes()`; the box follows automatically. After code changes the value (for example, after a ride ends) call `syncSearchable("routeCode")`.
+- Reusable: `makeSearchable("someSelectId")` works on any `<select>`.
+
+### Data and security
+
+| Item | Detail |
+|---|---|
+| Tables | `notice` and `driver_report`, created automatically by `ddl-auto=update` |
+| Passenger notices | `GET /api/notices/active` is public (`/api/notices/**` in `SecurityConfig`) |
+| Admin endpoints | Under `/admin/**`, so admin login is required; CSRF token is sent as `_csrf` |
+| Driver endpoints | Under `/api/driver/**` (already public + CSRF-exempt), authorised by `X-Driver-Token` |
+
+Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
+
+> ⚠️ Not covered by automated tests yet. Reports are not de-duplicated (two drivers can report the same blockage), and the notice banner is polled every 60 seconds rather than pushed over WebSocket.
+
+---
+
 ## 🛣️ Multi-Route Support
 
 Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_FLK.xlsx`, loaded once at startup). Real operation needs many independent routes — different corridors, different stop lists, added and removed over time without a redeploy. That's now a first-class concept.
@@ -763,6 +850,9 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/admin-buses.html` | 🔐 Admin only |
 | `/admin/depots`, `/admin/depots/upload`, `/admin/depots/template` | 🔐 Admin only |
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
+| `/api/notices/active` | 🌐 Everyone *(read-only list of live notices)* |
+| `/api/driver/reports` | 🌐 Public route, 🔑 but requires a valid `X-Driver-Token` header — enforced in the controller |
+| `/admin/notices/**`, `/admin/reports/**` | 🔐 Admin only |
 
 > On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
 
@@ -998,17 +1088,79 @@ GET /admin/routes/template
 
 </details>
 
+<details>
+<summary><b>📢 Notice APIs</b></summary>
+
+#### Live Notices (public, passenger banner)
+```http
+GET /api/notices/active
+```
+```json
+[ { "id": 3, "title": "Route APD_FLK diverted", "message": "Via NH31 until 6 PM.", "severity": "WARNING",
+    "routeCode": "APD_FLK", "busNumber": null, "createdAt": "2026-11-05T09:30:00" } ]
+```
+Only active, non-expired notices, most severe first.
+
+#### Admin: list / publish / hide / delete
+```http
+GET    /admin/notices
+POST   /admin/notices                       title, message, severity, routeCode?, busNumber?, expiresInHours?
+PUT    /admin/notices/{id}/active?value=false
+DELETE /admin/notices/{id}
+```
+Admin login required. `severity` is `INFO`, `WARNING` or `CRITICAL`; `expiresInHours` is 1 to 2160 (omit = never).
+
+</details>
+
+<details>
+<summary><b>📥 Driver Report APIs</b></summary>
+
+#### Driver: send a report
+```http
+POST /api/driver/reports
+Content-Type: application/json
+X-Driver-Token: a1b2c3d4-...
+
+{ "type": "ROAD_BLOCKAGE", "place": "NH31 near Falakata", "description": "Bridge closed, trucks diverted." }
+```
+`type` is `BREAKDOWN`, `ROAD_BLOCKAGE`, `ROUTE_REQUEST` or `OTHER`.
+
+| Status | Meaning |
+|---|---|
+| `200` | Saved |
+| `400` | Bad type, or description not 5 to 1000 characters |
+| `401` | Missing / expired driver token |
+| `429` | More than 5 reports from this bus in the last hour |
+
+#### Driver: my recent reports (status only)
+```http
+GET /api/driver/reports
+X-Driver-Token: a1b2c3d4-...
+```
+Returns the bus's latest 20 reports with `status`, never the admin's note.
+
+#### Admin: review
+```http
+GET    /admin/reports?status=NEW            (status optional)
+PUT    /admin/reports/{id}                  status, adminNote?
+POST   /admin/reports/{id}/publish          title, message, severity, expiresInHours?
+DELETE /admin/reports/{id}
+```
+Admin login required. `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published.
+
+</details>
+
 ---
 
 ## 🖥️ Frontend Pages
 
 | Page | Who uses it | Description |
 |---|---|---|
-| `index.html` | Passenger | Three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, header shortcuts to Driver/Admin |
+| `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, header shortcuts to Driver/Admin |
 | `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, dark / light mode, see [The Tracking Page](#-the-tracking-page) |
-| `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride |
+| `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride. The route picker is type-to-search, and a floating **Report an issue** button appears once logged in |
 | `login.html` | Admin | Secure login form |
-| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list) |
+| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list), **Notices** (publish / hide / delete), **Driver Reports** (review, status, notes, publish as notice) |
 
 ---
 
@@ -1029,6 +1181,10 @@ WIMB/
 │   │   ├── DriverAuthController.java    # /api/driver/verify, /api/driver/depots
 │   │   ├── AdminDepotController.java    # /admin/depots (view/upload/template)
 │   │   ├── AdminRouteController.java    # /admin/routes (view/add/update/delete/template)
+│   │   ├── NoticeController.java        # public GET /api/notices/active (passenger banner)
+│   │   ├── AdminNoticeController.java   # /admin/notices (list/publish/hide/delete)
+│   │   ├── DriverReportController.java  # /api/driver/reports (driver sends + sees own status)
+│   │   ├── AdminReportController.java   # /admin/reports (review, status, note, publish as notice)
 │   │   ├── DriverController.java        # serves the driver.html view (Thymeleaf)
 │   │   ├── AdminController.java         # serves admin.html / admin-buses.html views
 │   │   ├── HomeController.java
@@ -1062,6 +1218,8 @@ WIMB/
 │   │   ├── Bus.java
 │   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount
 │   │   ├── AdminUpload.java             # DB-backed store for depot codes / bus rosters / timetables
+│   │   ├── Notice.java                  # passenger notice (severity, optional route/bus, expiry)
+│   │   ├── DriverReport.java            # driver report + status workflow
 │   │   └── Location.java               # implements Serializable; ride is @JsonIgnore (see Active Ride Cache)
 │   ├── enums/
 │   │   └── RideStatus.java
@@ -1069,7 +1227,9 @@ WIMB/
 │   │   ├── RideRepository.java          # incl. searchByBusNumber(...) — the bus-number search query
 │   │   ├── BusRepository.java
 │   │   ├── RouteRepository.java
-│   │   └── AdminUploadRepository.java
+│   │   ├── AdminUploadRepository.java
+│   │   ├── NoticeRepository.java
+│   │   └── DriverReportRepository.java
 │   └── dto/
 │       ├── StartRideRequest.java
 │       ├── LocationUpdateRequest.java
@@ -1093,6 +1253,11 @@ WIMB/
 │   │   │   ├── driver.js                # login, auto-resume, GPS sending (no dropped fixes), Simulate location (follows the ride's direction), current-stop card, tracking health
 │   │   │   ├── native-gps.js            # GPS source: browser, or background service inside the Android app
 │   │   │   ├── geo-utils.js             # passenger location helpers: nearest stop, distances, error messages
+│   │   │   ├── notices.js               # passenger notice banner (polls /api/notices/active)
+│   │   │   ├── admin-notices.js         # admin Notices tab
+│   │   │   ├── driver-reports.js        # driver Report an issue button, form, status list
+│   │   │   ├── admin-reports.js         # admin Driver Reports tab
+│   │   │   ├── searchable-select.js     # type-to-search <select> (driver route picker)
 │   │   │   └── admin-buses.js
 │   │   └── data/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
@@ -1256,6 +1421,13 @@ A multi-stage `Dockerfile`:
 - [x] ~~Passenger "use my location"~~ — done: nearest stop on the home page, distance to the bus on the tracking page
 - [x] ~~Buses disappearing from search when Redis is down~~ — done: circuit breaker, in-memory last location, database fallback, tokens in memory
 - [x] ~~Location history growing forever~~ — done: nightly clean-up of rows older than 30 days
+- [x] ~~Passenger notices for route / bus problems~~ — done: admin-posted banner on the home page, see [Notices & Driver Reports](#-notices--driver-reports)
+- [x] ~~Drivers reporting issues to the admin~~ — done: report form, status workflow, publish as notice
+- [x] ~~Drivers could only scroll to find a route~~ — done: type-to-search route picker
+- [ ] Show the admin's reply (not just the status) to the driver in the driver app
+- [ ] Edit a notice after publishing it; type-to-search on the driver's Start / Destination stop pickers
+- [ ] Optional photo on a driver report
+- [ ] Push the notice banner over WebSocket instead of polling every 60 seconds
 - [ ] Database migrations (Flyway) instead of `ddl-auto=update` — postponed on purpose
 - [x] ~~Driver GPS dying when the phone locks~~ — done in code: background-GPS Android app scaffold + honest tracking status (app build still to be tested)
 - [x] ~~Tracking page redesign~~ — done: train-tracker style layout, arrival / departure per stop, per-stop ETA from real speed, reload button with short-lived cache, alarm, light / dark themes
