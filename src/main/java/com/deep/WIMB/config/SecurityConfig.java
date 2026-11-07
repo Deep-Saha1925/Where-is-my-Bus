@@ -80,6 +80,7 @@ public class SecurityConfig {
                                 "/api/notices/**",      // <-- ADD
                                 "/api/ride/active/all",
                                 "/api/driver/**",
+                                "/api/passenger/**",    // passenger "report a problem"
                                 // Live-tracking WebSocket handshake (SockJS). Same
                                 // public read-only data as /api/ride/active/all and
                                 // /api/location/** already serve, just pushed instead
@@ -147,6 +148,7 @@ public class SecurityConfig {
                                 "/api/ride/**",
                                 "/api/location/**",
                                 "/api/driver/**",
+                                "/api/passenger/**",
                                 "/ws/**"
                         )
                 );
