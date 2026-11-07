@@ -12,8 +12,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * A report a driver sends to the admin: breakdown, road blockage / diversion,
- * new route or stop request, or anything else. The admin triages it through
+ * A report sent to the admin by a driver (breakdown, road blockage / diversion,
+ * new route or stop request, ...) or by a passenger (wrong bus location, bus not
+ * running, staff behaviour, app problem, ...). The admin triages it through
  * the status workflow and can turn it into a public {@link Notice}.
  */
 @Entity
@@ -31,6 +32,13 @@ public class DriverReport {
     public static final String ROAD_BLOCKAGE = "ROAD_BLOCKAGE";
     public static final String ROUTE_REQUEST = "ROUTE_REQUEST";
     public static final String OTHER = "OTHER";
+
+    /** Who sent the report. Rows created before this column existed have null = DRIVER. */
+    public static final String SOURCE_DRIVER = "DRIVER";
+    public static final String SOURCE_PASSENGER = "PASSENGER";
+
+    /** busNumber value for a passenger report that is not about one particular bus. */
+    public static final String NO_BUS = "-";
 
     public static final String NEW = "NEW";
     public static final String UNDER_REVIEW = "UNDER_REVIEW";
@@ -65,6 +73,14 @@ public class DriverReport {
 
     /** Set when the admin turned this report into a public notice. */
     private Long publishedNoticeId;
+
+    /** DRIVER or PASSENGER (null on old rows = DRIVER). */
+    @Column(length = 20)
+    private String source = SOURCE_DRIVER;
+
+    /** Optional phone / email a passenger chose to leave. Admin-only, never sent to drivers. */
+    @Column(length = 100)
+    private String contact;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
