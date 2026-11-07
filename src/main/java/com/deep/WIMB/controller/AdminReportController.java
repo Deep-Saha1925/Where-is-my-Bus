@@ -101,7 +101,8 @@ public class AdminReportController {
         n.setTitle(t);
         n.setMessage(m);
         n.setSeverity(sev);
-        n.setBusNumber(r.getBusNumber());
+        // passenger reports that are not about one bus carry the "-" placeholder
+        n.setBusNumber(DriverReport.NO_BUS.equals(r.getBusNumber()) ? null : r.getBusNumber());
         n.setActive(true);
         n.setCreatedAt(now);
         n.setExpiresAt(expiresInHours == null ? null : now.plusHours(expiresInHours));
