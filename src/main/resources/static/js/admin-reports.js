@@ -7,11 +7,17 @@
         BREAKDOWN: "🔧 Breakdown / bus issue",
         ROAD_BLOCKAGE: "🚧 Road blockage / diversion",
         ROUTE_REQUEST: "🗺️ New route / stop request",
-        OTHER: "💬 Other"
+        OTHER: "💬 Other",
+        // passenger report types
+        LOCATION_WRONG: "📍 Bus location looks wrong",
+        BUS_NOT_RUNNING: "🚫 Bus not running / cancelled",
+        CONDUCT: "🧑 Driver or staff behaviour",
+        APP_PROBLEM: "🛠️ Problem with the app"
     };
     var STATUS_LABEL = { NEW: "New", UNDER_REVIEW: "Under review", NEED_INFO: "Need info", APPROVED: "Approved", REJECTED: "Rejected" };
     var STATUS_COLOR = { NEW: "#3b82f6", UNDER_REVIEW: "#f59e0b", NEED_INFO: "#ea580c", APPROVED: "#22c55e", REJECTED: "#ef4444" };
-    var DEFAULT_SEV = { BREAKDOWN: "WARNING", ROAD_BLOCKAGE: "WARNING", ROUTE_REQUEST: "INFO", OTHER: "INFO" };
+    var DEFAULT_SEV = { BREAKDOWN: "WARNING", ROAD_BLOCKAGE: "WARNING", ROUTE_REQUEST: "INFO", OTHER: "INFO",
+                        LOCATION_WRONG: "INFO", BUS_NOT_RUNNING: "WARNING", CONDUCT: "INFO", APP_PROBLEM: "INFO" };
     var cache = {};
 
     function esc(v) {
@@ -62,12 +68,20 @@
         var published = r.publishedNoticeId
             ? '<span style="font-size:12px;color:#22c55e;font-weight:600;">📢 Published as notice #' + Number(r.publishedNoticeId) + "</span>"
             : '<button class="row-update-btn" onclick="toggleReportPublish(' + Number(r.id) + ')">📢 Publish as notice</button>';
+        var fromPassenger = r.source === "PASSENGER";
+        var badge = fromPassenger
+            ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(124,58,237,.15);color:#7c3aed;margin-right:6px;">🧍 Passenger</span>'
+            : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;">🚌 Driver</span>';
+        var busText = r.busNumber === "-" ? "<i>no bus given</i>" : "Bus <b>" + esc(r.busNumber) + "</b>";
+        var contact = r.contact
+            ? '<div style="font-size:12.5px;margin-top:4px;">📞 Contact left: <b>' + esc(r.contact) + "</b></div>"
+            : "";
         return '<div class="panel-card" style="margin-bottom:12px;"><div class="panel-card-body">' +
             '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">' +
-            "<div><b>" + esc(TYPE_LABEL[r.type] || r.type) + "</b> · Bus <b>" + esc(r.busNumber) + "</b>" +
+            "<div>" + badge + "<b>" + esc(TYPE_LABEL[r.type] || r.type) + "</b> · " + busText +
             (r.place ? " · " + esc(r.place) : "") + "</div>" +
             '<span style="font-weight:700;color:' + (STATUS_COLOR[r.status] || "") + '">' + esc(STATUS_LABEL[r.status] || r.status) + "</span></div>" +
-            '<div style="margin:6px 0;white-space:pre-wrap;">' + esc(r.description) + "</div>" +
+            '<div style="margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere;">' + esc(r.description) + "</div>" + contact +
             '<div style="font-size:11.5px;color:var(--text-faint);">Sent ' + esc(new Date(r.createdAt).toLocaleString()) + "</div>" +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">' +
             '<select id="rs-' + r.id + '" class="pick-select">' + opts + "</select>" +
