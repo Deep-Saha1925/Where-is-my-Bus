@@ -681,7 +681,9 @@ function etaText(mins) {
 /* Bottom sheet: collapsed shows just the status + reload; tap to open the trip details */
 function syncSheetPad() {
   const sheet = document.getElementById("sheet");
-  if (sheet) document.body.style.paddingBottom = (sheet.offsetHeight + 16) + "px";
+  if (!sheet) return;
+  document.body.style.paddingBottom = (sheet.offsetHeight + 16) + "px";
+  document.documentElement.style.setProperty("--sheet-h", sheet.offsetHeight + "px");
 }
 function toggleSheet() {
   const body = document.getElementById("sheetBody");
