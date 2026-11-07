@@ -10,6 +10,7 @@ import com.deep.WIMB.model.DriverReport;
 import com.deep.WIMB.repository.DriverReportRepository;
 import com.deep.WIMB.service.DriverTokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,12 +64,13 @@ public class DriverReportController {
         if (place.length() > 150) place = place.substring(0, 150);
 
         LocalDateTime now = LocalDateTime.now();
-        if (reportRepository.countByBusNumberAndCreatedAtAfter(bus, now.minusHours(1)) >= MAX_PER_HOUR) {
+        if (reportRepository.countDriverReportsSince(bus, now.minusHours(1)) >= MAX_PER_HOUR) {
             return ResponseEntity.status(429).body(Map.of("error", "Too many reports in the last hour. Please wait."));
         }
 
         DriverReport r = new DriverReport();
         r.setBusNumber(bus);
+        r.setSource(DriverReport.SOURCE_DRIVER);
         r.setType(type);
         r.setPlace(place.isEmpty() ? null : place);
         r.setDescription(desc);
@@ -87,7 +89,7 @@ public class DriverReportController {
         if (bus == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Please log in again"));
         }
-        List<DriverView> out = reportRepository.findTop20ByBusNumberOrderByCreatedAtDesc(bus).stream()
+        List<DriverView> out = reportRepository.findOwnByBus(bus, PageRequest.of(0, 20)).stream()
                 .map(r -> new DriverView(r.getId(), r.getType(), r.getPlace(), r.getDescription(),
                         r.getStatus(), r.getCreatedAt(), r.getUpdatedAt()))
                 .toList();
