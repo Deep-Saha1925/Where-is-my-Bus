@@ -386,6 +386,7 @@ async function searchBuses() {
     noResults.style.display     = "none";
     resultsHeader.style.display = "none";
     quickResults.style.display  = "none";
+    if (window.UpcomingBuses) UpcomingBuses.clear();
     loading.style.display       = "block";
 
     try {
@@ -399,10 +400,22 @@ async function searchBuses() {
 
         if (!buses.length) {
             noResults.style.display = "block";
+            // Nothing running right now: list the scheduled buses that are coming soon instead
+            // of leaving the passenger with a dead end.
+            if (window.UpcomingBuses) {
+                UpcomingBuses.show(source, destination, buses, (list) => {
+                    if (list.length) {
+                        setNoResultsText(tr("No bus is running right now"),
+                                         tr("Scheduled buses coming up are listed below"));
+                    }
+                });
+            }
             return;
         }
 
         renderBusCards(buses, routeKey);
+        // Live buses found: still show what is scheduled next (e.g. the following bus).
+        if (window.UpcomingBuses) UpcomingBuses.show(source, destination, buses);
 
     } catch (err) {
         loading.style.display = "none";
@@ -463,6 +476,7 @@ function switchSearchTab(tab) {
     document.getElementById("noResults").style.display           = "none";
     document.getElementById("loading").style.display             = "none";
     document.getElementById("busList").innerHTML                 = "";
+    if (window.UpcomingBuses) UpcomingBuses.clear();
     setNoResultsText(tr("No active buses"), tr("No buses are currently running on this route"));
 
     if (isLive) {
@@ -565,6 +579,7 @@ function cancelBusSearch() {
 
 // Wipe the results area completely, so nothing from a previous search stays on screen
 function clearBusResults() {
+    if (window.UpcomingBuses) UpcomingBuses.clear();
     document.getElementById("busList").innerHTML           = "";
     document.getElementById("resultsHeader").style.display = "none";
     document.getElementById("noResults").style.display     = "none";
