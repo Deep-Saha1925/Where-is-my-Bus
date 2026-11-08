@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -45,6 +45,9 @@
 - 🔍 Search buses by source & destination
 - 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop; the tracking page shows how far the bus is from you and can send your location to a friend (WhatsApp, SMS...), see [Use My Location](#-use-my-location-passenger)
 - 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
+- 🕒 **Upcoming scheduled buses** — if no bus is running right now (say it is 10:55 and the next bus leaves at 11:00), the search no longer ends at *"not available"*: it lists the next buses from the timetable (*Due in 5 min*, *In 25 min*) and any that are **late / not live yet**, see [Upcoming Scheduled Buses](#-upcoming-scheduled-buses)
+- ⚠️ **Report a problem** — wrong bus location, bus not running, staff behaviour, app problem: from the tracking page (⋮ menu or ⚠️ Report chip) or the home page footer, no login needed, see [Notices & Driver Reports](#-notices--driver-reports)
+- 📱 **Phone-friendly pages** — safe-area padding on notched phones, pinch-zoom allowed, 44px tap targets, a header that fits 320px screens, and toasts that sit above the bottom sheet
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
 - 📍 Live route timeline in the style of a train tracker — **arrival time on the left, departure time on the right** of every stop, a thick rail with the bus on it, and it opens with the bus scrolled to the middle of the screen, then you scroll freely, see [The Tracking Page](#-the-tracking-page)
@@ -86,7 +89,7 @@
 - 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
 - 📢 **Notices tab** — publish, hide or delete passenger notices, with severity, optional route / bus tag and auto-expiry
-- 📥 **Driver Reports tab** — an inbox of driver reports with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, a "new" counter on the tab, and one-step **Publish as notice**
+- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged 🚌 Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, a "new" counter on the tab, and one-step **Publish as notice**
 
 </td>
 <td width="50%">
@@ -382,6 +385,52 @@ exact matches first, then alphabetical → cached → returned
 - Public endpoint, same access level as `/api/ride/active`.
 
 > ⚠️ `LIKE '%text%'` can't use a normal database index, so the speed-up comes from only reading active rides and capping the result count — which is small for this app. Single-instance caveat applies to `BusSearchCache` exactly as it does to `ActiveRideCache`.
+
+---
+
+## 🕒 Upcoming Scheduled Buses
+
+### The problem
+`BUS1` leaves **A** for **D** at 11:00. A passenger searches A → D at 10:55. Nothing is running yet, so live search used to answer only *"No active buses"*, even though a bus was five minutes away.
+
+### What it does now
+The Live Buses search also asks `GET /api/routes/upcoming` and shows a **🕒 Upcoming scheduled buses** box under the live results (or under the "no bus is running right now" message):
+
+| Badge | Meaning |
+|---|---|
+| 🟢 **Due in 4 min** | The bus reaches the passenger's stop within about 5 minutes |
+| 🔵 **In 25 min** | A later scheduled bus (up to 5 are listed, next 3 hours) |
+| 🟠 **Scheduled 12 min ago, not live yet** | Its time has passed, but no live ride is on that route: not started, delayed, or the driver is not using the app (shown for up to 30 minutes) |
+
+If nothing is due in the next 3 hours the single next departure is still shown, for example tomorrow's first bus (marked *Tomorrow*). The box refreshes every minute while the page is open, and **live buses and suggestions can appear together** (the live ones first, then what is scheduled next).
+
+### How the time at your stop is worked out
+It uses only data the admin already enters. A route's **departure times** (Routes tab → timetable) are daily times from the route's first stop **in its running direction** (the admin-entered source depot → destination depot, not the Excel row order). There is no per-stop timetable, so for a stop further along:
+
+```
+time at your stop = departure + (distance from the first stop ÷ average speed) + halts of the stops before it
+```
+
+- A stop that is the route's **first stop** shows the exact timetable time. Any other stop shows an estimate marked `~`, plus *"leaves {first stop} at {time}"*.
+- Average speed is **30 km/h**, the same figure the home page uses for its live ETA. Halts are each stop's `slack_min`.
+- Direction matters: a route only matches when the passenger's A → D goes the same way the route runs and both stops lie inside the route's own start and end.
+- The result also shows the **estimated arrival at D**, the distance and stop count, and the route's bus roster.
+
+> ⚠️ **Limits:** a bus is not tied to a departure time. The roster only says which buses run the route, so the box shows *route + time*, not *"BUS1 at 11:00"*. Times at middle stops are estimates, not a published timetable. A route with no departure times registered produces no suggestions (the Depot Routes tab behaves the same).
+
+### Settings (all optional)
+
+| Property | Default | Meaning |
+|---|---|---|
+| `wimb.schedule.zone` | `Asia/Kolkata` | Time zone the departure times are read in |
+| `wimb.schedule.avg-speed-kmh` | 30 | Average speed used for the estimate |
+| `wimb.schedule.look-ahead-minutes` | 180 | How far ahead buses are listed |
+| `wimb.schedule.late-grace-minutes` | 30 | How long a missed, not-live bus is still shown as late |
+| `wimb.schedule.max-upcoming` | 5 | Most upcoming buses listed |
+
+Set them in `application.properties` or as environment variables (`WIMB_SCHEDULE_AVG_SPEED_KMH` and so on).
+
+Files: `UpcomingBusService`, `UpcomingBusController`, `UpcomingBus` (Java); `static/js/upcoming-buses.js` (the box, builds its own container) and a few lines in `index.js`. The endpoint sits under `/api/routes/**`, so `SecurityConfig` needed no change.
 
 ---
 
@@ -712,7 +761,7 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 
 ## 📢 Notices & Driver Reports
 
-Two linked features that move information between drivers, the admin and passengers:
+Linked features that move information between drivers, passengers, the admin and the passenger banner:
 
 ```
  DRIVER                         ADMIN                            PASSENGER
@@ -768,6 +817,28 @@ NEW ──► UNDER_REVIEW ──► NEED_INFO ──► APPROVED
 - **📢 Publish as notice** opens a form pre-filled from the report (title, message, a suggested severity, expiry). The driver's wording is only a draft, so the admin edits it and confirms. The notice then shows on the passenger banner, carries the bus number as its tag, the report becomes **Approved**, and it cannot be published twice.
 - Approving a *new route request* only records the decision. Adding the route is still done in the Routes tab.
 
+### 2b. Passenger reports (passenger → admin)
+
+Passengers can report a problem without logging in: the **⚠️ Report** chip and the **⋮ → Report a problem** item on the tracking page, and a **Report a problem** link in the home page footer. A bottom sheet opens (on the tracking page the bus number and route are already filled in).
+
+| Report type | Typical use |
+|---|---|
+| 📍 Bus location looks wrong | The map or stop times do not match where the bus really is |
+| 🚫 Bus is not running / cancelled | Bus never came, or was cancelled |
+| 👤 Driver or staff behaviour | Complaints about conduct |
+| 🛠️ Problem with this app | Something in WIMB is broken |
+| 💬 Something else | Anything else |
+
+Optional: bus number, route / place, and a **phone or email** if the passenger wants a reply (admin-only, never shown to drivers). Details must be 5 to 1000 characters. There is no passenger account, so there is no status shown back to the passenger.
+
+- **Same inbox as driver reports:** it lands in the admin **Driver Reports** tab with a 🧍 Passenger badge, the contact line, and the same status workflow and **Publish as notice**. (A passenger report with no bus number is stored with the placeholder `-`, and a notice made from it gets no bus tag.)
+- **Drivers never see them:** a driver's own list and hourly quota count only `source = DRIVER` reports (old rows with no source count as driver reports), so passenger complaints about a bus never appear in that driver's app or use up their 5 reports an hour.
+- **Spam guards** (the endpoint is public, so it is limited three ways): **3 reports per IP per hour** (real IP via `ClientIpResolver`), **10 per bus per hour**, **60 per hour in total**, plus a hidden honeypot field that only bots fill in (they get a fake "sent" and nothing is stored). Over a limit: HTTP 429. Counters are in memory, per instance, like the login limiter.
+- The bus number is checked (letters, digits, space, `-`, `/`, `.` only, up to 40 characters) and control characters are stripped.
+- Text is always shown escaped, so nothing a passenger types can run as HTML in the admin tab.
+
+> ⚠️ Not covered by automated tests yet. Reports are not de-duplicated, and a passenger cannot attach a photo.
+
 ### 3. Type-to-search route picker (driver)
 
 `js/searchable-select.js` turns the driver's **Route** `<select>` into a search box. The original `<select>` stays in the page, hidden, and stays the source of truth, so the rest of `driver.js` is unchanged.
@@ -785,8 +856,10 @@ NEW ──► UNDER_REVIEW ──► NEED_INFO ──► APPROVED
 | Passenger notices | `GET /api/notices/active` is public (`/api/notices/**` in `SecurityConfig`) |
 | Admin endpoints | Under `/admin/**`, so admin login is required; CSRF token is sent as `_csrf` |
 | Driver endpoints | Under `/api/driver/**` (already public + CSRF-exempt), authorised by `X-Driver-Token` |
+| Passenger endpoint | `POST /api/passenger/reports`: public and CSRF-exempt (`/api/passenger/**` in `SecurityConfig`), protected by the rate limits above |
+| `driver_report` columns | `source` (`DRIVER` / `PASSENGER`) and `contact` were added; `ddl-auto=update` creates them, old rows stay valid |
 
-Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
+Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `PassengerReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `passenger-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
 
 > ⚠️ Not covered by automated tests yet. Reports are not de-duplicated (two drivers can report the same blockage), and the notice banner is polled every 60 seconds rather than pushed over WebSocket.
 
@@ -852,6 +925,8 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/admin/routes`, `/admin/routes/upload`, `/admin/routes/{routeCode}` (update/delete), `/admin/routes/template` | 🔐 Admin only |
 | `/api/notices/active` | 🌐 Everyone *(read-only list of live notices)* |
 | `/api/driver/reports` | 🌐 Public route, 🔑 but requires a valid `X-Driver-Token` header — enforced in the controller |
+| `/api/passenger/reports` | 🌐 Everyone *(rate-limited per IP / bus / overall, honeypot-protected)* |
+| `/api/routes/upcoming` | 🌐 Everyone *(read-only scheduled-bus suggestions, covered by `/api/routes/**`)* |
 | `/admin/notices/**`, `/admin/reports/**` | 🔐 Admin only |
 
 > On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
@@ -1020,6 +1095,19 @@ Returns code, name, and stop count only — never the server file path.
 GET /api/routes/stops?routeCode=APD_FLK
 ```
 
+#### Upcoming Scheduled Buses Between Two Stops
+```http
+GET /api/routes/upcoming?source=ALIPURDUAR&destination=FALAKATA&liveRoutes=APD_FLK
+```
+`liveRoutes` is optional: route codes that already have a live bus for this search, so those routes are not reported as *late*. See [Upcoming Scheduled Buses](#-upcoming-scheduled-buses).
+```json
+[ { "routeCode": "APD_FLK", "routeName": "Alipurduar ⇄ Falakata", "status": "DUE",
+    "startStop": "Alipurduar", "departsStart": "11:00", "atSource": "11:00", "atDestination": "12:10",
+    "minutesUntil": 5, "nextDay": false, "approximate": false, "stopsBetween": 4, "distanceKm": 35.0,
+    "busNumbers": ["WB-23A-1245"] } ]
+```
+`status` is `DUE`, `UPCOMING` or `LATE`; times are `HH:mm`; at most 5 upcoming plus 3 late entries.
+
 </details>
 
 <details>
@@ -1139,6 +1227,22 @@ X-Driver-Token: a1b2c3d4-...
 ```
 Returns the bus's latest 20 reports with `status`, never the admin's note.
 
+#### Passenger: send a report
+```http
+POST /api/passenger/reports
+Content-Type: application/json
+
+{ "type": "LOCATION_WRONG", "busNumber": "WB-23A-1245", "place": "Alipurduar to Falakata",
+  "description": "Map shows the bus at Sonapur but it is still at the depot.", "contact": "98xxxxxx12" }
+```
+`type` is `LOCATION_WRONG`, `BUS_NOT_RUNNING`, `CONDUCT`, `APP_PROBLEM` or `OTHER`. `busNumber`, `place` and `contact` are optional. A hidden `website` field must stay empty (anti-bot).
+
+| Status | Meaning |
+|---|---|
+| `200` | Saved (also returned, without saving, if the honeypot was filled) |
+| `400` | Bad type, bad bus number, or details not 5 to 1000 characters |
+| `429` | Over the per-IP (3/h), per-bus (10/h) or overall (60/h) limit |
+
 #### Admin: review
 ```http
 GET    /admin/reports?status=NEW            (status optional)
@@ -1146,7 +1250,7 @@ PUT    /admin/reports/{id}                  status, adminNote?
 POST   /admin/reports/{id}/publish          title, message, severity, expiresInHours?
 DELETE /admin/reports/{id}
 ```
-Admin login required. `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published.
+Admin login required. The list holds driver **and** passenger reports (`source`, and `contact` for passengers). `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published.
 
 </details>
 
@@ -1156,8 +1260,8 @@ Admin login required. `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED`
 
 | Page | Who uses it | Description |
 |---|---|---|
-| `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, header shortcuts to Driver/Admin |
-| `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, dark / light mode, see [The Tracking Page](#-the-tracking-page) |
+| `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, an **Upcoming scheduled buses** box under the live results, a **Report a problem** footer link, header shortcuts to Driver/Admin |
+| `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, **Report a problem** (⋮ menu and ⚠️ chip), dark / light mode, see [The Tracking Page](#-the-tracking-page) |
 | `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride. The route picker is type-to-search, and a floating **Report an issue** button appears once logged in |
 | `login.html` | Admin | Secure login form |
 | `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list), **Notices** (publish / hide / delete), **Driver Reports** (review, status, notes, publish as notice) |
@@ -1184,6 +1288,8 @@ WIMB/
 │   │   ├── NoticeController.java        # public GET /api/notices/active (passenger banner)
 │   │   ├── AdminNoticeController.java   # /admin/notices (list/publish/hide/delete)
 │   │   ├── DriverReportController.java  # /api/driver/reports (driver sends + sees own status)
+│   │   ├── PassengerReportController.java # /api/passenger/reports (public, rate-limited, honeypot)
+│   │   ├── UpcomingBusController.java   # GET /api/routes/upcoming (scheduled buses coming soon)
 │   │   ├── AdminReportController.java   # /admin/reports (review, status, note, publish as notice)
 │   │   ├── DriverController.java        # serves the driver.html view (Thymeleaf)
 │   │   ├── AdminController.java         # serves admin.html / admin-buses.html views
@@ -1195,6 +1301,7 @@ WIMB/
 │   │   ├── ActiveRideCache.java         # in-memory rideId→busNumber, avoids a DB hit per GPS ping
 │   │   ├── BusNumbers.java              # bus-number normalisation shared by the passenger search
 │   │   ├── BusSearchCache.java          # 5s TTL cache for bus-number search, cleared when a ride starts/ends
+│   │   ├── UpcomingBusService.java      # next scheduled buses between two stops, from route departure times
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
 │   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
@@ -1219,7 +1326,7 @@ WIMB/
 │   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount
 │   │   ├── AdminUpload.java             # DB-backed store for depot codes / bus rosters / timetables
 │   │   ├── Notice.java                  # passenger notice (severity, optional route/bus, expiry)
-│   │   ├── DriverReport.java            # driver report + status workflow
+│   │   ├── DriverReport.java            # driver / passenger report (source, contact) + status workflow
 │   │   └── Location.java               # implements Serializable; ride is @JsonIgnore (see Active Ride Cache)
 │   ├── enums/
 │   │   └── RideStatus.java
@@ -1236,6 +1343,7 @@ WIMB/
 │       ├── LocationBroadcast.java       # lean {rideId, lat, lng, accuracy, timestamp} payload for WebSocket pushes + last-loc
 │       ├── ActiveRideResponse.java
 │       ├── RouteStop.java
+│       ├── UpcomingBus.java             # one scheduled bus suggestion (status, times, roster)
 │       └── RouteSummary.java            # public-safe route listing (no file paths)
 │
 ├── src/main/resources/
@@ -1256,7 +1364,9 @@ WIMB/
 │   │   │   ├── notices.js               # passenger notice banner (polls /api/notices/active)
 │   │   │   ├── admin-notices.js         # admin Notices tab
 │   │   │   ├── driver-reports.js        # driver Report an issue button, form, status list
-│   │   │   ├── admin-reports.js         # admin Driver Reports tab
+│   │   │   ├── passenger-reports.js     # passenger Report a problem bottom sheet (home + tracking page)
+│   │   │   ├── upcoming-buses.js        # "Upcoming scheduled buses" box under the live search results
+│   │   │   ├── admin-reports.js         # admin Driver Reports tab (driver + passenger reports)
 │   │   │   ├── searchable-select.js     # type-to-search <select> (driver route picker)
 │   │   │   └── admin-buses.js
 │   │   └── data/
@@ -1424,6 +1534,10 @@ A multi-stage `Dockerfile`:
 - [x] ~~Passenger notices for route / bus problems~~ — done: admin-posted banner on the home page, see [Notices & Driver Reports](#-notices--driver-reports)
 - [x] ~~Drivers reporting issues to the admin~~ — done: report form, status workflow, publish as notice
 - [x] ~~Drivers could only scroll to find a route~~ — done: type-to-search route picker
+- [x] ~~"Not available" dead end when a bus is about to leave~~ — done: upcoming scheduled buses (due soon, later, late / not live yet), see [Upcoming Scheduled Buses](#-upcoming-scheduled-buses)
+- [x] ~~Passengers could not report problems~~ — done: public report sheet, same admin inbox as driver reports
+- [ ] Tie a bus number to each departure time (so the box can say *"BUS1 at 11:00"*, not just the route)
+- [ ] A real per-stop timetable instead of estimating the time at middle stops
 - [ ] Show the admin's reply (not just the status) to the driver in the driver app
 - [ ] Edit a notice after publishing it; type-to-search on the driver's Start / Destination stop pickers
 - [ ] Optional photo on a driver report
