@@ -82,7 +82,7 @@
             (r.place ? " · " + esc(r.place) : "") + "</div>" +
             '<span style="font-weight:700;color:' + (STATUS_COLOR[r.status] || "") + '">' + esc(STATUS_LABEL[r.status] || r.status) + "</span></div>" +
             '<div style="margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere;">' + esc(r.description) + "</div>" + contact +
-            '<div style="font-size:11.5px;color:var(--text-faint);">Sent ' + esc(new Date(r.createdAt).toLocaleString()) + "</div>" +
+            '<div style="font-size:11.5px;color:var(--text-faint);">Sent ' + esc(new Date(r.createdAtInstant || r.createdAt).toLocaleString()) + "</div>" +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">' +
             '<select id="rs-' + r.id + '" class="pick-select">' + opts + "</select>" +
             '<input id="rn-' + r.id + '" class="pick-text" maxlength="500" placeholder="Internal note (driver cannot see this)" value="' + esc(r.adminNote || "") + '" style="flex:1;min-width:180px;"/>' +
