@@ -6,10 +6,12 @@
  */
 package com.deep.WIMB.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * A report sent to the admin by a driver (breakdown, road blockage / diversion,
@@ -87,4 +89,20 @@ public class DriverReport {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * createdAt / updatedAt are zone-less (stored in the server's own time zone, UTC on Render),
+     * so a browser would read them as ITS local time and show the wrong clock time. These two
+     * extra JSON fields carry the same moment as an ISO instant ending in "Z", which every
+     * browser converts to the viewer's own time zone correctly.
+     */
+    @JsonProperty("createdAtInstant")
+    public String createdAtInstant() { return toInstant(createdAt); }
+
+    @JsonProperty("updatedAtInstant")
+    public String updatedAtInstant() { return toInstant(updatedAt); }
+
+    public static String toInstant(LocalDateTime t) {
+        return t == null ? null : t.atZone(ZoneId.systemDefault()).toInstant().toString();
+    }
 }
