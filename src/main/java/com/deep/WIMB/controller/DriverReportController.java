@@ -41,7 +41,7 @@ public class DriverReportController {
 
     /** What a driver may see: status only, never the admin's internal note. */
     public record DriverView(Long id, String type, String place, String description,
-                             String status, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+                             String status, String createdAt, String updatedAt) {}
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody CreateRequest req,
@@ -91,7 +91,8 @@ public class DriverReportController {
         }
         List<DriverView> out = reportRepository.findOwnByBus(bus, PageRequest.of(0, 20)).stream()
                 .map(r -> new DriverView(r.getId(), r.getType(), r.getPlace(), r.getDescription(),
-                        r.getStatus(), r.getCreatedAt(), r.getUpdatedAt()))
+                        r.getStatus(), DriverReport.toInstant(r.getCreatedAt()),
+                        DriverReport.toInstant(r.getUpdatedAt())))
                 .toList();
         return ResponseEntity.ok(out);
     }
