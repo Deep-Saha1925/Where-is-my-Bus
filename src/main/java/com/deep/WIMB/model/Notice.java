@@ -6,10 +6,12 @@
  */
 package com.deep.WIMB.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * A passenger-facing notice posted by the admin (route diversion, bus
@@ -59,6 +61,12 @@ public class Notice {
 
     /** null = stays up until the admin removes it. */
     private LocalDateTime expiresAt;
+
+    /** expiresAt as an ISO instant ("Z"), so a browser shows it in the viewer's own time zone. */
+    @JsonProperty("expiresAtInstant")
+    public String expiresAtInstant() {
+        return expiresAt == null ? null : expiresAt.atZone(ZoneId.systemDefault()).toInstant().toString();
+    }
 
     public boolean isLive(LocalDateTime now) {
         return active && (expiresAt == null || expiresAt.isAfter(now));

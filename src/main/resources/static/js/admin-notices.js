@@ -45,7 +45,7 @@
                     "<td>" + scope + "</td>" +
                     "<td style='color:" + color + ";font-weight:600'>" + state +
                     (n.expiresAt ? "<div style='font-size:11px;font-weight:400;color:var(--text-faint)'>until " +
-                        esc(new Date(n.expiresAt).toLocaleString()) + "</div>" : "") + "</td>" +
+                        esc(new Date(n.expiresAtInstant || n.expiresAt).toLocaleString()) + "</div>" : "") + "</td>" +
                     "<td style='white-space:nowrap'>" +
                     "<button class='row-update-btn' onclick='toggleNotice(" + Number(n.id) + "," + (!n.active) + ")'>" +
                     (n.active ? "Hide" : "Show") + "</button> " +
