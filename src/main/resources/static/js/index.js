@@ -356,6 +356,15 @@ function renderBusCards(buses, routeKey, opts = {}) {
       </button>
     `;
 
+        // The whole card opens the tracker, not just the button. Clicks on the button keep
+        // using their own handler, and selecting text by dragging does not navigate away.
+        card.classList.add("bus-card-clickable");
+        card.addEventListener("click", (e) => {
+            if (e.target.closest("button, a")) return;
+            if (window.getSelection && window.getSelection().toString()) return;
+            track(cardKey, Number(bus.rideId), bus.routeCode || "");
+        });
+
         busList.appendChild(card);
     });
 }
@@ -406,7 +415,7 @@ async function searchBuses() {
                 UpcomingBuses.show(source, destination, buses, (list) => {
                     if (list.length) {
                         setNoResultsText(tr("No bus is running right now"),
-                                         tr("Scheduled buses coming up are listed below"));
+                            tr("Scheduled buses coming up are listed below"));
                     }
                 });
             }
