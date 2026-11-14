@@ -416,6 +416,15 @@
             box-shadow: var(--shadow-lg);
         }
 
+        /* Search-result cards: the whole card opens the tracker (see renderBusCards in js/index.js) */
+        .bus-card-clickable { cursor: pointer; }
+        .bus-card-clickable:hover { border-color: #6366f1; }
+        .bus-card-clickable:hover .track-btn {
+            opacity: 0.92;
+            box-shadow: 0 5px 14px rgba(99,102,241,0.4);
+        }
+        .bus-card-clickable:active { transform: scale(0.992); }
+
         .bus-icon-wrap {
             width: 40px; height: 40px;
             border-radius: 12px;
