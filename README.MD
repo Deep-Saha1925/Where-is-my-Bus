@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Tap-Anywhere Cards](#-tap-anywhere-on-a-bus-card) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -50,6 +50,7 @@
 - 📱 **Phone-friendly pages** — safe-area padding on notched phones, pinch-zoom allowed, 44px tap targets, a header that fits 320px screens, and toasts that sit above the bottom sheet
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
+- 👆 **Tap anywhere on a bus card** to open its tracker — not just the small **Track Bus** button. Works on the route search and the Bus Number tab; the cards show a pointer, an indigo border and a brighter button on hover, see [Tap Anywhere on a Bus Card](#-tap-anywhere-on-a-bus-card)
 - 📍 Live route timeline in the style of a train tracker — **arrival time on the left, departure time on the right** of every stop, a thick rail with the bus on it, and it opens with the bus scrolled to the middle of the screen, then you scroll freely, see [The Tracking Page](#-the-tracking-page)
 - 🕒 **Arrival and departure for every stop** — upcoming stops show an estimate (*"in 12 min"*), stops the bus has passed keep the time it actually arrived and the time it left (and how long it halted)
 - ⏱️ **ETA per stop** from the bus's *real recent speed* plus each stop's scheduled halt, with a summary of when the bus reaches **your stop** and the **destination**
@@ -345,10 +346,10 @@ Ride starts / ends
 
 - **Handshake endpoint:** `/ws` (public, same access level as the other passenger/driver-facing tracking endpoints)
 - **Fallback polling kept as a safety net** — in case a socket silently dies (a flaky network, a proxy that kills idle connections):
-    - `track.html` checks every **5s**, but *skips* the request while live pushes are arriving (anything newer than 15s). A healthy socket costs nothing extra; a broken one is noticed within seconds instead of the old 20s. Even when the socket is down, the check reads the page's short-lived cache first, so the server is asked at most about **once every 15 seconds** per open page (see [The Tracking Page](#-the-tracking-page)).
-    - Switching back to the tab (phones put background tabs and their sockets to sleep) fetches the latest position immediately.
-    - A dropped connection reconnects and re-subscribes automatically, keeping stomp.js's own disconnect handling intact.
-    - `admin-buses.html` still falls back to a 30s poll.
+  - `track.html` checks every **5s**, but *skips* the request while live pushes are arriving (anything newer than 15s). A healthy socket costs nothing extra; a broken one is noticed within seconds instead of the old 20s. Even when the socket is down, the check reads the page's short-lived cache first, so the server is asked at most about **once every 15 seconds** per open page (see [The Tracking Page](#-the-tracking-page)).
+  - Switching back to the tab (phones put background tabs and their sockets to sleep) fetches the latest position immediately.
+  - A dropped connection reconnects and re-subscribes automatically, keeping stomp.js's own disconnect handling intact.
+  - `admin-buses.html` still falls back to a 30s poll.
 - **Driver-side sends never drop the newest position.** `driver.js` posts at most once per 3s (once per 1s while simulating). A position arriving inside that window used to be discarded, so passengers only saw it at the next 10s heartbeat — or never, if the bus then stopped. It is now queued and sent as soon as the window ends, using whatever the *latest* position is by then.
 - **Single-instance limitation:** the message broker (`registry.enableSimpleBroker`) is in-memory, same caveat as `ActiveRideCache` above — a message published on one instance won't reach a passenger connected to a different instance. Moving to multiple instances means swapping this for a real broker (e.g. Redis pub/sub relayed to STOMP, or RabbitMQ's STOMP plugin).
 
@@ -356,7 +357,7 @@ Ride starts / ends
 
 ## 🚌 Search by Bus Number
 
-Passengers can find a running bus directly by its number — the **Bus Number** tab on the home page (next to *Live Buses* and *Depot Routes*). Each result card shows the bus number, ride ID, source → destination and a Live badge, and **Track Bus** opens the normal tracking page for that ride. ETA is intentionally not shown on these cards: an ETA is measured to a passenger's boarding stop, and a bus-number search doesn't have one.
+Passengers can find a running bus directly by its number — the **Bus Number** tab on the home page (next to *Live Buses* and *Depot Routes*). Each result card shows the bus number, ride ID, source → destination and a Live badge, and **Track Bus** opens the normal tracking page for that ride (tapping anywhere on the card does the same). ETA is intentionally not shown on these cards: an ETA is measured to a passenger's boarding stop, and a bus-number search doesn't have one.
 
 ### How it works
 
@@ -379,8 +380,8 @@ exact matches first, then alphabetical → cached → returned
 - **Matching** ignores case, spaces, dashes, underscores, `/` and `.` on both sides, so `wb23a1245`, `WB 23A 1245` and `wb-23a-1245` all find `WB-23A-1245`. Partial numbers match anywhere in the number.
 - **The filtering happens in the database.** The old approach downloaded every active ride and filtered in the browser, which gets slower with every bus that starts running. The repository query only reads *active* rides whose bus number matches, joins the bus in the same query (no extra query per ride), and returns at most **20** rows.
 - **Two small caches, both with short lifetimes:**
-    - `BusSearchCache` (server) — 5s per query, max 500 entries, no extra dependency. It is **cleared whenever a ride starts or ends**, so a bus that just started or stopped never shows up stale.
-    - A per-tab cache in `index.js` — 15s per query, so retyping the same number is instant.
+  - `BusSearchCache` (server) — 5s per query, max 500 entries, no extra dependency. It is **cleared whenever a ride starts or ends**, so a bus that just started or stopped never shows up stale.
+  - A per-tab cache in `index.js` — 15s per query, so retyping the same number is instant.
 - **Old results never linger.** Every new keystroke or search wipes the results area immediately, cancels the previous request (`AbortController`) and bumps a sequence number, so a slow earlier response can never draw over a newer search. Switching tabs cancels any pending bus search too.
 - Public endpoint, same access level as `/api/ride/active`.
 
@@ -549,9 +550,31 @@ The real app's pages are served by this same server, so browsers never need CORS
 
 ---
 
+## 👆 Tap Anywhere on a Bus Card
+
+On the passenger home page, a bus result card used to open the tracker only when the small **Track Bus** button was hit — easy to miss on a phone. Now **the whole card is the tap target**.
+
+| Where | Behaviour |
+|---|---|
+| **Live Buses** search results (source → destination) | Tap anywhere on the card → `track.html` for that ride |
+| **Bus Number** search results | Same |
+| **Recent-search quick cards** | Were already fully tappable (unchanged) |
+| **Upcoming scheduled buses** | Not trackable (no live ride yet), so no tap action |
+
+**Details**
+- The card calls the same `track(routeKey, rideId, routeCode)` function as the button, so the opened page and URL are identical.
+- A click that lands on the **Track Bus** button (or any link/button inside the card) is left to that element — no double navigation.
+- Dragging to **select text** on a card does not open the tracker.
+- Hover (desktop): hand cursor, indigo card border, brighter **Track Bus** button. Press: the card shrinks very slightly, which gives tap feedback on phones.
+- **Keyboard / screen readers:** the real **Track Bus** `<button>` remains the one focusable control. The card itself is deliberately not focusable, because a button nested inside a "link" card is confusing for assistive technology.
+
+Files: `renderBusCards()` in `static/js/index.js` (the click handler) and the `.bus-card-clickable` rules in `static/index.html`. The admin *Active Buses* cards (`admin-buses.js`, **View on Map**) are unchanged.
+
+---
+
 ## 📱 The Tracking Page
 
-`track.html` + `js/track.js` — what a passenger sees after tapping **Track Bus**. It is laid out like a train-tracker app and works the same on a phone and a desktop (content is centred and capped at 600px wide).
+`track.html` + `js/track.js` — what a passenger sees after tapping **Track Bus** (or anywhere on a bus card). It is laid out like a train-tracker app and works the same on a phone and a desktop (content is centred and capped at 600px wide).
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -691,10 +714,10 @@ The driver page runs in a browser tab. When the phone locks or the driver switch
 - **`native-gps.js`** gives the driver page one GPS source for both worlds: the browser's `watchPosition`, or, inside the Android app, a background-location plugin that runs a **foreground service** (visible "ride active" notification) so location keeps flowing with the screen off.
 - **`driver-app/`** is a small Capacitor project that wraps the same `/driver` page as an Android app. No server changes: same login, ride and location endpoints. Build steps and phone settings are in [`driver-app/README.md`](driver-app/README.md).
 - **Honest tracking in a browser too:**
-    - A notice on the ride screen says whether background tracking is on (green, in the app) or that the browser pauses GPS when the phone locks (amber).
-    - When the page comes back after more than 20 seconds in the background, the GPS watch is restarted and the pause is noted ("Last pause: 3 min at 14:05").
-    - If the GPS has not produced a new fix for 30 seconds, the status says so ("No new GPS fix for 2 min: passengers see your last known position") instead of claiming "Sharing live location" while the heartbeat re-sends an old point.
-    - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
+  - A notice on the ride screen says whether background tracking is on (green, in the app) or that the browser pauses GPS when the phone locks (amber).
+  - When the page comes back after more than 20 seconds in the background, the GPS watch is restarted and the pause is noted ("Last pause: 3 min at 14:05").
+  - If the GPS has not produced a new fix for 30 seconds, the status says so ("No new GPS fix for 2 min: passengers see your last known position") instead of claiming "Sharing live location" while the heartbeat re-sends an old point.
+  - Closing or refreshing the tab mid-ride asks for confirmation (browser only).
 
 > The Android app has **not been built or tested yet**; follow "First test" in `driver-app/README.md`. The browser-side changes work without it and are covered by tests in `tests/js/native-gps.test.js`.
 
@@ -873,10 +896,10 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 
 - Every route is a real `Route` record (code, display name, file location) backed by Postgres — not just a derived text string.
 - Admin manages routes from the **Routes tab**, same interaction pattern as Depot Codes:
-    - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
-    - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
-    - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
-    - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
+  - **Add** — pick a route code (e.g. `APD_FLK`) + display name (`Alipurduar ⇄ Falakata`) + an Excel file. Adding is additive — it doesn't touch other routes.
+  - **Update** — rename a route and/or replace its stop file in place. The route code itself never changes.
+  - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
+  - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
 - Drivers now **pick their Route explicitly** before choosing Start Location / Destination (mirrors picking a Depot). The stop pickers are then scoped to only that route's stops — not a global list — which is what makes it safe for the same stop name (a shared junction town, say) to legitimately appear on more than one route without any ambiguity.
 - Registered route file paths are **normalized at load time** (forward slashes, regardless of the OS they were originally saved on) — a route added during local development on Windows still loads correctly once deployed to a Linux container.
 
@@ -1260,7 +1283,7 @@ Admin login required. The list holds driver **and** passenger reports (`source`,
 
 | Page | Who uses it | Description |
 |---|---|---|
-| `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; recent searches, quick results, an **Upcoming scheduled buses** box under the live results, a **Report a problem** footer link, header shortcuts to Driver/Admin |
+| `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; tap-anywhere bus cards, recent searches, quick results, an **Upcoming scheduled buses** box under the live results, a **Report a problem** footer link, header shortcuts to Driver/Admin |
 | `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, **Report a problem** (⋮ menu and ⚠️ chip), dark / light mode, see [The Tracking Page](#-the-tracking-page) |
 | `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride. The route picker is type-to-search, and a floating **Report an issue** button appears once logged in |
 | `login.html` | Admin | Secure login form |
@@ -1352,11 +1375,11 @@ WIMB/
 │   │   ├── admin.html
 │   │   └── admin-buses.html
 │   ├── static/
-│   │   ├── index.html                   # Passenger search, custom stop dropdown, Driver/Admin shortcuts
+│   │   ├── index.html                   # Passenger search, custom stop dropdown, clickable bus cards, Driver/Admin shortcuts
 │   │   ├── track.html                   # Passenger tracking page: header, chips, arrival/departure timeline, bottom status sheet, themes
 │   │   ├── login.html                   # Admin login
 │   │   ├── js/
-│   │   │   ├── index.js                 # autocomplete dropdown + search tabs (incl. bus-number search, caching, stale-result guard)
+│   │   │   ├── index.js                 # autocomplete dropdown + search tabs (incl. bus-number search, caching, stale-result guard), tap-anywhere bus cards
 │   │   │   ├── track.js                 # live timeline: WebSocket push + cached fallback poll, reconnect, tab wake-up, per-stop ETA, reload, alarm, recorded arrival/departure times
 │   │   │   ├── driver.js                # login, auto-resume, GPS sending (no dropped fixes), Simulate location (follows the ride's direction), current-stop card, tracking health
 │   │   │   ├── native-gps.js            # GPS source: browser, or background service inside the Android app
