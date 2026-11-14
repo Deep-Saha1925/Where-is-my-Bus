@@ -53,8 +53,6 @@ public class RouteExcelLoader {
         try (Workbook wb = WorkbookFactory.create(is)) {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(legacyRouteKey, stops);
-            System.out.println("Loaded legacy route " + legacyRouteKey + " with " + stops.size()
-                    + " stops: " + stopNamesOf(stops));
         }
     }
 
@@ -267,9 +265,6 @@ public class RouteExcelLoader {
              Workbook wb = WorkbookFactory.create(is)) {
             List<RouteStop> stops = parseWorkbook(wb);
             routeCache.put(route.getRouteCode(), stops);
-            System.out.println("Loaded route " + route.getRouteCode()
-                    + " (" + route.getRouteName() + ") with " + stops.size() + " stops: "
-                    + stopNamesOf(stops));
         }
         // Every admin-added/updated route needs to surface its stops on the
         // passenger search page too, not just the legacy route — otherwise
@@ -665,8 +660,6 @@ public class RouteExcelLoader {
             file.getParentFile().mkdirs();
 
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, json);
-            System.out.println("Updated stops.json file (" + stopNames.size() + " stops across "
-                    + routeCache.size() + " route(s))");
         } catch (Exception e) {
             System.err.println("Error updating stops.json file");
             e.printStackTrace();
