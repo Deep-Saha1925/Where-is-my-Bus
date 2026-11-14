@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Tap-Anywhere Cards](#-tap-anywhere-on-a-bus-card) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Tap-Anywhere Cards](#-tap-anywhere-on-a-bus-card) · [Splash Screen](#-splash-screen) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
 
 </div>
 
@@ -50,6 +50,7 @@
 - 📱 **Phone-friendly pages** — safe-area padding on notched phones, pinch-zoom allowed, 44px tap targets, a header that fits 320px screens, and toasts that sit above the bottom sheet
 - ⌨️ Custom styled autocomplete dropdown for stop search — type-ahead matching with highlighted results, arrow-key navigation, and click-to-select (no plain browser popup)
 - 🕐 Recent searches with quick results
+- ✨ **Splash screen only when you open the app** — not every time you come back from the tracking page. Returning visits show the home page instantly, see [Splash Screen](#-splash-screen)
 - 👆 **Tap anywhere on a bus card** to open its tracker — not just the small **Track Bus** button. Works on the route search and the Bus Number tab; the cards show a pointer, an indigo border and a brighter button on hover, see [Tap Anywhere on a Bus Card](#-tap-anywhere-on-a-bus-card)
 - 📍 Live route timeline in the style of a train tracker — **arrival time on the left, departure time on the right** of every stop, a thick rail with the bus on it, and it opens with the bus scrolled to the middle of the screen, then you scroll freely, see [The Tracking Page](#-the-tracking-page)
 - 🕒 **Arrival and departure for every stop** — upcoming stops show an estimate (*"in 12 min"*), stops the bus has passed keep the time it actually arrived and the time it left (and how long it halted)
@@ -547,6 +548,27 @@ On Render, `getRemoteAddr()` is the proxy, so the real IP comes from `X-Forwarde
 
 ### CORS
 The real app's pages are served by this same server, so browsers never need CORS for them. Cross-origin access is therefore **off by default**. For development with a separate front-end (e.g. VS Code Live Server) set `CORS_ALLOWED_ORIGINS=http://localhost:5500,http://127.0.0.1:5500`. Origins must be exact: `*` is rejected at startup because these mappings allow credentials. (The `/ws` WebSocket endpoint stays open to any origin on purpose: it only carries the same public bus data as `/api/ride/active/all`.)
+
+---
+
+## ✨ Splash Screen
+
+The blue logo splash used to play on **every** load of `index.html`, so pressing Back from the tracking page showed it again and hid the page for about two seconds. It now behaves like an app launch screen:
+
+| Situation | What you see |
+|---|---|
+| First load in a browser session (new tab, app launch) | The splash, about **1.5 s** (0.5 s if the device asks for reduced motion) |
+| Back from the tracker, reload, or coming from another page in the same session | **No splash** — the page appears at once with a short 0.25 s fade |
+| Page restored from the browser's back/forward cache | Page exactly as you left it, no splash |
+
+**Details**
+- The splash can be skipped: tap it, or press any key.
+- The "already seen" flag is `sessionStorage["wimb_splash_seen"]`. It is set when the splash starts, so leaving during the splash still counts, and it is cleared when the tab is closed, so the next visit shows the splash again.
+- A small script in `<head>` decides this **before the first paint**, so a returning visit never flashes the blue screen.
+- If storage is blocked (some private modes), the splash simply shows as before.
+- To see the splash again while testing, open `/index.html?splash=1` (or close the tab).
+
+Files: the `<head>` script and `html.no-splash` rules, and the splash script at the bottom of `static/index.html`. No Java changes.
 
 ---
 
@@ -1375,7 +1397,7 @@ WIMB/
 │   │   ├── admin.html
 │   │   └── admin-buses.html
 │   ├── static/
-│   │   ├── index.html                   # Passenger search, custom stop dropdown, clickable bus cards, Driver/Admin shortcuts
+│   │   ├── index.html                   # Passenger search, custom stop dropdown, clickable bus cards, once-per-session splash, Driver/Admin shortcuts
 │   │   ├── track.html                   # Passenger tracking page: header, chips, arrival/departure timeline, bottom status sheet, themes
 │   │   ├── login.html                   # Admin login
 │   │   ├── js/
