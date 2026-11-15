@@ -1,6 +1,6 @@
 /*
  * Where Is My Bus (WIMB)
- * Admin "Driver Reports" tab: review, update status, add notes, publish as notice.
+ * Admin "Driver Reports" tab: review, update status, add notes, reply to the driver, publish as notice.
  */
 (function () {
     var TYPE_LABEL = {
@@ -17,7 +17,7 @@
     var STATUS_LABEL = { NEW: "New", UNDER_REVIEW: "Under review", NEED_INFO: "Need info", APPROVED: "Approved", REJECTED: "Rejected" };
     var STATUS_COLOR = { NEW: "#3b82f6", UNDER_REVIEW: "#f59e0b", NEED_INFO: "#ea580c", APPROVED: "#22c55e", REJECTED: "#ef4444" };
     var DEFAULT_SEV = { BREAKDOWN: "WARNING", ROAD_BLOCKAGE: "WARNING", ROUTE_REQUEST: "INFO", OTHER: "INFO",
-                        LOCATION_WRONG: "INFO", BUS_NOT_RUNNING: "WARNING", CONDUCT: "INFO", APP_PROBLEM: "INFO" };
+        LOCATION_WRONG: "INFO", BUS_NOT_RUNNING: "WARNING", CONDUCT: "INFO", APP_PROBLEM: "INFO" };
     var cache = {};
 
     function esc(v) {
@@ -73,6 +73,18 @@
             ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(124,58,237,.15);color:#7c3aed;margin-right:6px;">🧍 Passenger</span>'
             : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;">🚌 Driver</span>';
         var busText = r.busNumber === "-" ? "<i>no bus given</i>" : "Bus <b>" + esc(r.busNumber) + "</b>";
+        // Reply the driver sees in the app. Passengers have no account, so no reply box for their reports.
+        var replyBox = fromPassenger ? "" :
+            '<div style="margin-top:10px;">' +
+            '<label for="rr-' + r.id + '" style="font-size:12px;font-weight:700;display:block;margin-bottom:3px;">💬 Reply to driver ' +
+            '<span style="font-weight:400;color:var(--text-faint);">(the driver sees this in the app)</span></label>' +
+            '<textarea id="rr-' + r.id + '" class="pick-text" maxlength="500" rows="2" style="width:100%;display:block;" ' +
+            'placeholder="e.g. Please tell your depot manager the exact stop name.">' + esc(r.adminReply || "") + "</textarea>" +
+            (r.adminReply && (r.repliedAtInstant || r.repliedAt)
+                ? '<div style="font-size:11.5px;color:var(--text-faint);margin-top:2px;">Reply sent ' +
+                esc(new Date(r.repliedAtInstant || r.repliedAt).toLocaleString()) + "</div>"
+                : "") +
+            "</div>";
         var contact = r.contact
             ? '<div style="font-size:12.5px;margin-top:4px;">📞 Contact left: <b>' + esc(r.contact) + "</b></div>"
             : "";
@@ -83,6 +95,7 @@
             '<span style="font-weight:700;color:' + (STATUS_COLOR[r.status] || "") + '">' + esc(STATUS_LABEL[r.status] || r.status) + "</span></div>" +
             '<div style="margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere;">' + esc(r.description) + "</div>" + contact +
             '<div style="font-size:11.5px;color:var(--text-faint);">Sent ' + esc(new Date(r.createdAtInstant || r.createdAt).toLocaleString()) + "</div>" +
+            replyBox +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">' +
             '<select id="rs-' + r.id + '" class="pick-select">' + opts + "</select>" +
             '<input id="rn-' + r.id + '" class="pick-text" maxlength="500" placeholder="Internal note (driver cannot see this)" value="' + esc(r.adminNote || "") + '" style="flex:1;min-width:180px;"/>' +
@@ -94,9 +107,18 @@
     }
 
     window.saveReport = async function (id) {
+        var status = document.getElementById("rs-" + id).value;
+        var replyEl = document.getElementById("rr-" + id);      // absent on passenger reports
+        var old = cache[id];
+        // A driver told "need info" or "rejected" with no words gets no idea why: ask once.
+        if (replyEl && old && status !== old.status && (status === "NEED_INFO" || status === "REJECTED") &&
+            !replyEl.value.trim()) {
+            if (!confirm("The driver will only see the status, not why. Save without a reply?")) return;
+        }
         var fd = new URLSearchParams();
-        fd.append("status", document.getElementById("rs-" + id).value);
+        fd.append("status", status);
         fd.append("adminNote", document.getElementById("rn-" + id).value);
+        if (replyEl) fd.append("adminReply", replyEl.value);
         var res = await fetch("/admin/reports/" + id + "?_csrf=" + encodeURIComponent(csrf()), { method: "PUT", body: fd });
         var data = await res.json().catch(function () { return {}; });
         msg(res.ok ? "✅ " + data.message : "❌ " + (data.error || "Failed"), res.ok ? "#22c55e" : "#ef4444");
@@ -147,7 +169,7 @@
             var f = document.getElementById("reportFilter");
             var list = document.getElementById("reportList");
             var editing = list && (list.contains(document.activeElement) ||
-                          list.querySelector("[id^='rp-'][style*='block']"));
+                list.querySelector("[id^='rp-'][style*='block']"));
             // keep the "new" badge fresh, but never wipe what the admin is typing
             if ((!f || !f.value) && !editing) loadReports();
         }, 60000);
