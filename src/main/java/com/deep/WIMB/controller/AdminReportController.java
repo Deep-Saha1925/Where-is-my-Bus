@@ -40,11 +40,15 @@ public class AdminReportController {
         return reportRepository.findTop200ByStatusOrderByCreatedAtDesc(status.trim().toUpperCase(Locale.ROOT));
     }
 
-    /** Move a report along the workflow and/or save an internal note. */
+    /**
+     * Move a report along the workflow, save an internal note, and/or write a reply for the driver.
+     * adminReply: omitted = leave the current reply alone, blank = remove it, text = set it.
+     */
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable Long id,
                                     @RequestParam("status") String status,
-                                    @RequestParam(value = "adminNote", required = false) String adminNote) {
+                                    @RequestParam(value = "adminNote", required = false) String adminNote,
+                                    @RequestParam(value = "adminReply", required = false) String adminReply) {
         DriverReport r = reportRepository.findById(id).orElse(null);
         if (r == null) return ResponseEntity.status(404).body(Map.of("error", "Report not found"));
 
@@ -57,9 +61,29 @@ public class AdminReportController {
             return ResponseEntity.badRequest().body(Map.of("error", "Note is too long (max 500 characters)"));
         }
 
+        // Reply for the driver (validated before anything is changed)
+        String reply = adminReply == null ? null : adminReply.trim();
+        if (reply != null) {
+            if (reply.length() > 500) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reply is too long (max 500 characters)"));
+            }
+            if (!reply.isEmpty() && DriverReport.SOURCE_PASSENGER.equals(r.getSource())) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Passenger reports cannot get a reply (a passenger has no account to read it)"));
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
         r.setStatus(st);
         r.setAdminNote(note.isEmpty() ? null : note);
-        r.setUpdatedAt(LocalDateTime.now());
+        if (reply != null) {
+            String current = r.getAdminReply() == null ? "" : r.getAdminReply();
+            if (!reply.equals(current)) {              // only a real change counts as a new reply
+                r.setAdminReply(reply.isEmpty() ? null : reply);
+                r.setRepliedAt(reply.isEmpty() ? null : now);
+            }
+        }
+        r.setUpdatedAt(now);
         reportRepository.save(r);
         return ResponseEntity.ok(Map.of("message", "Report updated"));
     }
