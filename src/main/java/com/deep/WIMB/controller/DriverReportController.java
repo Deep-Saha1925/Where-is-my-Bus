@@ -39,9 +39,13 @@ public class DriverReportController {
 
     public record CreateRequest(String type, String place, String description) {}
 
-    /** What a driver may see: status only, never the admin's internal note. */
+    /**
+     * What a driver may see: the status and the reply the admin wrote for the driver.
+     * The admin's internal note (adminNote) and a passenger's contact are never included.
+     */
     public record DriverView(Long id, String type, String place, String description,
-                             String status, String createdAt, String updatedAt) {}
+                             String status, String createdAt, String updatedAt,
+                             String adminReply, String repliedAt) {}
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody CreateRequest req,
@@ -92,7 +96,8 @@ public class DriverReportController {
         List<DriverView> out = reportRepository.findOwnByBus(bus, PageRequest.of(0, 20)).stream()
                 .map(r -> new DriverView(r.getId(), r.getType(), r.getPlace(), r.getDescription(),
                         r.getStatus(), DriverReport.toInstant(r.getCreatedAt()),
-                        DriverReport.toInstant(r.getUpdatedAt())))
+                        DriverReport.toInstant(r.getUpdatedAt()),
+                        r.getAdminReply(), DriverReport.toInstant(r.getRepliedAt())))
                 .toList();
         return ResponseEntity.ok(out);
     }
