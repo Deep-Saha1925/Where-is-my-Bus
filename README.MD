@@ -1631,7 +1631,6 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 Java · Spring Boot · Real-Time Systems · North Bengal
 
 [![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=for-the-badge&logo=github)](https://github.com/Deep-Saha1925)
-
 ---
 
 *Built with ❤️ for North Bengal*
