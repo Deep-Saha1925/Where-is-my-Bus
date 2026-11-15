@@ -69,9 +69,20 @@ public class DriverReport {
     @Column(nullable = false, length = 20)
     private String status = NEW;
 
-    /** Internal admin note. Not shown to the driver (drivers see status only). */
+    /** Internal admin note. NEVER shown to the driver (see adminReply for what the driver does see). */
     @Column(length = 500)
     private String adminNote;
+
+    /**
+     * Message the admin wrote FOR the driver: the answer to a question, what extra information is needed,
+     * why a request was rejected... It is shown in the driver app next to the status. Only used on driver
+     * reports; a passenger has no account, so nobody could read a reply on a passenger report.
+     */
+    @Column(length = 500)
+    private String adminReply;
+
+    /** When adminReply was last written or changed (null = no reply). The driver app uses it to flag "new". */
+    private LocalDateTime repliedAt;
 
     /** Set when the admin turned this report into a public notice. */
     private Long publishedNoticeId;
@@ -101,6 +112,9 @@ public class DriverReport {
 
     @JsonProperty("updatedAtInstant")
     public String updatedAtInstant() { return toInstant(updatedAt); }
+
+    @JsonProperty("repliedAtInstant")
+    public String repliedAtInstant() { return toInstant(repliedAt); }
 
     public static String toInstant(LocalDateTime t) {
         return t == null ? null : t.atZone(ZoneId.systemDefault()).toInstant().toString();
