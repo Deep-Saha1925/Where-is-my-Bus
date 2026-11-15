@@ -1,6 +1,7 @@
 /*
  * Where Is My Bus (WIMB)
- * Driver "Report an issue" button + form + status list.
+ * Driver "Report an issue" button + form + list of the driver's own reports, with the status AND
+ * the admin's reply. A red count on the button flags replies the driver has not read yet.
  * Self-contained: injects its own button/modal and reads the global
  * `driverToken` that driver.js already maintains (null when logged out).
  */
@@ -27,6 +28,37 @@
     }
     function token() { try { return driverToken; } catch (e) { return null; } }
 
+    // Which replies the driver has already seen: { reportId: repliedAt }, kept in this browser only.
+    var SEEN_KEY = "wimb_rpt_seen";
+    function seenMap() {
+        try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}") || {}; } catch (e) { return {}; }
+    }
+    function isUnseen(r, seen) { return !!r.adminReply && seen[r.id] !== r.repliedAt; }
+    function markSeen(list) {
+        var next = {};                                   // only the reports still in the list, so it never grows
+        list.forEach(function (r) { if (r.adminReply) next[r.id] = r.repliedAt; });
+        try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch (e) {}
+    }
+    function setBadge(n) {
+        var b = document.getElementById("rptBadge");
+        if (!b) return;
+        b.textContent = n > 9 ? "9+" : String(n);
+        b.style.display = n > 0 ? "inline-block" : "none";
+    }
+    async function fetchMine() {
+        try {
+            var res = await fetch("/api/driver/reports", { headers: { "X-Driver-Token": token() || "" } });
+            return res.ok ? await res.json() : null;
+        } catch (e) { return null; }
+    }
+    // Count unread replies without opening the form.
+    async function refreshBadge() {
+        var list = await fetchMine();
+        if (!list) return;
+        var seen = seenMap();
+        setBadge(list.filter(function (r) { return isUnseen(r, seen); }).length);
+    }
+
     function build() {
         var s = document.createElement("style");
         s.textContent =
@@ -39,11 +71,20 @@
             "#rptBox{background:var(--bg-card);width:100%;max-width:480px;max-height:92vh;overflow-y:auto;" +
             "border-radius:20px 20px 0 0;padding:18px;}" +
             ".rpt-item{border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:13px;}" +
-            ".rpt-item b{font-size:13.5px;}";
+            ".rpt-item b{font-size:13.5px;}" +
+            ".rpt-item.has-new{border-color:#1f6f5c;box-shadow:0 0 0 2px rgba(31,111,92,.18);}" +
+            ".rpt-reply{background:rgba(31,111,92,.09);border-left:3px solid #1f6f5c;border-radius:8px;padding:8px 10px;margin:6px 0 4px;}" +
+            ".rpt-reply-h{font-size:12px;font-weight:700;color:#1f6f5c;margin-bottom:2px;}" +
+            ".rpt-reply-b{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);}" +
+            ".rpt-reply-t{font-size:11px;color:var(--text-faint);margin-top:3px;}" +
+            ".rpt-new{background:#dc2626;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;}" +
+            "#rptBadge{display:none;background:#dc2626;color:#fff;border:2px solid #fff;border-radius:999px;min-width:18px;height:18px;" +
+            "line-height:14px;box-sizing:content-box;padding:0 4px;font-size:11px;font-weight:700;margin-left:7px;text-align:center;}";
         document.head.appendChild(s);
 
         var fab = document.createElement("button");
-        fab.id = "rptFab"; fab.type = "button"; fab.textContent = "⚠️ " + t("Report an issue");
+        fab.id = "rptFab"; fab.type = "button";
+        fab.innerHTML = "<span>⚠️ " + esc(t("Report an issue")) + '</span><span id="rptBadge"></span>';
         fab.onclick = openModal;
         document.body.appendChild(fab);
 
@@ -113,27 +154,49 @@
 
     async function loadMine() {
         var box = document.getElementById("rptList");
-        try {
-            var res = await fetch("/api/driver/reports", { headers: { "X-Driver-Token": token() || "" } });
-            if (!res.ok) { box.innerHTML = ""; return; }
-            var list = await res.json();
-            if (!list.length) { box.innerHTML = '<p style="font-size:13px;color:var(--text-faint);margin-top:8px;">' + esc(t("No reports yet")) + '</p>'; return; }
-            box.innerHTML = list.map(function (r) {
-                var st = STATUS[r.status] || { text: r.status, color: "#5c6b62" };
-                return '<div class="rpt-item"><b>' + esc(TYPE_LABEL[r.type] || r.type) + '</b>' +
-                    (r.place ? ' · ' + esc(r.place) : '') +
-                    '<div style="color:var(--text-muted);margin:3px 0;">' + esc(r.description) + '</div>' +
-                    '<div style="font-weight:700;color:' + st.color + ';">' + esc(st.text) + '</div>' +
-                    '<div style="font-size:11.5px;color:var(--text-faint);">' + esc(new Date(r.createdAt).toLocaleString()) + '</div></div>';
-            }).join("");
-        } catch (e) { box.innerHTML = ""; }
+        var list = await fetchMine();
+        if (!list) { box.innerHTML = ""; return; }
+        if (!list.length) { box.innerHTML = '<p style="font-size:13px;color:var(--text-faint);margin-top:8px;">' + esc(t("No reports yet")) + '</p>'; return; }
+        var seen = seenMap();                         // read BEFORE marking, so the NEW chips can show
+        box.innerHTML = list.map(function (r) {
+            var st = STATUS[r.status] || { text: r.status, color: "#5c6b62" };
+            // With a written reply the generic "contact your depot" hint is no longer needed.
+            var statusText = (r.status === "NEED_INFO" && r.adminReply) ? t("Admin needs more info") : st.text;
+            var fresh = isUnseen(r, seen);
+            var reply = r.adminReply
+                ? '<div class="rpt-reply"><div class="rpt-reply-h">💬 ' + esc(t("Reply from admin")) +
+                (fresh ? '<span class="rpt-new">' + esc(t("NEW")) + '</span>' : '') + '</div>' +
+                '<div class="rpt-reply-b">' + esc(r.adminReply) + '</div>' +
+                (r.repliedAt ? '<div class="rpt-reply-t">' + esc(new Date(r.repliedAt).toLocaleString()) + '</div>' : '') +
+                '</div>'
+                : '';
+            return '<div class="rpt-item' + (fresh ? ' has-new' : '') + '"><b>' + esc(TYPE_LABEL[r.type] || r.type) + '</b>' +
+                (r.place ? ' · ' + esc(r.place) : '') +
+                '<div style="color:var(--text-muted);margin:3px 0;">' + esc(r.description) + '</div>' +
+                '<div style="font-weight:700;color:' + st.color + ';">' + esc(statusText) + '</div>' +
+                reply +
+                '<div style="font-size:11.5px;color:var(--text-faint);">' + esc(new Date(r.createdAt).toLocaleString()) + '</div></div>';
+        }).join("");
+        markSeen(list);                               // the driver has now seen every reply
+        setBadge(0);
     }
 
     document.addEventListener("DOMContentLoaded", function () {
         build();
         // Button only while a driver is logged in (driverToken is null otherwise).
+        var hadToken = false;
         setInterval(function () {
-            document.getElementById("rptFab").style.display = token() ? "block" : "none";
+            var has = !!token();
+            document.getElementById("rptFab").style.display = has ? "block" : "none";
+            if (has && !hadToken) refreshBadge();         // just logged in: any replies waiting?
+            hadToken = has;
         }, 1000);
+        // New replies while the driver is on the road: check once a minute, only while the app is
+        // visible and the form is closed (opening the form already loads the list).
+        setInterval(function () {
+            if (!token() || document.hidden) return;
+            if (document.getElementById("rptModal").classList.contains("open")) return;
+            refreshBadge();
+        }, 60000);
     });
 })();
