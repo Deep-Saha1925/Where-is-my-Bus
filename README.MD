@@ -71,7 +71,7 @@
 - ⏳ A neutral **Loading…** screen shows while depots/routes load, so the page never flashes the wrong step
 - 🛣️ Pick your Route first — Start Location / Destination are then scoped to just that route's stops, not a global list
 - ⌨️ **Type to find your route**: the Route field is a search box, so a driver can type part of a name (`sil`) instead of only scrolling; tapping it still shows the full list
-- ⚠️ **Report an issue** button (once logged in): breakdown, road blockage / diversion, new route or stop request, or anything else, sent straight to the admin, with the report's status shown back in the app, see [Notices & Driver Reports](#-notices--driver-reports)
+- ⚠️ **Report an issue** button (once logged in): breakdown, road blockage / diversion, new route or stop request, or anything else, sent straight to the admin, with the report's status **and the admin's reply** shown back in the app (a red count on the button flags unread replies), see [Notices & Driver Reports](#-notices--driver-reports)
 - 🗺️ GPS coordinates from Excel (no GPS needed at start)
 - 📍 **Current stop position** card on the ride screen — "At KOLKATA" / "Between A → B (40%)", stop *n* of *N*, progress bar, and a Live/Simulated badge
 - 🧪 **Simulate location** tab for testing without driving — it always follows the direction **the driver chose** (A → B), even when the route's Excel sheet lists the stops the other way round (B → A), see [Testing Without a Bus](#-testing-without-a-bus-simulate-location)
@@ -91,7 +91,7 @@
 - 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
 - 📢 **Notices tab** — publish, hide or delete passenger notices, with severity, optional route / bus tag and auto-expiry
-- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged 🚌 Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, a "new" counter on the tab, and one-step **Publish as notice**
+- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged 🚌 Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, **a reply the driver reads in the app**, a "new" counter on the tab, and one-step **Publish as notice**
 
 </td>
 <td width="50%">
@@ -814,7 +814,7 @@ Linked features that move information between drivers, passengers, the admin and
  (breakdown, blockage,        review · status · note
   new route, other)                  │
         ▲                            │ Publish as notice (edit, then confirm)
-        │ status only                ▼
+        │ status + reply             ▼
         └──────────────────  📢 Notices tab  ───────────────►  banner on the home page
                               (or post one directly)
 ```
@@ -849,7 +849,8 @@ Each report also has an optional **place / route** line and a **details** box (5
 
 - **Who sent it:** the bus number comes from the driver's `X-Driver-Token`, never from the request body, so a driver cannot file a report as another bus.
 - **Spam limit:** at most **5 reports per bus per hour** (HTTP 429 after that).
-- **Status the driver sees:** *Sent*, *Under review*, *Admin needs more info (contact your depot)*, *Approved*, *Rejected*. The driver sees the status only; the admin's internal note is **never** sent to the driver app.
+- **Status the driver sees:** *Sent*, *Under review*, *Admin needs more info (contact your depot)*, *Approved*, *Rejected*. The driver also sees the **reply the admin writes for them** (next bullet). The admin's *internal note* is **never** sent to the driver app.
+- **Admin reply (read in the app):** under the status, a green **💬 Reply from admin** box shows what the admin wrote (what information is needed, why a request was rejected, the next step) with the time it was sent. A reply the driver has not opened yet carries a red **NEW** tag, and the **⚠️ Report an issue** button shows a red count of unread replies. The count is checked when the driver logs in and then once a minute while the app is open and visible; opening the report list marks everything as read. "Read" is remembered in the browser only (`localStorage["wimb_rpt_seen"]`), nothing extra is stored on the server, and an edited reply counts as new again. When a report is *Need info* and has a reply, the status line is shortened to *Admin needs more info*, because the reply says what is needed.
 
 **Admin workflow** (**Driver Reports** tab):
 
@@ -858,7 +859,8 @@ NEW ──► UNDER_REVIEW ──► NEED_INFO ──► APPROVED
                     └───────────────►  REJECTED
 ```
 - The tab button shows **(N new)** for reports nobody has opened yet, and the list refreshes every minute (it pauses while the admin is typing or has a publish form open).
-- Each card has a status picker, an internal note, **Save** and **Delete**, plus a status filter at the top.
+- Each card has a status picker, an internal note (the driver never sees it), a **💬 Reply to driver** box (max 500 characters, shown in the driver app), **Save** and **Delete**, plus a status filter at the top.
+- The reply box appears only on **driver** reports. A passenger has no account to read it, so the API refuses a reply on a passenger report (`400`). Saving **Need info** or **Rejected** with an empty reply asks for confirmation first, because the driver would otherwise see only the status and not why.
 - **📢 Publish as notice** opens a form pre-filled from the report (title, message, a suggested severity, expiry). The driver's wording is only a draft, so the admin edits it and confirms. The notice then shows on the passenger banner, carries the bus number as its tag, the report becomes **Approved**, and it cannot be published twice.
 - Approving a *new route request* only records the decision. Adding the route is still done in the Routes tab.
 
@@ -903,6 +905,7 @@ Optional: bus number, route / place, and a **phone or email** if the passenger w
 | Driver endpoints | Under `/api/driver/**` (already public + CSRF-exempt), authorised by `X-Driver-Token` |
 | Passenger endpoint | `POST /api/passenger/reports`: public and CSRF-exempt (`/api/passenger/**` in `SecurityConfig`), protected by the rate limits above |
 | `driver_report` columns | `source` (`DRIVER` / `PASSENGER`) and `contact` were added; `ddl-auto=update` creates them, old rows stay valid |
+| `driver_report` reply columns | `adminReply` (text the driver sees) and `repliedAt` were added as nullable columns; `ddl-auto=update` creates them, old rows stay valid and simply have no reply |
 
 Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `PassengerReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `passenger-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
 
@@ -1265,12 +1268,18 @@ X-Driver-Token: a1b2c3d4-...
 | `401` | Missing / expired driver token |
 | `429` | More than 5 reports from this bus in the last hour |
 
-#### Driver: my recent reports (status only)
+#### Driver: my recent reports (status and admin reply)
 ```http
 GET /api/driver/reports
 X-Driver-Token: a1b2c3d4-...
 ```
-Returns the bus's latest 20 reports with `status`, never the admin's note.
+Returns the bus's latest 20 reports with `status`, plus `adminReply` (the text the admin wrote for the driver, `null` if none) and `repliedAt` (ISO instant, `null` if none). The admin's internal note and a passenger's contact are never included.
+
+```json
+{ "id": 12, "type": "BREAKDOWN", "status": "NEED_INFO", "description": "Tyre burst near Falakata",
+  "createdAt": "2026-11-14T10:00:00Z", "updatedAt": "2026-11-14T11:00:00Z",
+  "adminReply": "Please send the exact stop name to your depot manager.", "repliedAt": "2026-11-14T11:00:00Z" }
+```
 
 #### Passenger: send a report
 ```http
@@ -1291,11 +1300,11 @@ Content-Type: application/json
 #### Admin: review
 ```http
 GET    /admin/reports?status=NEW            (status optional)
-PUT    /admin/reports/{id}                  status, adminNote?
+PUT    /admin/reports/{id}                  status, adminNote?, adminReply?
 POST   /admin/reports/{id}/publish          title, message, severity, expiresInHours?
 DELETE /admin/reports/{id}
 ```
-Admin login required. The list holds driver **and** passenger reports (`source`, and `contact` for passengers). `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published.
+Admin login required. The list holds driver **and** passenger reports (`source`, and `contact` for passengers). `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published. `adminReply` (max 500 characters) is the message the driver sees: leave the parameter out to keep the current reply, send it blank to remove it, send text to set it (only a real change updates `repliedAt`, so the driver is not told "new" again for an unchanged reply). It returns `400` when it is too long or the report came from a passenger.
 
 </details>
 
@@ -1332,7 +1341,7 @@ WIMB/
 │   │   ├── AdminRouteController.java    # /admin/routes (view/add/update/delete/template)
 │   │   ├── NoticeController.java        # public GET /api/notices/active (passenger banner)
 │   │   ├── AdminNoticeController.java   # /admin/notices (list/publish/hide/delete)
-│   │   ├── DriverReportController.java  # /api/driver/reports (driver sends + sees own status)
+│   │   ├── DriverReportController.java  # /api/driver/reports (driver sends + sees own status and the admin's reply)
 │   │   ├── PassengerReportController.java # /api/passenger/reports (public, rate-limited, honeypot)
 │   │   ├── UpcomingBusController.java   # GET /api/routes/upcoming (scheduled buses coming soon)
 │   │   ├── AdminReportController.java   # /admin/reports (review, status, note, publish as notice)
@@ -1371,7 +1380,7 @@ WIMB/
 │   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount
 │   │   ├── AdminUpload.java             # DB-backed store for depot codes / bus rosters / timetables
 │   │   ├── Notice.java                  # passenger notice (severity, optional route/bus, expiry)
-│   │   ├── DriverReport.java            # driver / passenger report (source, contact) + status workflow
+│   │   ├── DriverReport.java            # driver / passenger report (source, contact) + status workflow + adminReply / repliedAt
 │   │   └── Location.java               # implements Serializable; ride is @JsonIgnore (see Active Ride Cache)
 │   ├── enums/
 │   │   └── RideStatus.java
@@ -1408,10 +1417,10 @@ WIMB/
 │   │   │   ├── geo-utils.js             # passenger location helpers: nearest stop, distances, error messages
 │   │   │   ├── notices.js               # passenger notice banner (polls /api/notices/active)
 │   │   │   ├── admin-notices.js         # admin Notices tab
-│   │   │   ├── driver-reports.js        # driver Report an issue button, form, status list
+│   │   │   ├── driver-reports.js        # driver Report an issue button, form, status list + admin replies + unread badge
 │   │   │   ├── passenger-reports.js     # passenger Report a problem bottom sheet (home + tracking page)
 │   │   │   ├── upcoming-buses.js        # "Upcoming scheduled buses" box under the live search results
-│   │   │   ├── admin-reports.js         # admin Driver Reports tab (driver + passenger reports)
+│   │   │   ├── admin-reports.js         # admin Driver Reports tab (driver + passenger reports, reply to driver)
 │   │   │   ├── searchable-select.js     # type-to-search <select> (driver route picker)
 │   │   │   └── admin-buses.js
 │   │   └── data/
@@ -1583,7 +1592,7 @@ A multi-stage `Dockerfile`:
 - [x] ~~Passengers could not report problems~~ — done: public report sheet, same admin inbox as driver reports
 - [ ] Tie a bus number to each departure time (so the box can say *"BUS1 at 11:00"*, not just the route)
 - [ ] A real per-stop timetable instead of estimating the time at middle stops
-- [ ] Show the admin's reply (not just the status) to the driver in the driver app
+- [x] ~~Show the admin's reply (not just the status) to the driver in the driver app~~ — done: separate `adminReply` text, green reply box with a NEW tag and an unread count on the Report button, see [Notices & Driver Reports](#-notices--driver-reports)
 - [ ] Edit a notice after publishing it; type-to-search on the driver's Start / Destination stop pickers
 - [ ] Optional photo on a driver report
 - [ ] Push the notice banner over WebSocket instead of polling every 60 seconds
@@ -1607,6 +1616,7 @@ A multi-stage `Dockerfile`:
 - [ ] Mobile app (Android)
 
 ---
+
 ## 📜 License
 
 **Copyright © 2025–2026 Deep Saha. All rights reserved.**
@@ -1618,6 +1628,7 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 - Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
 
 ---
+
 ## 👨‍💻 Author
 
 <div align="center">
@@ -1629,6 +1640,7 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 Java · Spring Boot · Real-Time Systems · North Bengal
 
 [![GitHub](https://img.shields.io/badge/GitHub-Deep--Saha1925-181717?style=for-the-badge&logo=github)](https://github.com/Deep-Saha1925)
+
 ---
 
 *Built with ❤️ for North Bengal*
