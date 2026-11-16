@@ -18,4 +18,9 @@ public class AdminController {
     public String getAllActiveRides() {
         return "admin-buses";
     }
+
+    @GetMapping("/depot-accounts")
+    public String depotAccounts() {
+        return "admin-depot-accounts";
+    }
 }
