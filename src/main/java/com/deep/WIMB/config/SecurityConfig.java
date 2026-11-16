@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import com.deep.WIMB.repository.DepotRepository;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,14 +38,29 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService() {
+    public UserDetailsService userDetailsService(DepotRepository depotRepository) {
         var admin = User.builder()
                 .username(adminUsername)
                 .password(passwordEncoder().encode(adminPassword))
                 .roles("ADMIN")
                 .build();
+        var adminOnly = new InMemoryUserDetailsManager(admin);
 
-        return new InMemoryUserDetailsManager(admin);
+        // Admin comes from the environment as before; depot accounts come from the database.
+        // (Only ONE UserDetailsService bean may exist, or Spring skips building the login provider.)
+        return username -> {
+            if (adminUsername.equals(username)) {
+                return adminOnly.loadUserByUsername(username);
+            }
+            return depotRepository.findByUsername(username == null ? "" : username.toLowerCase())
+                    .filter(d -> d.isEnabled())
+                    .map(d -> User.builder()
+                            .username(d.getUsername())
+                            .password(d.getPasswordHash())
+                            .roles("DEPOT")
+                            .build())
+                    .orElseThrow(() -> new UsernameNotFoundException("Unknown user"));
+        };
     }
 
     @Bean
@@ -102,6 +119,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).hasRole("ADMIN")
+                        // ── Depot staff pages & APIs — depot login required ──
+                        .requestMatchers("/depot/**").hasRole("DEPOT")
                         // ── Everything else requires login ──
                         .anyRequest().authenticated()
                 )
@@ -112,7 +131,10 @@ public class SecurityConfig {
                         .loginProcessingUrl("/do-login") // Spring processes this URL
                         .successHandler((req, res, auth) -> {
                             adminLoginThrottle.reset(req);
-                            res.sendRedirect(req.getContextPath() + "/admin/active/all-buses");
+                            boolean isDepot = auth.getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_DEPOT"));
+                            res.sendRedirect(req.getContextPath()
+                                    + (isDepot ? "/depot/dashboard" : "/admin/active/all-buses"));
                         })
                         .failureHandler((req, res, ex) -> {
                             adminLoginThrottle.recordFailure(req);
