@@ -6,6 +6,7 @@
  */
 package com.deep.WIMB.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,4 +26,10 @@ public class Bus {
 
     @Column(unique = true, nullable = false)
     private String busNumber;
+
+    // Owning depot. Null = not assigned yet (existing buses stay valid).
+    // @JsonIgnore: Bus is returned inside Ride JSON on public endpoints.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Depot depot;
 }
