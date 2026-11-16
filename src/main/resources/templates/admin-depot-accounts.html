@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WIMB Admin – Depot Logins</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#1a1d23; --muted:#6b7280; --border:#e2e5ea; --accent:#2563eb; --bad:#dc2626; --ok:#16a34a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b21; --text:#e8eaee; --muted:#9aa3b2; --border:#2a2f38; } }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:var(--card); border-bottom:1px solid var(--border); }
+  header a { color:var(--accent); text-decoration:none; font-weight:600; }
+  main { max-width:860px; margin:20px auto; padding:0 14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  h2,h3 { margin:0 0 10px; }
+  input, textarea, button { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+  button { cursor:pointer; background:var(--accent); color:#fff; border:none; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  button.danger { background:var(--bad); }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; align-items:center; }
+  .chip { display:inline-flex; gap:6px; align-items:center; padding:3px 10px; border:1px solid var(--border); border-radius:999px; font-size:13px; margin:2px; }
+  .chip b { cursor:pointer; color:var(--bad); }
+  .muted { color:var(--muted); font-size:13px; }
+  #msg { min-height:20px; font-weight:600; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/admin/active/all-buses">← Back to admin</a>
+  <strong>🏬 Depot Logins</strong>
+</header>
+<main>
+  <div id="msg"></div>
+
+  <div class="card">
+    <h3>Create a depot login</h3>
+    <div class="row">
+      <input id="newName" placeholder="Depot name (e.g. ALIPURDUAR)">
+      <input id="newUser" placeholder="Username">
+      <input id="newPass" type="password" placeholder="Password (min 8)">
+      <button onclick="createDepot()">Create</button>
+    </div>
+    <div class="muted">Depot staff sign in at the normal login page and land on their own dashboard. This does not change the drivers' depot codes.</div>
+  </div>
+
+  <div id="list"></div>
+</main>
+
+<script>
+let csrfHeader = null, csrfToken = null;
+
+async function loadCsrf() {
+  const r = await fetch('/csrf-token');
+  const d = await r.json();
+  csrfHeader = d.headerName; csrfToken = d.token;
+}
+
+function show(text, ok) {
+  const m = document.getElementById('msg');
+  m.textContent = text;
+  m.style.color = ok ? 'var(--ok)' : 'var(--bad)';
+}
+
+async function call(method, url, params) {
+  if (!csrfToken) await loadCsrf();
+  const opts = { method, headers: { [csrfHeader]: csrfToken } };
+  if (params) {
+    opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    opts.body = new URLSearchParams(params).toString();
+  }
+  const r = await fetch(url, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('Request failed (' + r.status + ')'));
+  return data;
+}
+
+const API = '/admin/depot-accounts/api';
+
+async function createDepot() {
+  try {
+    const d = await call('POST', API + '/create', {
+      name: document.getElementById('newName').value,
+      username: document.getElementById('newUser').value,
+      password: document.getElementById('newPass').value
+    });
+    show(d.message, true);
+    ['newName', 'newUser', 'newPass'].forEach(id => document.getElementById(id).value = '');
+    load();
+  } catch (e) { show(e.message, false); }
+}
+
+async function act(fn, okText) {
+  try {
+    const d = await fn();
+    if (d && d.added) {
+      let t = 'Added: ' + (d.added.join(', ') || 'none');
+      if (d.conflicts.length) t += ' | Skipped (owned by another depot): ' + d.conflicts.join(', ');
+      if (d.invalid.length) t += ' | Invalid: ' + d.invalid.join(', ');
+      show(t, !d.conflicts.length && !d.invalid.length);
+    } else show(okText || (d && d.message) || 'Done', true);
+    load();
+  } catch (e) { show(e.message, false); }
+}
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  kids.forEach(k => e.append(k));
+  return e;
+}
+
+async function load() {
+  const list = document.getElementById('list');
+  let depots;
+  try { depots = await (await fetch(API)).json(); } catch (e) { show('Could not load depots', false); return; }
+  list.replaceChildren();
+  if (!depots.length) { list.append(el('div', { className: 'muted' }, 'No depot logins yet.')); return; }
+
+  depots.forEach(d => {
+    const card = el('div', { className: 'card' });
+    card.append(el('h2', {}, d.name + (d.enabled ? '' : '  (disabled)')));
+    card.append(el('div', { className: 'muted' }, 'Login: ' + d.username + ' · ' + d.buses.length + ' bus(es)'));
+
+    const chips = el('div', { style: 'margin:10px 0;' });
+    if (!d.buses.length) chips.append(el('span', { className: 'muted' }, 'No buses assigned yet'));
+    d.buses.forEach(b => {
+      const x = el('b', { title: 'Remove from this depot' }, '×');
+      x.onclick = () => act(() => call('DELETE', API + '/' + d.id + '/buses?busNumber=' + encodeURIComponent(b)));
+      chips.append(el('span', { className: 'chip' }, b, x));
+    });
+    card.append(chips);
+
+    const ta = el('textarea', { rows: 2, placeholder: 'Add buses: WB-23A-1245, WB-23A-1246 …', style: 'width:100%;box-sizing:border-box;' });
+    const addBtn = el('button', {}, 'Assign buses');
+    addBtn.onclick = () => act(() => call('POST', API + '/' + d.id + '/buses', { busNumbers: ta.value }));
+    card.append(ta, el('div', { className: 'row', style: 'margin-top:8px;' }, addBtn));
+
+    const pw = el('input', { type: 'password', placeholder: 'New password' });
+    const pwBtn = el('button', { className: 'ghost' }, 'Reset password');
+    pwBtn.onclick = () => act(() => call('POST', API + '/' + d.id + '/password', { password: pw.value }));
+    const togBtn = el('button', { className: 'ghost' }, d.enabled ? 'Disable login' : 'Enable login');
+    togBtn.onclick = () => act(() => call('POST', API + '/' + d.id + '/enabled', { enabled: String(!d.enabled) }));
+    const delBtn = el('button', { className: 'danger' }, 'Delete depot');
+    delBtn.onclick = () => { if (confirm('Delete ' + d.name + '? Its buses become unassigned.')) act(() => call('DELETE', API + '/' + d.id)); };
+    card.append(el('div', { className: 'row' }, pw, pwBtn, togBtn, delBtn));
+
+    list.append(card);
+  });
+}
+load();
+</script>
+</body>
+</html>
