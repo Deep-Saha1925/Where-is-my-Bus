@@ -149,9 +149,22 @@
   </div>
 
   <!-- Login form — action must match loginProcessingUrl in SecurityConfig -->
-  <form action="/do-login" method="post">
+  <form action="/do-login" method="post" onsubmit="return beforeSubmit()">
 
     <div style="margin-bottom:16px;">
+      <label for="role">Sign in as</label>
+      <select class="input-field" id="role" onchange="onRoleChange()">
+        <option value="admin">Admin</option>
+        <option value="depot">Depot</option>
+      </select>
+    </div>
+
+    <div id="depotRow" style="margin-bottom:16px; display:none;">
+      <label for="depotSelect">Depot</label>
+      <select class="input-field" id="depotSelect"></select>
+    </div>
+
+    <div id="usernameRow" style="margin-bottom:16px;">
       <label for="username">Username</label>
       <input class="input-field" type="text"
              id="username" name="username"
@@ -160,7 +173,7 @@
     </div>
 
     <div style="margin-bottom:24px;">
-      <label for="password">Password</label>
+      <label for="password" id="passwordLabel">Password</label>
       <div style="position:relative;">
         <input class="input-field" type="password"
                id="password" name="password"
@@ -201,6 +214,34 @@
       applyTheme();
   }
   applyTheme();
+
+  // ── Admin / Depot switch ──
+  // Depot sign-in: pick the depot, enter its depot code. The server receives "depot:NAME" as the username.
+  let depotsLoaded = false;
+  async function onRoleChange() {
+    const depot = document.getElementById("role").value === "depot";
+    document.getElementById("depotRow").style.display    = depot ? "" : "none";
+    document.getElementById("usernameRow").style.display = depot ? "none" : "";
+    document.getElementById("username").required = !depot;
+    document.getElementById("passwordLabel").textContent = depot ? "Depot code" : "Password";
+    document.getElementById("password").placeholder      = depot ? "Enter depot code" : "Enter password";
+    if (depot && !depotsLoaded) {
+      try {
+        const names = await (await fetch("/api/driver/depots")).json();
+        const sel = document.getElementById("depotSelect");
+        names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
+        depotsLoaded = true;
+      } catch (e) { console.error("Could not load depots", e); }
+    }
+  }
+  function beforeSubmit() {
+    if (document.getElementById("role").value === "depot") {
+      const name = document.getElementById("depotSelect").value;
+      if (!name) return false;
+      document.getElementById("username").value = "depot:" + name;
+    }
+    return true;
+  }
 
   // Show error/logout banners from URL params
   const params = new URLSearchParams(window.location.search);
