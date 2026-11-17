@@ -472,7 +472,6 @@
     <button class="tab-btn" id="tabBtnBusRoster" onclick="switchTab('busroster')">🚐 Schedule</button>
     <button class="tab-btn" id="tabBtnNotices" onclick="switchTab('notices')">📢 Notices</button>
     <button class="tab-btn" id="tabBtnReports" onclick="switchTab('reports')">📥 Driver Reports</button>
-    <a class="tab-btn" href="/admin/depot-accounts" style="text-decoration:none;">🏬 Depot Logins</a>
 </div>
 
 <!-- ── ACTIVE BUSES TAB ── -->
@@ -638,9 +637,9 @@
             <div class="panel-card-body">
                 <div style="overflow-x:auto;">
                     <table class="depot-table">
-                        <thead><tr><th>Depot</th><th>Code</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Depot</th><th>Code</th><th>Buses</th><th>Actions</th></tr></thead>
                         <tbody id="depotTableBody">
-                        <tr><td colspan="3" class="table-empty">Loading...</td></tr>
+                        <tr><td colspan="4" class="table-empty">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1075,6 +1074,8 @@
         try {
             const res = await fetch("/admin/depots");
             const depots = await res.json(); // { "ALIPURDUAR": "101", ... }
+            let depotBuses = {};
+            try { depotBuses = await (await fetch("/admin/depot-buses")).json(); } catch (e) { /* buses column just stays empty */ }
             depotsCache = depots;
             refreshDepotSelects();
             const entries = Object.entries(depots);
@@ -1084,7 +1085,7 @@
                 : "No depots loaded yet";
 
             if (!entries.length) {
-                tbody.innerHTML = `<tr><td colspan="3" class="table-empty">No depots yet — add one with the form above</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="table-empty">No depots yet — add one with the form above</td></tr>`;
                 return;
             }
 
@@ -1092,7 +1093,9 @@
         <tr>
           <td>${esc(name)}</td>
           <td class="code-cell">${esc(code)}</td>
+          <td>${(depotBuses[name] || []).map(b => `<span style="display:inline-block;border:1px solid var(--border);border-radius:999px;padding:1px 8px;margin:2px;font-size:12px;">${esc(b)} <b style="cursor:pointer;color:#ef4444;" data-name="${esc(name)}" data-bus="${esc(b)}" onclick="unassignDepotBus(this.dataset.name, this.dataset.bus)">×</b></span>`).join("") || '<span style="color:var(--text-muted);font-size:12px;">none</span>'}</td>
           <td style="white-space:nowrap;">
+            <button class="row-update-btn" data-name="${esc(name)}" onclick="assignDepotBuses(this.dataset.name)">+ Buses</button>
             <button class="row-update-btn" data-name="${esc(name)}" onclick="editDepotFromTable(this.dataset.name)">Edit</button>
             <button class="row-delete-btn" data-name="${esc(name)}" onclick="deleteDepotByName(this.dataset.name)">Delete</button>
           </td>
@@ -1100,7 +1103,7 @@
         } catch (err) {
             console.error("Failed to load depot codes:", err);
             countSub.textContent = "Failed to load";
-            tbody.innerHTML = `<tr><td colspan="3" class="table-empty" style="color:#ef4444;">Failed to load depot codes</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="table-empty" style="color:#ef4444;">Failed to load depot codes</td></tr>`;
         }
     }
 
@@ -1863,6 +1866,40 @@
             console.error(err);
             setStatus(statusEl, "Save failed: " + err.message, "#ef4444");
         }
+    }
+
+    // ── Buses owned by a depot (the depot's own login only sees these) ──
+    async function assignDepotBuses(name) {
+        const list = prompt(`Add buses to ${name}\n\nBus numbers, separated by commas:`);
+        if (!list || !list.trim()) return;
+        const fd = new FormData();
+        fd.append("depot", name);
+        fd.append("busNumbers", list);
+        fd.append("_csrf", document.getElementById("csrfToken").value);
+        try {
+            const res = await fetch("/admin/depot-buses/assign", { method: "POST", body: fd });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || "Failed"); return; }
+            let msg = "Added: " + (data.added.join(", ") || "none");
+            if (data.conflicts.length) msg += "\nSkipped (already owned by another depot): " + data.conflicts.join(", ");
+            if (data.invalid.length) msg += "\nInvalid: " + data.invalid.join(", ");
+            if (data.conflicts.length || data.invalid.length) alert(msg);
+            loadDepotTable();
+        } catch (err) { alert("Failed: " + err.message); }
+    }
+
+    async function unassignDepotBus(name, bus) {
+        if (!confirm(`Remove ${bus} from ${name}?`)) return;
+        const fd = new FormData();
+        fd.append("depot", name);
+        fd.append("busNumber", bus);
+        fd.append("_csrf", document.getElementById("csrfToken").value);
+        try {
+            const res = await fetch("/admin/depot-buses/unassign", { method: "POST", body: fd });
+            const data = await res.json();
+            if (!res.ok) { alert(data.error || "Failed"); return; }
+            loadDepotTable();
+        } catch (err) { alert("Failed: " + err.message); }
     }
 
     async function deleteDepotByName(name) {
