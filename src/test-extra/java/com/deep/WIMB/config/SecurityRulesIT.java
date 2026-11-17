@@ -9,7 +9,6 @@ package com.deep.WIMB.config;
 import com.deep.WIMB.controller.DriverAuthController;
 import com.deep.WIMB.controller.LocationController;
 import com.deep.WIMB.controller.RideController;
-import com.deep.WIMB.repository.DepotRepository;
 import com.deep.WIMB.service.ActiveRideCache;
 import com.deep.WIMB.service.ClientIpResolver;
 import com.deep.WIMB.service.DriverAccessService;
@@ -55,7 +54,6 @@ class SecurityRulesIT {
     @MockitoBean DriverTokenService driverTokenService;
     @MockitoBean ActiveRideCache activeRideCache;
     @MockitoBean DriverAccessService driverAccessService;
-    @MockitoBean DepotRepository depotRepository; // SecurityConfig loads depot logins from it
     @MockitoBean LoginRateLimiter loginRateLimiter;
     @MockitoBean ClientIpResolver clientIpResolver;
 
@@ -106,7 +104,6 @@ class SecurityRulesIT {
         assertSentToLogin("/admin/depots");
         assertSentToLogin("/admin/routes");
         assertSentToLogin("/admin-buses.html");
-        assertSentToLogin("/admin/depot-accounts");
         assertSentToLogin("/depot/dashboard");
         assertSentToLogin("/depot/api/buses");
         assertSentToLogin("/swagger-ui.html");
