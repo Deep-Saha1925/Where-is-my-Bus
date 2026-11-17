@@ -12,9 +12,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * A depot account: owns a set of buses and logs in (ROLE_DEPOT) to see only those.
- * Created by the admin. Separate from the drivers' depot-code list (Excel), which
- * keeps working unchanged.
+ * Owner of a set of buses. Just the depot's name, matching the name in the admin's
+ * "Depot Codes" list. The login password is that list's code, so nothing secret is stored here.
  */
 @Entity
 @Getter
@@ -26,17 +25,7 @@ public class Depot {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Upper-case display name, e.g. ALIPURDUAR. */
+    /** Upper-case depot name, same as in the depot codes list. */
     @Column(unique = true, nullable = false)
     private String name;
-
-    /** Lower-case login name. */
-    @Column(unique = true, nullable = false)
-    private String username;
-
-    /** BCrypt hash, never the plain password. */
-    @Column(nullable = false)
-    private String passwordHash;
-
-    private boolean enabled = true;
 }
