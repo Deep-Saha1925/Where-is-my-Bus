@@ -13,81 +13,45 @@ import com.deep.WIMB.model.Depot;
 import com.deep.WIMB.repository.BusRepository;
 import com.deep.WIMB.repository.DepotRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Depot accounts and the buses they own.
+ * Which buses belong to which depot, and the depot's own (scoped) live view.
+ * Depots are the names in the admin's Depot Codes list; login password = that depot's code.
  *
- * Isolation rule: everything a depot user can read goes through {@link #liveBuses(Depot)},
+ * Isolation rule: everything a depot user can read goes through {@link #liveBuses(String)},
  * which only ever looks at buses where bus.depot == that depot.
  */
 @Service
 @RequiredArgsConstructor
 public class DepotService {
 
-    private static final Pattern USERNAME = Pattern.compile("^[a-z0-9._-]{3,30}$");
+    /** Prefix the login page adds to the username when "Depot" is chosen. */
+    public static final String LOGIN_PREFIX = "depot:";
 
     private final DepotRepository depotRepository;
     private final BusRepository busRepository;
     private final RideService rideService;
-    private final PasswordEncoder passwordEncoder;
-
-    @Value("${wimb.admin.username}")
-    private String adminUsername;
+    private final DriverAccessService driverAccessService;
 
     // ───────────── admin side ─────────────
 
-    @Transactional
-    public Depot create(String name, String username, String password) {
-        String n = InputRules.safeText(name, "name", 60).toUpperCase(Locale.ROOT);
-        String u = username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
-        if (!USERNAME.matcher(u).matches()) {
-            throw new IllegalArgumentException("Username: 3-30 chars, letters, digits, dot, dash or underscore");
+    /** depot name -> its bus numbers, for every depot in the codes list. */
+    @Transactional(readOnly = true)
+    public Map<String, List<String>> busesByDepot() {
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        for (String name : driverAccessService.getDepotNames()) {
+            List<String> buses = depotRepository.findByName(name)
+                    .map(d -> busRepository.findByDepotOrderByBusNumber(d).stream()
+                            .map(Bus::getBusNumber).collect(Collectors.toList()))
+                    .orElseGet(ArrayList::new);
+            out.put(name, buses);
         }
-        if (u.equalsIgnoreCase(adminUsername)) {
-            throw new IllegalArgumentException("That username is reserved");
-        }
-        checkPassword(password);
-        if (depotRepository.existsByName(n)) throw new IllegalArgumentException("A depot named " + n + " already exists");
-        if (depotRepository.existsByUsername(u)) throw new IllegalArgumentException("Username already taken");
-
-        Depot d = new Depot();
-        d.setName(n);
-        d.setUsername(u);
-        d.setPasswordHash(passwordEncoder.encode(password));
-        return depotRepository.save(d);
-    }
-
-    @Transactional
-    public void setPassword(Long id, String password) {
-        checkPassword(password);
-        Depot d = get(id);
-        d.setPasswordHash(passwordEncoder.encode(password));
-        depotRepository.save(d);
-    }
-
-    @Transactional
-    public void setEnabled(Long id, boolean enabled) {
-        Depot d = get(id);
-        d.setEnabled(enabled);
-        depotRepository.save(d);
-    }
-
-    /** Deleting a depot keeps its buses; they just become unassigned. */
-    @Transactional
-    public void delete(Long id) {
-        Depot d = get(id);
-        List<Bus> buses = busRepository.findByDepotOrderByBusNumber(d);
-        buses.forEach(b -> b.setDepot(null));
-        busRepository.saveAll(buses);
-        depotRepository.delete(d);
+        return out;
     }
 
     /**
@@ -96,8 +60,8 @@ public class DepotService {
      * never silently moved.
      */
     @Transactional
-    public Map<String, Object> assignBuses(Long id, String rawList) {
-        Depot d = get(id);
+    public Map<String, Object> assignBuses(String depotName, String rawList) {
+        Depot d = getOrCreate(depotName);
         List<String> added = new ArrayList<>();
         List<String> conflicts = new ArrayList<>();
         List<String> invalid = new ArrayList<>();
@@ -132,8 +96,8 @@ public class DepotService {
     }
 
     @Transactional
-    public void unassignBus(Long id, String busNumber) {
-        Depot d = get(id);
+    public void unassignBus(String depotName, String busNumber) {
+        Depot d = getOrCreate(depotName);
         Bus bus = busRepository.findByBusNumber(InputRules.busNumber(busNumber))
                 .orElseThrow(() -> new IllegalArgumentException("Bus not found"));
         if (bus.getDepot() == null || !bus.getDepot().getId().equals(d.getId())) {
@@ -143,35 +107,15 @@ public class DepotService {
         busRepository.save(bus);
     }
 
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> listForAdmin() {
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Depot d : depotRepository.findAll()) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", d.getId());
-            row.put("name", d.getName());
-            row.put("username", d.getUsername());
-            row.put("enabled", d.isEnabled());
-            row.put("buses", busRepository.findByDepotOrderByBusNumber(d).stream()
-                    .map(Bus::getBusNumber).collect(Collectors.toList()));
-            out.add(row);
-        }
-        out.sort(Comparator.comparing(m -> (String) m.get("name")));
-        return out;
-    }
-
     // ───────────── depot side (scoped) ─────────────
-
-    @Transactional(readOnly = true)
-    public Depot findByUsername(String username) {
-        return depotRepository.findByUsername(username == null ? "" : username.toLowerCase(Locale.ROOT))
-                .orElseThrow(() -> new IllegalArgumentException("Unknown depot"));
-    }
 
     /** This depot's buses only, each marked running or not. */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> liveBuses(Depot depot) {
-        List<String> own = busRepository.findByDepotOrderByBusNumber(depot).stream()
+    public List<Map<String, Object>> liveBuses(String depotName) {
+        Optional<Depot> depot = depotRepository.findByName(normalize(depotName));
+        if (depot.isEmpty()) return new ArrayList<>();
+
+        List<String> own = busRepository.findByDepotOrderByBusNumber(depot.get()).stream()
                 .map(Bus::getBusNumber).collect(Collectors.toList());
 
         Map<String, ActiveRideResponse> running = new HashMap<>();
@@ -200,13 +144,19 @@ public class DepotService {
 
     // ───────────── helpers ─────────────
 
-    private Depot get(Long id) {
-        return depotRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Depot not found"));
+    private Depot getOrCreate(String depotName) {
+        String name = normalize(depotName);
+        if (!driverAccessService.getAllDepotCodes().containsKey(name)) {
+            throw new IllegalArgumentException("Unknown depot: " + depotName);
+        }
+        return depotRepository.findByName(name).orElseGet(() -> {
+            Depot d = new Depot();
+            d.setName(name);
+            return depotRepository.save(d);
+        });
     }
 
-    private static void checkPassword(String p) {
-        if (p == null || p.length() < 8 || p.length() > 72) {
-            throw new IllegalArgumentException("Password must be 8-72 characters");
-        }
+    private static String normalize(String name) {
+        return name == null ? "" : name.trim().toUpperCase(Locale.ROOT);
     }
 }
