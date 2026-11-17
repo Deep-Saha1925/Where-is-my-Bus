@@ -11,7 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import com.deep.WIMB.repository.DepotRepository;
+import com.deep.WIMB.service.DepotService;
+import com.deep.WIMB.service.DriverAccessService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -38,7 +39,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(DepotRepository depotRepository) {
+    public UserDetailsService userDetailsService(DriverAccessService driverAccessService) {
         var admin = User.builder()
                 .username(adminUsername)
                 .password(passwordEncoder().encode(adminPassword))
@@ -46,20 +47,24 @@ public class SecurityConfig {
                 .build();
         var adminOnly = new InMemoryUserDetailsManager(admin);
 
-        // Admin comes from the environment as before; depot accounts come from the database.
+        // Admin comes from the environment as before. A depot signs in with its name from the
+        // Depot Codes list (the login page sends "depot:NAME") and that depot's code as password.
         // (Only ONE UserDetailsService bean may exist, or Spring skips building the login provider.)
         return username -> {
+            if (username != null && username.startsWith(DepotService.LOGIN_PREFIX)) {
+                String name = username.substring(DepotService.LOGIN_PREFIX.length()).trim().toUpperCase();
+                String code = driverAccessService.getAllDepotCodes().get(name);
+                if (code == null) throw new UsernameNotFoundException("Unknown depot");
+                return User.builder()
+                        .username(DepotService.LOGIN_PREFIX + name)
+                        .password(passwordEncoder().encode(code))
+                        .roles("DEPOT")
+                        .build();
+            }
             if (adminUsername.equals(username)) {
                 return adminOnly.loadUserByUsername(username);
             }
-            return depotRepository.findByUsername(username == null ? "" : username.toLowerCase())
-                    .filter(d -> d.isEnabled())
-                    .map(d -> User.builder()
-                            .username(d.getUsername())
-                            .password(d.getPasswordHash())
-                            .roles("DEPOT")
-                            .build())
-                    .orElseThrow(() -> new UsernameNotFoundException("Unknown user"));
+            throw new UsernameNotFoundException("Unknown user");
         };
     }
 
