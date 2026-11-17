@@ -14,7 +14,5 @@ import java.util.Optional;
 
 @Repository
 public interface DepotRepository extends JpaRepository<Depot, Long> {
-    Optional<Depot> findByUsername(String username);
-    boolean existsByUsername(String username);
-    boolean existsByName(String name);
+    Optional<Depot> findByName(String name);
 }
