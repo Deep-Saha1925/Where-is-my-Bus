@@ -6,7 +6,6 @@
  */
 package com.deep.WIMB.controller;
 
-import com.deep.WIMB.model.Depot;
 import com.deep.WIMB.service.DepotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -38,9 +37,9 @@ public class DepotController {
     @GetMapping("/api/buses")
     @ResponseBody
     public Map<String, Object> myBuses(Authentication auth) {
-        Depot depot = depotService.findByUsername(auth.getName());
+        String depot = auth.getName().substring(DepotService.LOGIN_PREFIX.length());
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("depot", depot.getName());
+        out.put("depot", depot);
         out.put("buses", depotService.liveBuses(depot));
         return out;
     }
