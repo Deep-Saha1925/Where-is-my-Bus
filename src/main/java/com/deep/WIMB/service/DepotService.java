@@ -95,6 +95,31 @@ public class DepotService {
         return out;
     }
 
+    /**
+     * Called when a driver logs in with a valid depot name + code. A bus that has no depot yet
+     * is attached to that depot, so it shows up on the depot dashboard without the admin having
+     * to pre-assign every bus by hand. A bus that already belongs to the same depot is left alone,
+     * and a bus that belongs to ANOTHER depot is never moved (same rule as assignBuses).
+     *
+     * @return true if the bus now belongs to this depot
+     */
+    @Transactional
+    public boolean claimBusForLogin(String depotName, String busNumber) {
+        Depot d = getOrCreate(depotName);
+        String number = InputRules.busNumber(busNumber);
+        Bus bus = busRepository.findByBusNumber(number).orElseGet(() -> {
+            Bus b = new Bus();
+            b.setBusNumber(number);
+            return b;
+        });
+        if (bus.getDepot() == null) {
+            bus.setDepot(d);
+            busRepository.save(bus);
+            return true;
+        }
+        return bus.getDepot().getId().equals(d.getId());
+    }
+
     @Transactional
     public void unassignBus(String depotName, String busNumber) {
         Depot d = getOrCreate(depotName);
