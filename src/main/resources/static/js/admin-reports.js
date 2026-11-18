@@ -12,12 +12,17 @@
         LOCATION_WRONG: "📍 Bus location looks wrong",
         BUS_NOT_RUNNING: "🚫 Bus not running / cancelled",
         CONDUCT: "🧑 Driver or staff behaviour",
-        APP_PROBLEM: "🛠️ Problem with the app"
+        APP_PROBLEM: "🛠️ Problem with the app",
+        // depot request types
+        ROUTE_CORRECTION: "✏️ Route correction",
+        STOP_REQUEST: "📍 New stop request",
+        BUS_PROBLEM: "🔧 Bus problem (from depot)"
     };
     var STATUS_LABEL = { NEW: "New", UNDER_REVIEW: "Under review", NEED_INFO: "Need info", APPROVED: "Approved", REJECTED: "Rejected" };
     var STATUS_COLOR = { NEW: "#3b82f6", UNDER_REVIEW: "#f59e0b", NEED_INFO: "#ea580c", APPROVED: "#22c55e", REJECTED: "#ef4444" };
     var DEFAULT_SEV = { BREAKDOWN: "WARNING", ROAD_BLOCKAGE: "WARNING", ROUTE_REQUEST: "INFO", OTHER: "INFO",
-        LOCATION_WRONG: "INFO", BUS_NOT_RUNNING: "WARNING", CONDUCT: "INFO", APP_PROBLEM: "INFO" };
+        LOCATION_WRONG: "INFO", BUS_NOT_RUNNING: "WARNING", CONDUCT: "INFO", APP_PROBLEM: "INFO",
+        ROUTE_CORRECTION: "INFO", STOP_REQUEST: "INFO", BUS_PROBLEM: "WARNING" };
     var cache = {};
 
     function esc(v) {
@@ -57,7 +62,7 @@
         if (!btn) return;
         if (all) {
             var n = all.filter(function (r) { return r.status === "NEW"; }).length;
-            btn.textContent = "📥 Driver Reports" + (n ? " (" + n + " new)" : "");
+            btn.textContent = "📥 Reports" + (n ? " (" + n + " new)" : "");
         }
     }
 
@@ -69,17 +74,23 @@
             ? '<span style="font-size:12px;color:#22c55e;font-weight:600;">📢 Published as notice #' + Number(r.publishedNoticeId) + "</span>"
             : '<button class="row-update-btn" onclick="toggleReportPublish(' + Number(r.id) + ')">📢 Publish as notice</button>';
         var fromPassenger = r.source === "PASSENGER";
+        var fromDepot = r.source === "DEPOT";
+        var who = fromDepot ? "depot" : "driver";
         var badge = fromPassenger
             ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(124,58,237,.15);color:#7c3aed;margin-right:6px;">🧍 Passenger</span>'
-            : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;">🚌 Driver</span>';
-        var busText = r.busNumber === "-" ? "<i>no bus given</i>" : "Bus <b>" + esc(r.busNumber) + "</b>";
+            : fromDepot
+                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(22,163,74,.15);color:#15803d;margin-right:6px;">🏢 Depot ' + esc(r.depotName || "") + "</span>"
+                : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;">🚌 Driver</span>';
+        var busText = r.busNumber === "-"
+            ? (fromDepot ? "<i>not about one bus</i>" : "<i>no bus given</i>")
+            : "Bus <b>" + esc(r.busNumber) + "</b>";
         // Reply the driver sees in the app. Passengers have no account, so no reply box for their reports.
         var replyBox = fromPassenger ? "" :
             '<div style="margin-top:10px;">' +
-            '<label for="rr-' + r.id + '" style="font-size:12px;font-weight:700;display:block;margin-bottom:3px;">💬 Reply to driver ' +
-            '<span style="font-weight:400;color:var(--text-faint);">(the driver sees this in the app)</span></label>' +
+            '<label for="rr-' + r.id + '" style="font-size:12px;font-weight:700;display:block;margin-bottom:3px;">💬 Reply to ' + who + ' ' +
+            '<span style="font-weight:400;color:var(--text-faint);">(the ' + who + ' sees this ' + (fromDepot ? "on its dashboard" : "in the app") + ")</span></label>" +
             '<textarea id="rr-' + r.id + '" class="pick-text" maxlength="500" rows="2" style="width:100%;display:block;" ' +
-            'placeholder="e.g. Please tell your depot manager the exact stop name.">' + esc(r.adminReply || "") + "</textarea>" +
+            'placeholder="' + (fromDepot ? "e.g. Route added. It will show up in search within a few minutes." : "e.g. Please tell your depot manager the exact stop name.") + '">' + esc(r.adminReply || "") + "</textarea>" +
             (r.adminReply && (r.repliedAtInstant || r.repliedAt)
                 ? '<div style="font-size:11.5px;color:var(--text-faint);margin-top:2px;">Reply sent ' +
                 esc(new Date(r.repliedAtInstant || r.repliedAt).toLocaleString()) + "</div>"
@@ -98,7 +109,7 @@
             replyBox +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">' +
             '<select id="rs-' + r.id + '" class="pick-select">' + opts + "</select>" +
-            '<input id="rn-' + r.id + '" class="pick-text" maxlength="500" placeholder="Internal note (driver cannot see this)" value="' + esc(r.adminNote || "") + '" style="flex:1;min-width:180px;"/>' +
+            '<input id="rn-' + r.id + '" class="pick-text" maxlength="500" placeholder="Internal note (not shown to the sender)" value="' + esc(r.adminNote || "") + '" style="flex:1;min-width:180px;"/>' +
             '<button class="row-update-btn" onclick="saveReport(' + Number(r.id) + ')">Save</button>' +
             published +
             '<button class="row-delete-btn" onclick="deleteReport(' + Number(r.id) + ')">Delete</button></div>' +
@@ -113,7 +124,7 @@
         // A driver told "need info" or "rejected" with no words gets no idea why: ask once.
         if (replyEl && old && status !== old.status && (status === "NEED_INFO" || status === "REJECTED") &&
             !replyEl.value.trim()) {
-            if (!confirm("The driver will only see the status, not why. Save without a reply?")) return;
+            if (!confirm("The " + (old.source === "DEPOT" ? "depot" : "driver") + " will only see the status, not why. Save without a reply?")) return;
         }
         var fd = new URLSearchParams();
         fd.append("status", status);
