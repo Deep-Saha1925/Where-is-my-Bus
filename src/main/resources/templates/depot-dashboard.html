@@ -232,10 +232,14 @@
 
   /* ───────── list ───────── */
   function renderChips(counts) {
-    const defs = [['all', 'All'], ['running', 'Running'], ['silent', 'Not reporting'], ['idle', 'Idle']];
+    // (no double square brackets anywhere in this file: Thymeleaf would read them as inline expressions)
+    const defs = [
+      { key: 'all', label: 'All' }, { key: 'running', label: 'Running' },
+      { key: 'silent', label: 'Not reporting' }, { key: 'idle', label: 'Idle' }
+    ];
     const box = $('chips');
     box.replaceChildren();
-    defs.forEach(([key, label]) => {
+    defs.forEach(({ key, label }) => {
       const c = el('button', 'chip', label);
       c.type = 'button';
       c.setAttribute('aria-pressed', String(filter === key));
