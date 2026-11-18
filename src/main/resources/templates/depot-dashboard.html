@@ -109,7 +109,41 @@
     .bus-marker { width:34px; height:34px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.4); display:grid; place-items:center; font-size:17px; }
     .bus-marker.silent { background:var(--warn); }
 
+    /* ───── request / report panel ───── */
+    :root { --bad:#dc2626; --bad-bg:#fdecec; }
+    :root[data-theme="dark"] { --bad:#f87171; --bad-bg:#331616; }
+    .btn .badge { margin-left:6px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; display:inline-grid; place-items:center; }
+    .btn .badge[hidden] { display:none; }
+    .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .btn.primary:hover { filter:brightness(1.08); color:#fff; background:var(--accent); }
+    .btn[disabled] { opacity:.6; cursor:default; }
+    .types { display:flex; flex-wrap:wrap; gap:8px; }
+    .types .chip { display:inline-flex; gap:6px; align-items:center; }
+    .field { display:flex; flex-direction:column; gap:5px; }
+    .field label { font-size:12.5px; font-weight:700; color:var(--muted); }
+    .field input, .field select, .field textarea { font:inherit; font-size:14px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); width:100%; }
+    .field textarea { resize:vertical; min-height:110px; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+    .hint { font-size:12.5px; color:var(--muted); line-height:1.4; }
+    .count { text-align:right; font-size:11.5px; color:var(--muted); }
+    .form-msg { font-size:13px; font-weight:600; min-height:18px; }
+    .form-msg.ok { color:var(--ok); } .form-msg.err { color:var(--bad); }
+    .req { padding:12px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+    .req:last-child { border-bottom:0; }
+    .req-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .req-desc { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text); }
+    .req small { color:var(--muted); display:block; margin-top:4px; }
+    .reply { margin-top:8px; padding:9px 12px; border-radius:10px; background:var(--accent-bg); border-left:4px solid var(--accent); }
+    .reply b { display:block; font-size:12px; color:var(--accent); margin-bottom:2px; }
+    .newtag { font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; background:var(--bad); color:#fff; margin-left:6px; }
+    .s-new { --c:var(--accent); --bg-c:var(--accent-bg); }
+    .s-review { --c:var(--warn); --bg-c:var(--warn-bg); }
+    .s-info { --c:var(--warn); --bg-c:var(--warn-bg); }
+    .s-ok { --c:var(--ok); --bg-c:var(--ok-bg); }
+    .s-no { --c:var(--bad); --bg-c:var(--bad-bg); }
+
     @media (max-width:700px) {
+      .btn .lbl { display:none; }
       .summary { grid-template-columns:repeat(2, 1fr); }
       .drawer { top:auto; width:100%; height:90vh; height:90dvh; border-left:0; border-radius:20px 20px 0 0; transform:translateY(100%); }
       .drawer.open { transform:none; }
@@ -128,6 +162,7 @@
     </div>
   </div>
   <div class="head-actions">
+    <button class="btn primary" id="reqBtn" type="button" aria-label="Request or report to admin">📝<span class="lbl">&nbsp;Request / report</span><span class="badge" id="reqBadge" hidden>0</span></button>
     <button class="btn icon" id="themeBtn" type="button" title="Switch theme" aria-label="Switch theme">🌓</button>
     <form action="/logout" method="post" style="margin:0">
       <input type="hidden" name="_csrf" id="csrfToken">
@@ -166,6 +201,43 @@
     <button class="btn icon" id="dClose" type="button" aria-label="Close details">✕</button>
   </div>
   <div class="d-body" id="dBody"></div>
+</aside>
+
+<aside class="drawer" id="reqPanel" role="dialog" aria-modal="true" aria-labelledby="rTitle" aria-hidden="true">
+  <div class="d-head">
+    <div>
+      <h2 id="rTitle">Request / report to admin</h2>
+      <span class="hint">Ask for a new route, a correction, or report a problem.</span>
+    </div>
+    <button class="btn icon" id="rClose" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="d-body">
+    <div>
+      <div class="hint" style="margin-bottom:8px;font-weight:700">What is this about?</div>
+      <div class="types" id="rTypes" role="group" aria-label="Type of request"></div>
+    </div>
+    <div class="field">
+      <label for="rBus">Related bus <span style="font-weight:400">(optional)</span></label>
+      <select id="rBus"></select>
+    </div>
+    <div class="field">
+      <label for="rPlace" id="rPlaceLabel">Route / place</label>
+      <input id="rPlace" type="text" maxlength="150" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="rDesc">Details</label>
+      <textarea id="rDesc" maxlength="1000"></textarea>
+      <div class="hint" id="rHint"></div>
+      <div class="count" id="rCount">0 / 1000</div>
+    </div>
+    <div class="form-msg" id="rMsg" role="status" aria-live="polite"></div>
+    <button class="btn primary" id="rSend" type="button" style="padding:11px 16px;font-size:14px">Send to admin</button>
+
+    <div class="d-sec" style="margin-top:6px">
+      <h3>Your requests</h3>
+      <div id="rList"><div class="map-note">Loading…</div></div>
+    </div>
+  </div>
 </aside>
 
 <script>
@@ -220,7 +292,14 @@
     });
   })();
 
-  fetch('/csrf-token').then(r => r.json()).then(d => { $('csrfToken').value = d.token; }).catch(() => {});
+  let csrf = { header: 'X-CSRF-TOKEN', token: '' };
+  function loadCsrf() {
+    return fetch('/csrf-token').then(r => r.json()).then(d => {
+      csrf = { header: d.headerName || 'X-CSRF-TOKEN', token: d.token };
+      $('csrfToken').value = d.token;
+    }).catch(() => {});
+  }
+  loadCsrf();
 
   /* ───────── state ───────── */
   let buses = [];
@@ -495,11 +574,205 @@
   }
 
   $('dClose').addEventListener('click', closeDrawer);
-  $('backdrop').addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && selected) closeDrawer(); });
+  $('backdrop').addEventListener('click', () => { closeDrawer(); closeReq(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (selected) closeDrawer();
+    else if ($('reqPanel').classList.contains('open')) closeReq();
+  });
+
+  /* ───────── requests / reports to admin ───────── */
+  const REQ_TYPES = [
+    { key: 'ROUTE_REQUEST',    icon: '\uD83D\uDDFA\uFE0F', label: 'Add a route',
+      place: 'Route (from \u2192 to)', ph: 'e.g. Alipurduar \u2192 Falakata',
+      hint: 'Give the start and end, the main stops in order, and the usual timings.' },
+    { key: 'ROUTE_CORRECTION', icon: '\u270F\uFE0F', label: 'Fix a route',
+      place: 'Which route?', ph: 'e.g. Alipurduar \u2192 Falakata',
+      hint: 'What is wrong (missing stop, wrong order, wrong name) and what it should be.' },
+    { key: 'STOP_REQUEST',     icon: '\uD83D\uDCCD', label: 'Add a stop',
+      place: 'Stop name and route', ph: 'e.g. College More, on Alipurduar \u2192 Falakata',
+      hint: 'Where the stop is and between which two existing stops it comes.' },
+    { key: 'BUS_PROBLEM',      icon: '\uD83D\uDD27', label: 'Bus problem',
+      place: 'Where (optional)', ph: 'e.g. Depot yard',
+      hint: 'What is wrong with the bus, and whether it is off the road.' },
+    { key: 'OTHER',            icon: '\uD83D\uDCAC', label: 'Other',
+      place: 'Subject (optional)', ph: '',
+      hint: 'Anything else the admin should know.' }
+  ];
+  const REQ_LABEL = {};
+  REQ_TYPES.forEach(t => { REQ_LABEL[t.key] = t.icon + ' ' + t.label; });
+  const REQ_STATUS = {
+    NEW:          { label: 'Sent',            cls: 's-new' },
+    UNDER_REVIEW: { label: 'Under review',    cls: 's-review' },
+    NEED_INFO:    { label: 'Needs more info', cls: 's-info' },
+    APPROVED:     { label: 'Approved',        cls: 's-ok' },
+    REJECTED:     { label: 'Rejected',        cls: 's-no' }
+  };
+  let reqType = 'ROUTE_REQUEST';
+  let requests = [];
+  let freshIds = new Set();      // replies that were new when the panel was opened
+
+  function seenMap() {
+    try { return JSON.parse(localStorage.getItem('wimb-seen-replies') || '{}'); } catch (e) { return {}; }
+  }
+  function saveSeen(m) { try { localStorage.setItem('wimb-seen-replies', JSON.stringify(m)); } catch (e) {} }
+  function isUnseen(r, seen) { return !!r.adminReply && seen[r.id] !== r.repliedAt; }
+
+  function updateBadge() {
+    const seen = seenMap();
+    const n = requests.filter(r => isUnseen(r, seen)).length;
+    const b = $('reqBadge');
+    b.textContent = n;
+    b.hidden = n === 0;
+  }
+
+  function renderTypes() {
+    const box = $('rTypes');
+    box.replaceChildren();
+    REQ_TYPES.forEach(t => {
+      const c = el('button', 'chip', t.icon + ' ' + t.label);
+      c.type = 'button';
+      c.setAttribute('aria-pressed', String(reqType === t.key));
+      c.addEventListener('click', () => { reqType = t.key; renderTypes(); applyType(); });
+      box.append(c);
+    });
+  }
+  function applyType() {
+    const t = REQ_TYPES.find(x => x.key === reqType);
+    $('rPlaceLabel').textContent = t.place;
+    $('rPlace').placeholder = t.ph;
+    $('rHint').textContent = t.hint;
+    $('rDesc').placeholder = t.hint;
+  }
+  function fillBusSelect() {
+    const sel = $('rBus');
+    const keep = sel.value;
+    sel.replaceChildren();
+    const none = el('option', null, 'Not about one particular bus');
+    none.value = '';
+    sel.append(none);
+    buses.map(b => b.busNumber).sort().forEach(n => {
+      const o = el('option', null, n);
+      o.value = n;
+      sel.append(o);
+    });
+    sel.value = keep;
+  }
+
+  function renderRequests() {
+    const box = $('rList');
+    box.replaceChildren();
+    if (!requests.length) {
+      box.append(el('div', 'map-note', 'You have not sent any requests yet.'));
+      return;
+    }
+    requests.forEach(r => {
+      const st = REQ_STATUS[r.status] || { label: r.status, cls: 's-new' };
+      const row = el('div', 'req');
+      const top = el('div', 'req-top');
+      const title = el('b', null, REQ_LABEL[r.type] || r.type);
+      if (freshIds.has(r.id)) title.append(el('span', 'newtag', 'NEW REPLY'));
+      top.append(title, el('span', 'pill ' + st.cls, st.label));
+      row.append(top);
+      const sub = [];
+      if (r.busNumber) sub.push('Bus ' + r.busNumber);
+      if (r.place) sub.push(r.place);
+      if (sub.length) row.append(el('small', null, sub.join(' \u00B7 ')));
+      row.append(el('div', 'req-desc', r.description));
+      if (r.adminReply) {
+        const rep = el('div', 'reply');
+        rep.append(el('b', null, 'Admin replied' + (r.repliedAt ? ' \u00B7 ' + clock(Date.parse(r.repliedAt)) : '')), el('div', null, r.adminReply));
+        row.append(rep);
+      }
+      row.append(el('small', null, 'Sent ' + clock(Date.parse(r.createdAt))));
+      box.append(row);
+    });
+  }
+
+  async function loadRequests() {
+    try {
+      const r = await fetch('/depot/api/reports', { cache: 'no-store' });
+      if (r.redirected || r.status === 401 || r.status === 403) return;
+      if (!r.ok) return;
+      requests = await r.json();
+      updateBadge();
+      if ($('reqPanel').classList.contains('open')) renderRequests();
+    } catch (e) { /* keep the last list; the main refresh shows the offline banner */ }
+  }
+
+  function setMsg(text, kind) {
+    const m = $('rMsg');
+    m.textContent = text || '';
+    m.className = 'form-msg' + (kind ? ' ' + kind : '');
+  }
+
+  async function sendRequest() {
+    const desc = $('rDesc').value.trim();
+    if (desc.length < 10) { setMsg('Please describe it in at least 10 characters.', 'err'); $('rDesc').focus(); return; }
+    const btn = $('rSend');
+    btn.disabled = true;
+    setMsg('Sending\u2026');
+    const body = JSON.stringify({
+      type: reqType, busNumber: $('rBus').value, place: $('rPlace').value.trim(), description: desc
+    });
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const headers = { 'Content-Type': 'application/json' };
+        headers[csrf.header] = csrf.token;
+        const r = await fetch('/depot/api/reports', { method: 'POST', headers, body });
+        if (r.status === 403 && attempt === 0) { await loadCsrf(); continue; }   // token went stale: refresh once
+        if (r.redirected || r.status === 401) { location.href = '/login.html'; return; }
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) { setMsg(data.error || 'Could not send. Please try again.', 'err'); break; }
+        $('rDesc').value = '';
+        $('rPlace').value = '';
+        $('rCount').textContent = '0 / 1000';
+        setMsg('Sent to admin. Their reply will appear below.', 'ok');
+        await loadRequests();
+        break;
+      }
+    } catch (e) {
+      setMsg('Connection problem. Please try again.', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function openReq() {
+    closeDrawer();
+    lastFocus = $('reqBtn');
+    const seen = seenMap();
+    freshIds = new Set(requests.filter(r => isUnseen(r, seen)).map(r => r.id));
+    requests.forEach(r => { if (r.adminReply) seen[r.id] = r.repliedAt; });
+    saveSeen(seen);
+    updateBadge();
+    renderTypes(); applyType(); fillBusSelect(); renderRequests(); setMsg('');
+    $('reqPanel').classList.add('open');
+    $('backdrop').classList.add('open');
+    $('reqPanel').setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    $('rClose').focus();
+    loadRequests();
+  }
+  function closeReq() {
+    if (!$('reqPanel').classList.contains('open')) return;
+    $('reqPanel').classList.remove('open');
+    $('backdrop').classList.remove('open');
+    $('reqPanel').setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    freshIds = new Set();
+    if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+  }
+
+  $('reqBtn').addEventListener('click', openReq);
+  $('rClose').addEventListener('click', closeReq);
+  $('rSend').addEventListener('click', sendRequest);
+  $('rDesc').addEventListener('input', () => { $('rCount').textContent = $('rDesc').value.length + ' / 1000'; });
 
   refresh();
+  loadRequests();
   setInterval(refresh, 10000);
+  setInterval(loadRequests, 30000);
 </script>
 </body>
 </html>
