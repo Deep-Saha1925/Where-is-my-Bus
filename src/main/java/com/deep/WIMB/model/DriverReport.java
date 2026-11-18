@@ -35,9 +35,15 @@ public class DriverReport {
     public static final String ROUTE_REQUEST = "ROUTE_REQUEST";
     public static final String OTHER = "OTHER";
 
+    /** Types a depot can send (route / stop requests and bus problems from the depot dashboard). */
+    public static final String ROUTE_CORRECTION = "ROUTE_CORRECTION";
+    public static final String STOP_REQUEST = "STOP_REQUEST";
+    public static final String BUS_PROBLEM = "BUS_PROBLEM";
+
     /** Who sent the report. Rows created before this column existed have null = DRIVER. */
     public static final String SOURCE_DRIVER = "DRIVER";
     public static final String SOURCE_PASSENGER = "PASSENGER";
+    public static final String SOURCE_DEPOT = "DEPOT";
 
     /** busNumber value for a passenger report that is not about one particular bus. */
     public static final String NO_BUS = "-";
@@ -90,6 +96,10 @@ public class DriverReport {
     /** DRIVER or PASSENGER (null on old rows = DRIVER). */
     @Column(length = 20)
     private String source = SOURCE_DRIVER;
+
+    /** Which depot sent the report (only set when source = DEPOT). Taken from the depot login, never the request. */
+    @Column(length = 100)
+    private String depotName;
 
     /** Optional phone / email a passenger chose to leave. Admin-only, never sent to drivers. */
     @Column(length = 100)
