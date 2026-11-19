@@ -44,7 +44,7 @@
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
 - 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop; the tracking page shows how far the bus is from you and can send your location to a friend (WhatsApp, SMS...), see [Use My Location](#-use-my-location-passenger)
-- 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
+- <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - 🕒 **Upcoming scheduled buses** — if no bus is running right now (say it is 10:55 and the next bus leaves at 11:00), the search no longer ends at *"not available"*: it lists the next buses from the timetable (*Due in 5 min*, *In 25 min*) and any that are **late / not live yet**, see [Upcoming Scheduled Buses](#-upcoming-scheduled-buses)
 - ⚠️ **Report a problem** — wrong bus location, bus not running, staff behaviour, app problem: from the tracking page (⋮ menu or ⚠️ Report chip) or the home page footer, no login needed, see [Notices & Driver Reports](#-notices--driver-reports)
 - 📱 **Phone-friendly pages** — safe-area padding on notched phones, pinch-zoom allowed, 44px tap targets, a header that fits 320px screens, and toasts that sit above the bottom sheet
@@ -91,7 +91,7 @@
 - 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
 - 📢 **Notices tab** — publish, hide or delete passenger notices, with severity, optional route / bus tag and auto-expiry
-- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged 🚌 Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, **a reply the driver reads in the app**, a "new" counter on the tab, and one-step **Publish as notice**
+- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, **a reply the driver reads in the app**, a "new" counter on the tab, and one-step **Publish as notice**
 
 </td>
 <td width="50%">
@@ -356,7 +356,7 @@ Ride starts / ends
 
 ---
 
-## 🚌 Search by Bus Number
+## <img src="src/main/resources/static/images/logo.png" width="28" alt="bus"> Search by Bus Number
 
 Passengers can find a running bus directly by its number — the **Bus Number** tab on the home page (next to *Live Buses* and *Depot Routes*). Each result card shows the bus number, ride ID, source → destination and a Live badge, and **Track Bus** opens the normal tracking page for that ride (tapping anywhere on the card does the same). ETA is intentionally not shown on these cards: an ETA is measured to a passenger's boarding stop, and a bus-number search doesn't have one.
 
@@ -1028,7 +1028,7 @@ Returns a token on success, tied to the given bus number for ~12 hours:
 </details>
 
 <details>
-<summary><b>🚌 Ride APIs</b></summary>
+<summary><b><img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> Ride APIs</b></summary>
 
 #### Start Ride
 ```http
