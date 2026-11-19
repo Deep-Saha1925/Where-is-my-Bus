@@ -79,8 +79,8 @@
         var badge = fromPassenger
             ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(124,58,237,.15);color:#7c3aed;margin-right:6px;">🧍 Passenger</span>'
             : fromDepot
-                ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(22,163,74,.15);color:#15803d;margin-right:6px;">🏢 Depot ' + esc(r.depotName || "") + "</span>"
-                : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;">🚌 Driver</span>';
+            ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(22,163,74,.15);color:#15803d;margin-right:6px;">🏢 Depot ' + esc(r.depotName || "") + "</span>"
+            : '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(14,165,233,.15);color:#0284c7;margin-right:6px;"><img src="/images/logo.png" alt="" style="width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;"> Driver</span>';
         var busText = r.busNumber === "-"
             ? (fromDepot ? "<i>not about one bus</i>" : "<i>no bus given</i>")
             : "Bus <b>" + esc(r.busNumber) + "</b>";

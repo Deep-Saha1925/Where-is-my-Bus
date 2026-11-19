@@ -443,7 +443,7 @@
 <!-- ── PAGE HEADER ── -->
 <div class="page-header">
     <div>
-        <div class="header-title">🚌 WIMB Admin</div>
+        <div class="header-title"><img src="/images/logo.png" alt="" style="width:1.4em;height:1.4em;vertical-align:-0.3em;border-radius:50%;"> WIMB Admin</div>
         <div class="header-sub" id="lastRefreshed">Refreshing...</div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
@@ -466,12 +466,12 @@
 
 <!-- ── TAB BAR ── -->
 <div class="tab-bar">
-    <button class="tab-btn active" id="tabBtnBuses" onclick="switchTab('buses')">🚌 Active Buses</button>
+    <button class="tab-btn active" id="tabBtnBuses" onclick="switchTab('buses')"><img src="/images/logo.png" alt="" style="width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;"> Active Buses</button>
     <button class="tab-btn" id="tabBtnDepots" onclick="switchTab('depots')">🏢 Depot Codes</button>
     <button class="tab-btn" id="tabBtnRoutes" onclick="switchTab('routes')">🛣️ Routes</button>
     <button class="tab-btn" id="tabBtnBusRoster" onclick="switchTab('busroster')">🚐 Schedule</button>
     <button class="tab-btn" id="tabBtnNotices" onclick="switchTab('notices')">📢 Notices</button>
-    <button class="tab-btn" id="tabBtnReports" onclick="switchTab('reports')">📥 Driver Reports</button>
+    <button class="tab-btn" id="tabBtnReports" onclick="switchTab('reports')">📥 Reports</button>
 </div>
 
 <!-- ── ACTIVE BUSES TAB ── -->
@@ -521,7 +521,7 @@
 
     <div class="card-grid" id="busGrid">
         <div class="empty-state">
-            <div class="empty-icon">🚌</div>
+            <div class="empty-icon"><img src="/images/logo.png" alt="" style="width:1em;height:1em;border-radius:50%;"></div>
             <div class="empty-title">Loading buses...</div>
             <div class="empty-sub">Fetching active rides</div>
         </div>
@@ -769,7 +769,7 @@
         <!-- Bulk bus roster upload -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
-                <div class="panel-icon">🚌</div>
+                <div class="panel-icon"><img src="/images/logo.png" alt="" style="width:26px;height:26px;border-radius:50%;"></div>
                 <div>
                     <div class="panel-title">Bulk-update bus rosters</div>
                     <div class="panel-sub">Set bus numbers for many routes in one file, instead of editing them one by one</div>
@@ -814,7 +814,7 @@
         <!-- Quick add: one bus onto a route, from dropdowns -->
         <div class="panel-card full-width">
             <div class="panel-card-header">
-                <div class="panel-icon">🚌</div>
+                <div class="panel-icon"><img src="/images/logo.png" alt="" style="width:26px;height:26px;border-radius:50%;"></div>
                 <div>
                     <div class="panel-title">Add a bus to a route</div>
                     <div class="panel-sub">Choose the route, then pick a known bus or type a new one — no file needed</div>
@@ -1025,7 +1025,7 @@
             <div class="panel-card-header">
                 <div class="panel-icon">📥</div>
                 <div>
-                    <div class="panel-title">Driver reports</div>
+                    <div class="panel-title">Reports (drivers, passengers and depots)</div>
                     <div class="panel-sub" id="reportCountSub">Loading...</div>
                 </div>
             </div>
@@ -1251,7 +1251,7 @@
                 return `
         <tr id="routeRow-${esc(r.routeCode)}">
           <td class="code-cell">${esc(r.routeCode)}</td>
-          <td>${esc(r.routeName)}</td>
+          <td>${esc(r.routeName)}${r.ownerDepot ? `<br><small style="color:var(--text-faint);">🏢 added by depot ${esc(r.ownerDepot)}</small>` : ""}</td>
           <td style="font-size:12.5px; white-space:nowrap;">${direction}</td>
           <td>${r.stopCount}</td>
           <td style="font-size:12.5px; color:var(--text-muted); max-width:200px;">${buses}</td>
@@ -1579,7 +1579,7 @@
                 return `
         <tr id="schedRow-${esc(r.routeCode)}">
           <td class="code-cell">${esc(r.routeCode)}</td>
-          <td>${esc(r.routeName)}</td>
+          <td>${esc(r.routeName)}${r.ownerDepot ? `<br><small style="color:var(--text-faint);">🏢 added by depot ${esc(r.ownerDepot)}</small>` : ""}</td>
           <td style="font-size:12.5px; color:var(--text-muted);">${buses}</td>
           <td style="font-size:12.5px; color:var(--text-muted);">${departures}</td>
           <td style="white-space:nowrap;">

@@ -61,7 +61,7 @@ function renderCards(rides) {
     const query = document.getElementById("searchInput").value.trim();
     grid.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">${query ? "🔍" : "🚌"}</div>
+        <div class="empty-icon">${query ? "🔍" : '<img src="/images/logo.png" alt="" style="width:1em;height:1em;border-radius:50%;">'}</div>
         <div class="empty-title">${query ? `No results for "${query}"` : "No active buses"}</div>
         <div class="empty-sub">${query ? "Try a different bus number, source or destination" : "No rides are currently in progress"}</div>
       </div>`;
@@ -78,7 +78,7 @@ function renderCards(rides) {
     <div class="bus-card" style="animation-delay:${i * 60}ms">
       <div class="bus-card-header">
         <div class="bus-number">
-          <div class="bus-icon-circle">🚌</div>
+          <div class="bus-icon-circle"><img src="/images/logo.png" alt="" style="width:100%;height:100%;border-radius:50%;display:block;"></div>
           ${escapeHtml(ride.busNumber)}
         </div>
         ${ride.stale
