@@ -677,6 +677,15 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
 
 // Updates the "Current stop position" card. In sim mode it shows exactly what the
 // slider says; in live mode it works out the nearest stop from the GPS fix.
+/** Puts the project logo (instead of a bus emoji) in front of a line of text, without using innerHTML. */
+function setBusLine(el, text) {
+  const img = document.createElement("img");
+  img.src = "/images/logo.png";
+  img.alt = "";
+  img.style.cssText = "width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;margin-right:.3em;";
+  el.replaceChildren(img, document.createTextNode(text));
+}
+
 function updateCurrentStop() {
   const main = document.getElementById("posMain");
   if (!main) return;
@@ -706,7 +715,7 @@ function updateCurrentStop() {
       main.innerText = "📍 " + tr("At {stop}", { stop: name(simStops[idx + 1]) });
       sub.innerText = tr("Stop {i} of {n}", { i: idx + 2, n });
     } else {
-      main.innerText = `🚌 ${name(simStops[idx])} → ${name(simStops[idx + 1])}`;
+      setBusLine(main, `${name(simStops[idx])} → ${name(simStops[idx + 1])}`);
       sub.innerText = tr("{p}% of the way", { p: Math.round(t * 100) }) + " · " + tr("Stop {i} of {n}", { i: idx + 1, n });
     }
     bar.style.width = (n > 1 ? ((idx + t) / (n - 1)) * 100 : 100) + "%";
@@ -721,7 +730,8 @@ function updateCurrentStop() {
   });
   const AT_STOP_M = 150;
   const distText = bestD >= 1000 ? tr("{n} km", { n: (bestD / 1000).toFixed(1) }) : tr("{n} m", { n: Math.round(bestD) });
-  main.innerText = bestD <= AT_STOP_M ? "📍 " + tr("At {stop}", { stop: name(simStops[best]) }) : "🚌 " + tr("Near {stop}", { stop: name(simStops[best]) });
+  if (bestD <= AT_STOP_M) main.innerText = "📍 " + tr("At {stop}", { stop: name(simStops[best]) });
+  else setBusLine(main, tr("Near {stop}", { stop: name(simStops[best]) }));
   sub.innerText = tr("Stop {i} of {n}", { i: best + 1, n }) + (bestD <= AT_STOP_M ? "" : " · " + tr("{d} away", { d: distText }));
   bar.style.width = (n > 1 ? (best / (n - 1)) * 100 : 100) + "%";
 }

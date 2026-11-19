@@ -938,7 +938,7 @@ function renderTimeline() {
       <span>${tr("Bus location is about {n} km away from this route — the GPS fix may be inaccurate or the bus is on a diversion.", { n: busPos.offKm.toFixed(1) })}${busPos.noPosition ? "" : " " + tr("Showing the last position on the route.")}</span></div>`;
   }
   if (notYetArrived) {
-    bannerHtml += `<div class="banner banner-yellow"><span style="font-size:18px">🚌</span>
+    bannerHtml += `<div class="banner banner-yellow"><img src="/images/logo.png" alt="" style="width:20px;height:20px;flex-shrink:0;">
       <span>${tr("Bus is on its way — not yet reached your boarding stop")}</span></div>`;
   }
 
