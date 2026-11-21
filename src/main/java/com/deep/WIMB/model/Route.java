@@ -46,6 +46,11 @@ public class Route {
     private String sourceDepot;
     private String destinationDepot;
 
+    // Set when a DEPOT created this route from its dashboard (null = created by the admin).
+    // A depot may delete only routes it owns; the admin can always manage everything.
+    @Column(length = 100)
+    private String ownerDepot;
+
     @Column(nullable = false)
     private String filePath;    // legacy/informational only — kept for display, no longer read from
 
