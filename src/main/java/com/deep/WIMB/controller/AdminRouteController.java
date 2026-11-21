@@ -10,6 +10,7 @@ import com.deep.WIMB.model.AdminUpload;
 import com.deep.WIMB.model.Route;
 import com.deep.WIMB.repository.AdminUploadRepository;
 import com.deep.WIMB.repository.RouteRepository;
+import com.deep.WIMB.service.ReverseRouteService;
 import com.deep.WIMB.service.RouteExcelLoader;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -38,6 +39,7 @@ public class AdminRouteController {
     private final RouteRepository routeRepository;
     private final RouteExcelLoader routeExcelLoader;
     private final AdminUploadRepository adminUploadRepository;
+    private final ReverseRouteService reverseRouteService;
 
     @Value("${wimb.route.dir}")
     private String routeDir;
@@ -71,7 +73,10 @@ public class AdminRouteController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "busNumbers", required = false) String busNumbers,
             @RequestParam(value = "sourceDepot", required = false) String sourceDepot,
-            @RequestParam(value = "destinationDepot", required = false) String destinationDepot
+            @RequestParam(value = "destinationDepot", required = false) String destinationDepot,
+            // Also add the way back (B -> A) with its own reversed Excel sheet. On by default.
+            @RequestParam(value = "createReturn", required = false, defaultValue = "true") boolean createReturn,
+            @RequestParam(value = "returnRouteCode", required = false) String returnRouteCode
     ) {
         String code = routeCode == null ? "" : routeCode.trim().toUpperCase(Locale.ROOT);
         String name = routeName == null ? "" : routeName.trim();
@@ -154,6 +159,18 @@ public class AdminRouteController {
             response.put("stopCount", route.getStopCount());
             response.put("sourceDepot", resolvedSource);
             response.put("destinationDepot", resolvedDestination);
+
+            // The forward route is saved and live at this point. The return route is a bonus: whatever
+            // happens to it, the upload above has already succeeded and stays as uploaded.
+            if (createReturn) {
+                ReverseRouteService.Outcome back = reverseRouteService.createReturnRoute(route, returnRouteCode, null);
+                response.put("returnRoute", reverseRouteService.describe(back));
+                if (back.created()) {
+                    response.put("message", "Route added successfully, and its return route " + back.routeCode() + " too");
+                } else {
+                    response.put("returnWarning", back.message());
+                }
+            }
             if (sourceDepot == null || sourceDepot.isBlank() || destinationDepot == null || destinationDepot.isBlank()) {
                 response.put("warning", "Source/destination depot weren't provided, so they were guessed from the "
                         + "file's first and last stop (\"" + resolvedSource + "\" \u2192 \"" + resolvedDestination
