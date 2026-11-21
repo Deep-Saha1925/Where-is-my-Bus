@@ -696,7 +696,7 @@
             </div>
             <div class="panel-card-body">
                 <label class="brand-label-sm">Route code</label>
-                <input type="text" id="routeCodeInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. APD_FLK"/>
+                <input type="text" id="routeCodeInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. APD_FLK" oninput="updateReturnPlaceholder()"/>
 
                 <label class="brand-label-sm">Route name</label>
                 <input type="text" id="routeNameInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="e.g. Alipurduar ⇄ Falakata"/>
@@ -722,6 +722,14 @@
                     your Excel file, to tell them apart. Depots come from the Depot Codes tab — choose "Other" to type one that isn't listed.
                     Leave blank to guess from the file's first/last stop.
                 </div>
+
+                <label style="display:flex; gap:8px; align-items:flex-start; margin:4px 0 6px; font-size:13px; cursor:pointer;">
+                    <input type="checkbox" id="routeReturnCheck" checked onchange="onReturnToggle()" style="margin-top:3px;"/>
+                    <span><b>Also add the return route</b> (destination → source). A second Excel sheet is generated
+                    automatically: stops in reverse order, stop numbers renumbered, distances recalculated from the new start.
+                    The same buses are copied; departure times are not (set them in the 🚐 Schedule tab).</span>
+                </label>
+                <input type="text" id="routeReturnCodeInput" class="file-input" style="border-style:solid; margin-bottom:10px;" placeholder="Return route code — blank = auto"/>
 
                 <label class="brand-label-sm">Bus numbers (optional)</label>
                 <div id="routeBusesPicker"></div>
@@ -1378,6 +1386,25 @@
         }
     }
 
+    // Mirrors ReverseRouteLogic.reverseCode on the server, only to preview the automatic return code.
+    function reverseRouteCode(code) {
+        const c = (code || "").trim().toUpperCase();
+        if (!c) return "";
+        const parts = c.split("_");
+        return (parts.length === 2 && parts[0] && parts[1]) ? parts[1] + "_" + parts[0] : c + "_RETURN";
+    }
+    function updateReturnPlaceholder() {
+        const auto = reverseRouteCode(document.getElementById("routeCodeInput").value);
+        document.getElementById("routeReturnCodeInput").placeholder =
+            auto ? "Auto: " + auto + " (or type your own)" : "Return route code — blank = auto";
+    }
+    function onReturnToggle() {
+        const on = document.getElementById("routeReturnCheck").checked;
+        const box = document.getElementById("routeReturnCodeInput");
+        box.disabled = !on;
+        box.style.opacity = on ? "1" : "0.5";
+    }
+
     async function uploadRouteFile() {
         const codeInput = document.getElementById("routeCodeInput");
         const nameInput = document.getElementById("routeNameInput");
@@ -1408,6 +1435,8 @@
         formData.append("busNumbers", busPickerValue("routeBusesPicker"));
         formData.append("sourceDepot", getDepotPickValue("routeSourceDepotInput"));
         formData.append("destinationDepot", getDepotPickValue("routeDestDepotInput"));
+        formData.append("createReturn", document.getElementById("routeReturnCheck").checked ? "true" : "false");
+        formData.append("returnRouteCode", document.getElementById("routeReturnCodeInput").value.trim());
         formData.append("_csrf", document.getElementById("csrfToken").value);
 
         try {
@@ -1424,11 +1453,18 @@
                 return;
             }
 
-            statusEl.textContent = data.warning
+            let text = data.warning
                 ? `✅ ${data.message} (${data.stopCount} stops) — ⚠️ ${data.warning}`
                 : `✅ ${data.message} (${data.stopCount} stops): ${data.sourceDepot} → ${data.destinationDepot}`;
-            statusEl.style.color = data.warning ? "#d97706" : "#059669";
+            if (data.returnRoute && data.returnRoute.created) {
+                text += ` · ↩ ${data.returnRoute.routeCode} (${data.returnRoute.stopCount} stops): ${data.destinationDepot} → ${data.sourceDepot}`;
+            }
+            if (data.returnWarning) text += ` — ⚠️ ${data.returnWarning}`;
+            statusEl.textContent = text;
+            statusEl.style.color = (data.warning || data.returnWarning) ? "#d97706" : "#059669";
             codeInput.value = "";
+            document.getElementById("routeReturnCodeInput").value = "";
+            updateReturnPlaceholder();
             nameInput.value = "";
             fileInput.value = "";
             lastSuggestedName = "";

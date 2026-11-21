@@ -162,6 +162,8 @@
   .btn.danger { color:var(--bad); }
   .btn.danger:hover { background:var(--bad-bg); color:var(--bad); }
   a.btn { text-decoration:none; display:inline-block; }
+  .chk { display:flex; gap:10px; align-items:flex-start; font-size:13.5px; line-height:1.4; cursor:pointer; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:var(--card-2); }
+  .chk input { margin-top:3px; }
   .field input[type="file"] { padding:8px; }
   .pickrow { display:flex; gap:6px; flex-wrap:wrap; }
   .pick { font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; border:1px dashed var(--border); background:var(--card); color:var(--muted); cursor:pointer; }
@@ -278,6 +280,10 @@
       <label for="rfTimes">Departure times <span style="font-weight:400">(optional, comma separated)</span></label>
       <input id="rfTimes" type="text" autocomplete="off" placeholder="e.g. 06:00, 09:30, 14:15">
     </div>
+    <label class="chk" id="rfReturnWrap">
+      <input type="checkbox" id="rfReturn" checked>
+      <span id="rfReturnText">Also add the return route</span>
+    </label>
     <div class="form-msg" id="rfMsg" role="status" aria-live="polite"></div>
     <button class="btn primary" id="rfSave" type="button" style="padding:11px 16px;font-size:14px">Save route</button>
     <div class="hint">A route you add goes live straight away for passengers. The admin is notified and can fix or remove it.</div>
@@ -472,6 +478,7 @@ async function refresh() {
     $('title').textContent = data.depot + ' Depot';
     document.title = data.depot + ' Depot \u2013 WIMB';
     buses = data.buses || [];
+    depotName = data.depot || depotName;
     renderList();
     $('banner').classList.remove('show');
     $('liveDot').classList.remove('down');
@@ -852,17 +859,25 @@ $('rSend').addEventListener('click', sendRequest);
 $('rDesc').addEventListener('input', () => { $('rCount').textContent = $('rDesc').value.length + ' / 1000'; });
 
 /* ───────── routes ───────── */
+let depotName = '';
 let routes = [];
 let routesLoaded = false;
 let routeQuery = '';
 let editing = null;            // route being edited (null = adding)
 
-function toast(text) {
+function toast(text, ms) {
   const t = $('toast');
   t.textContent = text;
   t.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), 3500);
+  toast.timer = setTimeout(() => t.classList.remove('show'), ms || 3500);
+}
+
+function updateReturnText() {
+  const to = $('rfDest').value.trim() || 'the destination';
+  const from = depotName || 'your depot';
+  $('rfReturnText').textContent = 'Also add the return route (' + to + ' \u2192 ' + from + '). Its Excel sheet is made for you: '
+    + 'stops reversed and distances recalculated. Buses are copied; add departure times later.';
 }
 
 async function send(url, method, body) {
@@ -994,6 +1009,9 @@ function openRoute(route, trigger) {
   $('rfTimes').value = editing ? editing.departureTimes.join(', ') : '';
   renderPicks();
   rfMsg('');
+  $('rfReturnWrap').hidden = !!editing;      // the return route is only created together with a NEW route
+  $('rfReturn').checked = true;
+  updateReturnText();
   $('routePanel').classList.add('open');
   $('backdrop').classList.add('open');
   $('routePanel').setAttribute('aria-hidden', 'false');
@@ -1018,6 +1036,7 @@ async function saveRoute() {
   if (!editing && !file) { rfMsg('Please choose the stops Excel file.', 'err'); return; }
 
   const fd = new FormData();
+  if (!editing) fd.append('createReturn', $('rfReturn').checked ? 'true' : 'false');
   fd.append('routeName', name);
   fd.append('destinationDepot', dest);
   fd.append('busNumbers', $('rfBuses').value);
@@ -1034,7 +1053,12 @@ async function saveRoute() {
     const data = await r.json().catch(() => ({}));
     if (!r.ok) { rfMsg(data.error || 'Could not save. Please try again.', 'err'); return; }
     closeRoute();
-    toast((data.message || 'Saved') + (data.stopCount ? ' \u00B7 ' + data.stopCount + ' stops' : ''));
+    let note = (data.message || 'Saved') + (data.stopCount ? ' \u00B7 ' + data.stopCount + ' stops' : '');
+    if (data.returnRoute && data.returnRoute.created) {
+      note += ' \u00B7 return route ' + data.returnRoute.routeCode + ' added (' + data.returnRoute.stopCount + ' stops)';
+    }
+    if (data.returnWarning) note += ' \u00B7 ' + data.returnWarning;
+    toast(note, data.returnWarning ? 8000 : 3500);
     await loadRoutes();
   } catch (e) {
     rfMsg('Connection problem. Please try again.', 'err');
@@ -1059,6 +1083,7 @@ $('rtAdd').addEventListener('click', () => openRoute(null, $('rtAdd')));
 $('rtClose').addEventListener('click', closeRoute);
 $('rfSave').addEventListener('click', saveRoute);
 $('rfBuses').addEventListener('input', renderPicks);
+$('rfDest').addEventListener('input', updateReturnText);
 $('rtq').addEventListener('input', e => { routeQuery = e.target.value; renderRoutes(); });
 
 refresh();
