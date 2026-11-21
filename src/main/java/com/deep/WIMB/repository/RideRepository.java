@@ -25,6 +25,8 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
 
     List<Ride> findByStatus(RideStatus status);
 
+    boolean existsByRouteCodeAndStatus(String routeCode, RideStatus status);
+
     /** Newest trips of one bus first (used by the depot dashboard's bus detail view). */
     List<Ride> findTop10ByBusOrderByStartTimeDesc(Bus bus);
 
