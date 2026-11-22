@@ -206,6 +206,7 @@
   <nav class="tabs" role="tablist" aria-label="Dashboard sections">
     <button class="tab" id="tabBuses" role="tab" aria-selected="true" type="button"><img src="/images/logo.png" alt="" style="width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;"> Buses</button>
     <button class="tab" id="tabRoutes" role="tab" aria-selected="false" type="button">🗺️ Routes</button>
+    <button class="tab" id="tabFinder" role="tab" aria-selected="false" type="button">🔎 Find route</button>
   </nav>
 
   <div id="viewBuses">
@@ -233,6 +234,10 @@
       <button class="btn primary" id="rtAdd" type="button" style="padding:9px 16px">＋ Add route</button>
     </div>
     <div class="grid" id="routeList" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div></div>
+  </div>
+  <div id="viewFinder" hidden>
+    <div class="hint" style="margin-bottom:12px">Look up any route between two places. You can open every route to see its stops; you can change only the routes that start at your depot or that your depot added.</div>
+    <div id="finderRoot"></div>
   </div>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -327,6 +332,7 @@
   </div>
 </aside>
 
+<script src="/js/route-finder.js"></script>
 <script>
 /* ───────── helpers ───────── */
 const $ = id => document.getElementById(id);
@@ -893,12 +899,27 @@ async function send(url, method, body) {
 }
 
 function showTab(name) {
-  const routesOn = name === 'routes';
-  $('viewBuses').hidden = routesOn;
-  $('viewRoutes').hidden = !routesOn;
-  $('tabBuses').setAttribute('aria-selected', String(!routesOn));
-  $('tabRoutes').setAttribute('aria-selected', String(routesOn));
-  if (routesOn && !routesLoaded) loadRoutes();
+  $('viewBuses').hidden = name !== 'buses';
+  $('viewRoutes').hidden = name !== 'routes';
+  $('viewFinder').hidden = name !== 'finder';
+  $('tabBuses').setAttribute('aria-selected', String(name === 'buses'));
+  $('tabRoutes').setAttribute('aria-selected', String(name === 'routes'));
+  $('tabFinder').setAttribute('aria-selected', String(name === 'finder'));
+  if (name === 'routes' && !routesLoaded) loadRoutes();
+  if (name === 'finder') mountFinder();
+}
+
+// The Route Finder is built the first time its tab is opened.
+let finder = null;
+function mountFinder() {
+  if (finder) { finder.reload(); return; }       // already built: just refresh the list
+  finder = WIMBRouteFinder.mount($('finderRoot'), {
+    base: '/depot/api/route-finder',
+    csrf: () => csrf,
+    refreshCsrf: loadCsrf,
+    canChangeSource: false,
+    fileUrl: code => '/depot/api/routes/' + encodeURIComponent(code) + '/file'
+  });
 }
 
 async function loadRoutes() {
@@ -1079,6 +1100,7 @@ async function deleteRoute(r) {
 
 $('tabBuses').addEventListener('click', () => showTab('buses'));
 $('tabRoutes').addEventListener('click', () => showTab('routes'));
+$('tabFinder').addEventListener('click', () => showTab('finder'));
 $('rtAdd').addEventListener('click', () => openRoute(null, $('rtAdd')));
 $('rtClose').addEventListener('click', closeRoute);
 $('rfSave').addEventListener('click', saveRoute);

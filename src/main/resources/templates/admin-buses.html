@@ -469,6 +469,7 @@
     <button class="tab-btn active" id="tabBtnBuses" onclick="switchTab('buses')"><img src="/images/logo.png" alt="" style="width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;"> Active Buses</button>
     <button class="tab-btn" id="tabBtnDepots" onclick="switchTab('depots')">🏢 Depot Codes</button>
     <button class="tab-btn" id="tabBtnRoutes" onclick="switchTab('routes')">🛣️ Routes</button>
+    <button class="tab-btn" id="tabBtnFinder" onclick="switchTab('finder')">🔎 Route Finder</button>
     <button class="tab-btn" id="tabBtnBusRoster" onclick="switchTab('busroster')">🚐 Schedule</button>
     <button class="tab-btn" id="tabBtnNotices" onclick="switchTab('notices')">📢 Notices</button>
     <button class="tab-btn" id="tabBtnReports" onclick="switchTab('reports')">📥 Reports</button>
@@ -815,6 +816,24 @@
     </div>
 </div><!-- /tab-routes -->
 
+<!-- ── ROUTE FINDER TAB ── -->
+<div id="tab-finder" class="tab-panel" style="display:none;">
+    <div class="depot-layout">
+        <div class="panel-card full-width">
+            <div class="panel-card-header">
+                <div class="panel-icon">🔎</div>
+                <div>
+                    <div class="panel-title">Route Finder</div>
+                    <div class="panel-sub">Find the route between two places, then check or update its details and stops</div>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <div id="routeFinderRoot"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── SCHEDULE TAB ── -->
 <div id="tab-busroster" class="tab-panel" style="display:none;">
     <div class="depot-layout">
@@ -1058,6 +1077,7 @@
 <script src="/js/admin-buses.js"></script>
 <script src="/js/admin-notices.js"></script>
 <script src="/js/admin-reports.js"></script>
+<script src="/js/route-finder.js"></script>
 <script>
 
     // Fetch CSRF token from Spring Security endpoint
@@ -2241,19 +2261,35 @@
         document.getElementById("tab-buses").style.display      = tab === "buses"     ? "" : "none";
         document.getElementById("tab-depots").style.display     = tab === "depots"    ? "" : "none";
         document.getElementById("tab-routes").style.display     = tab === "routes"    ? "" : "none";
+        document.getElementById("tab-finder").style.display     = tab === "finder"    ? "" : "none";
         document.getElementById("tab-busroster").style.display  = tab === "busroster" ? "" : "none";
         document.getElementById("tab-notices").style.display    = tab === "notices"   ? "" : "none";
         document.getElementById("tab-reports").style.display    = tab === "reports"   ? "" : "none";
         document.getElementById("tabBtnBuses").classList.toggle("active", tab === "buses");
         document.getElementById("tabBtnDepots").classList.toggle("active", tab === "depots");
         document.getElementById("tabBtnRoutes").classList.toggle("active", tab === "routes");
+        document.getElementById("tabBtnFinder").classList.toggle("active", tab === "finder");
         document.getElementById("tabBtnBusRoster").classList.toggle("active", tab === "busroster");
         document.getElementById("tabBtnNotices").classList.toggle("active", tab === "notices");
         document.getElementById("tabBtnReports").classList.toggle("active", tab === "reports");
         localStorage.setItem("wimb_admin_tab", tab);
+        if (tab === "finder") mountRouteFinder();
+    }
+
+    // The Route Finder is built the first time its tab is opened.
+    let routeFinderMounted = false;
+    function mountRouteFinder() {
+        if (routeFinderMounted) return;
+        routeFinderMounted = true;
+        WIMBRouteFinder.mount(document.getElementById("routeFinderRoot"), {
+            base: "/admin/route-finder",
+            csrf: () => ({ header: "X-CSRF-TOKEN", token: document.getElementById("csrfToken").value }),
+            canChangeSource: true,
+            fileUrl: code => "/admin/routes/" + encodeURIComponent(code) + "/file"
+        });
     }
     const savedTab = localStorage.getItem("wimb_admin_tab");
-    const validTabs = ["depots", "routes", "busroster", "notices", "reports"];
+    const validTabs = ["depots", "routes", "finder", "busroster", "notices", "reports"];
     switchTab(validTabs.includes(savedTab) ? savedTab : "buses");
 
     /* ── THEME ── */
