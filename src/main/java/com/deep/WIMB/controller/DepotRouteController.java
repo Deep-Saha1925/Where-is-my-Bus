@@ -15,6 +15,7 @@ import com.deep.WIMB.repository.RideRepository;
 import com.deep.WIMB.repository.RouteRepository;
 import com.deep.WIMB.service.DepotService;
 import com.deep.WIMB.service.ReverseRouteService;
+import com.deep.WIMB.service.RouteAccess;
 import com.deep.WIMB.service.RouteExcelLoader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -267,17 +268,12 @@ public class DepotRouteController {
         return auth.getName().substring(DepotService.LOGIN_PREFIX.length());
     }
 
-    private static String norm(String s) {
-        return s == null ? "" : s.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
-    }
-    private static boolean same(String a, String b) { return !norm(a).isEmpty() && norm(a).equals(norm(b)); }
+    private static String norm(String s) { return RouteAccess.norm(s); }
+    private static boolean same(String a, String b) { return RouteAccess.same(a, b); }
 
-    /** Owner, or an admin-created route that is registered to start at this depot. */
-    static boolean canEdit(Route r, String depot) {
-        if (r.getOwnerDepot() != null) return same(r.getOwnerDepot(), depot);
-        return same(r.getSourceDepot(), depot);
-    }
-    static boolean canDelete(Route r, String depot) { return same(r.getOwnerDepot(), depot); }
+    /** Owner, or an admin-created route that is registered to START at this depot. */
+    static boolean canEdit(Route r, String depot) { return RouteAccess.canEdit(r, depot); }
+    static boolean canDelete(Route r, String depot) { return RouteAccess.canDelete(r, depot); }
 
     /** The route if this depot may at least see it, else null (so unknown and foreign codes look the same). */
     private Route visible(String routeCode, Authentication auth) {
