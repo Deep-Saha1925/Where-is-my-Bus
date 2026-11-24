@@ -10,7 +10,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
 /**
  * Owner of a set of buses. Just the depot's name, matching the name in the admin's
  * "Depot Codes" list. The login password is that list's code, so nothing secret is stored here.
@@ -20,7 +19,6 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class Depot {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
