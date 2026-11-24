@@ -743,7 +743,7 @@ public class AdminRouteController {
                     {"APD_FLK", "Alipurduar -> Falakata", "09:30"},
                     {"APD_FLK", "Alipurduar -> Falakata", "14:15"},
                     {"APD_SLG", "Alipurduar -> Siliguri", "07:45"},
-
+                    {"FLK_SLG", "Falakata -> Siliguri", "09:45"}
             };
             for (int i = 0; i < examples.length; i++) {
                 Row row = sheet.createRow(i + 1);
