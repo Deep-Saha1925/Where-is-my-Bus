@@ -8,6 +8,7 @@ package com.deep.WIMB.controller;
 
 import com.deep.WIMB.config.InputRules;
 import com.deep.WIMB.service.ClientIpResolver;
+import com.deep.WIMB.service.DepotService;
 import com.deep.WIMB.service.DriverAccessService;
 import com.deep.WIMB.service.DriverTokenService;
 import com.deep.WIMB.service.LoginRateLimiter;
@@ -29,6 +30,7 @@ public class DriverAuthController {
     private static final int MAX_FIELD_LENGTH = 100; // keeps absurdly long inputs out of the limiter's keys
 
     private final DriverAccessService driverAccessService;
+    private final DepotService depotService;
     private final DriverTokenService driverTokenService;
     private final LoginRateLimiter loginRateLimiter;
     private final ClientIpResolver clientIpResolver;
@@ -75,6 +77,17 @@ public class DriverAuthController {
                 return tooManyAttempts(now, ip, depotName, busNumber);
             }
             return ResponseEntity.status(401).body(Map.of("error", "Invalid depot or code"));
+        }
+
+        // Attach this bus to the depot the driver logged in with, so it appears on that depot's
+        // dashboard. Never lets a problem here block the login itself.
+        try {
+            if (!depotService.claimBusForLogin(depotName, busNumber)) {
+                log.warn("Bus {} logged in under depot {} but is assigned to a different depot; not moved",
+                        busNumber, depotName.trim());
+            }
+        } catch (Exception e) {
+            log.warn("Could not link bus {} to depot {}: {}", busNumber, depotName.trim(), e.getMessage());
         }
 
         return ResponseEntity.ok(Map.of("token", driverTokenService.issueToken(busNumber)));

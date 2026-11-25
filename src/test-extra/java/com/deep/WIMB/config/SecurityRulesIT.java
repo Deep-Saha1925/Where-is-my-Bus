@@ -104,6 +104,8 @@ class SecurityRulesIT {
         assertSentToLogin("/admin/depots");
         assertSentToLogin("/admin/routes");
         assertSentToLogin("/admin-buses.html");
+        assertSentToLogin("/depot/dashboard");
+        assertSentToLogin("/depot/api/buses");
         assertSentToLogin("/swagger-ui.html");
         assertSentToLogin("/v3/api-docs");
     }

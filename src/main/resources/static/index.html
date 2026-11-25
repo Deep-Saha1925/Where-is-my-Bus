@@ -689,8 +689,61 @@
             .header-sub { display: none; }
             .header-title { font-size: 16px; }
             .app-header { gap: 6px; }
-            .app-header a[href="/admin"] { display: none; }
             .theme-btn { width: 40px; height: 40px; }
+        }
+
+        /* ── Header hamburger (mobile): holds the Driver + Staff/Admin logins ── */
+        .menu-wrap { display: none; position: relative; }
+        .header-menu {
+            display: none; position: absolute; right: 0; top: calc(100% + 8px); min-width: 200px; z-index: 200;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.25); padding: 6px; animation: tabOpen 0.18s ease both;
+        }
+        .header-menu button { width: 100%; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; color: var(--text-primary, inherit); }
+        .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+        .header-menu.open { display: block; }
+        .header-menu a, .header-menu button {
+            display: flex; align-items: center; gap: 10px; padding: 12px 12px; border-radius: 10px;
+            color: var(--text-primary, inherit); text-decoration: none; font-size: 14px; font-weight: 600;
+        }
+        .header-menu a i, .header-menu button i { width: 18px; text-align: center; color: #6366f1; }
+        .header-menu a:hover, .header-menu button:hover, .header-menu a:active, .header-menu button:active { background: var(--bg-input); }
+        @media (max-width: 640px) {
+            .hdr-login, .app-header button[data-lang-toggle], .app-header #themeBtn { display: none !important; }
+            .menu-wrap { display: block; }
+        }
+
+        /* ── Mobile: search modes become a stacked accordion (tap a row → it expands) ── */
+        @media (max-width: 640px) {
+            .search-card { display: flex; flex-direction: column; }
+            .search-title { order: 0; }
+            .search-tabs { display: contents; }
+            #tabBtnLive { order: 1; } #liveSearchPanel  { order: 2; }
+            #tabBtnDepot{ order: 3; } #depotSearchPanel { order: 4; }
+            #tabBtnBus  { order: 5; } #busSearchPanel   { order: 6; }
+            #recentSection { order: 7; }
+            .search-tab-btn {
+                flex: none; width: 100%; justify-content: flex-start;
+                padding: 14px 14px; margin-top: 10px; font-size: 14px;
+                border-radius: 12px; position: relative;
+            }
+            .search-tab-btn i { width: 18px; text-align: center; }
+            .search-tab-btn::after {
+                content: "\203A"; margin-left: auto; font-size: 22px; line-height: 1;
+                transition: transform 0.2s;
+            }
+            .search-tab-btn.active {
+                padding: 18px 14px; font-size: 15.5px;
+                border-radius: 12px 12px 0 0; margin-bottom: 0;
+                box-shadow: 0 6px 18px rgba(79,70,229,0.28);
+            }
+            .search-tab-btn.active::after { transform: rotate(90deg); }
+            #liveSearchPanel, #depotSearchPanel, #busSearchPanel {
+                padding: 14px; border: 1px solid var(--border); border-top: none;
+                border-radius: 0 0 12px 12px; background: var(--bg-input);
+                animation: tabOpen 0.25s ease both;
+            }
+            @keyframes tabOpen { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
         }
     </style>
 </head>
@@ -720,17 +773,34 @@
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <a href="/driver" class="theme-btn" title="Driver login" aria-label="Driver login"
+            <a href="/driver" class="theme-btn hdr-login" title="Driver login" aria-label="Driver login"
                style="text-decoration:none;">
                 <i class="fa-solid fa-bus" style="font-size:15px; color:var(--text-muted);"></i>
             </a>
-            <a href="/admin" class="theme-btn" title="Staff / Admin login" aria-label="Staff or Admin login"
+            <a href="/admin" class="theme-btn hdr-login" title="Staff / Admin login" aria-label="Staff or Admin login"
                style="text-decoration:none;">
                 <i class="fa-solid fa-lock" style="font-size:14px; color:var(--text-muted);"></i>
             </a>
             <button type="button" class="theme-btn" data-lang-toggle style="font-size:12px; font-weight:700; width:auto; min-width:38px; padding:0 10px; cursor:pointer;">বাং</button>
             <button class="theme-btn" onclick="toggleTheme()" id="themeBtn"
                     aria-label="Toggle dark mode">🌙</button>
+            <div class="menu-wrap">
+                <button type="button" class="theme-btn" id="menuBtn" aria-label="Menu" aria-haspopup="true"
+                        aria-expanded="false" onclick="toggleHeaderMenu(event)">
+                    <i class="fa-solid fa-bars" style="font-size:15px; color:var(--text-muted);"></i>
+                </button>
+                <div class="header-menu" id="headerMenu" role="menu">
+                    <a href="/driver" role="menuitem"><i class="fa-solid fa-bus"></i> Driver login</a>
+                    <a href="/admin" role="menuitem"><i class="fa-solid fa-lock"></i> Staff / Admin login</a>
+                    <div class="menu-sep"></div>
+                    <button type="button" role="menuitem" onclick="document.querySelector('.app-header button[data-lang-toggle]').click()">
+                        <i class="fa-solid fa-language"></i> Language: <span data-lang-toggle style="pointer-events:none;font-weight:800;">বাং</span>
+                    </button>
+                    <button type="button" role="menuitem" onclick="document.getElementById('themeBtn').click()">
+                        <i class="fa-solid fa-circle-half-stroke"></i> <span id="themeMenuLabel">Dark mode</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -932,7 +1002,7 @@
             </div>
 
             <div id="noResults" class="no-results" style="display:none;">
-                <div style="font-size:40px; margin-bottom:10px; opacity:0.4;">🚌</div>
+                <div style="margin-bottom:10px; opacity:0.5;"><img src="/images/logo.png" alt="" style="width:48px; height:48px;"></div>
                 <div id="noResultsTitle" style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">No active buses</div>
                 <div id="noResultsSub" style="font-size:13px; color:var(--text-muted);">No buses are currently running on this route</div>
             </div>
@@ -952,6 +1022,18 @@
         &copy; 2025 Where Is My Bus &middot; Built by Deep Saha
     </footer>
 
+    <script>
+        function toggleHeaderMenu(e) {
+            e.stopPropagation();
+            const m = document.getElementById("headerMenu");
+            const open = m.classList.toggle("open");
+            document.getElementById("menuBtn").setAttribute("aria-expanded", open);
+        }
+        document.addEventListener("click", function () {
+            const m = document.getElementById("headerMenu");
+            if (m) { m.classList.remove("open"); document.getElementById("menuBtn").setAttribute("aria-expanded", "false"); }
+        });
+    </script>
     <script src="js/geo-utils.js"></script>
     <script src="js/index.js"></script>
     <script src="js/upcoming-buses.js"></script>
@@ -965,6 +1047,8 @@
         function applyTheme() {
             appBody.classList.toggle("dark-mode", isDark);
             themeBtn.textContent = isDark ? "☀️" : "🌙";
+            const tl = document.getElementById("themeMenuLabel");
+            if (tl) tl.textContent = isDark ? "Light mode" : "Dark mode";
         }
         function toggleTheme() {
             isDark = !isDark;

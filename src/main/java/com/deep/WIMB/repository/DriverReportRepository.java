@@ -35,5 +35,11 @@ public interface DriverReportRepository extends JpaRepository<DriverReport, Long
 
     long countBySourceAndBusNumberAndCreatedAtAfter(String source, String busNumber, LocalDateTime after);
 
+    /** A depot's own requests only. */
+    @Query("select r from DriverReport r where r.source = 'DEPOT' and r.depotName = :depot order by r.createdAt desc")
+    List<DriverReport> findOwnByDepot(@Param("depot") String depot, Pageable pageable);
+
+    long countByDepotNameAndSourceAndCreatedAtAfter(String depotName, String source, LocalDateTime after);
+
     long countByStatus(String status);
 }

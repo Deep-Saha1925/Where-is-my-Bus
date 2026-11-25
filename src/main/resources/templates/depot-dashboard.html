@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WIMB – Depot Dashboard</title>
+<style>
+  :root {
+    --bg:#f3f5f9; --card:#ffffff; --card-2:#f8f9fc; --text:#171a21; --muted:#667085; --border:#e3e7ee;
+    --ok:#16a34a; --ok-bg:#e8f7ee; --warn:#d97706; --warn-bg:#fdf2e0; --off:#8b93a3; --off-bg:#eef0f4;
+    --accent:#2563eb; --accent-bg:#e8effd; --shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+    --shadow-lg:0 12px 32px rgba(16,24,40,.18);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e1116; --card:#171b22; --card-2:#1d222b; --text:#e9ecf1; --muted:#98a2b3; --border:#2a303b;
+    --ok:#34d27b; --ok-bg:#12281d; --warn:#f0a43a; --warn-bg:#2d2310; --off:#7d8696; --off-bg:#222833;
+    --accent:#6ea0ff; --accent-bg:#17223a; --shadow:none; --shadow-lg:0 12px 32px rgba(0,0,0,.55);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text);
+         padding-bottom:env(safe-area-inset-bottom); }
+  button { font:inherit; color:inherit; }
+
+  /* ───── header ───── */
+  header { position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:12px;
+           padding:12px 20px; padding-top:calc(12px + env(safe-area-inset-top)); background:var(--card); border-bottom:1px solid var(--border); }
+  .brand { display:flex; align-items:center; gap:10px; min-width:0; }
+  .brand .logo { width:36px; height:36px; flex:none; }
+  .brand .logo img { width:100%; height:100%; display:block; }
+  .brand h1 { margin:0; font-size:17px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand small { color:var(--muted); font-size:12px; display:flex; align-items:center; gap:6px; }
+  .live { width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 0 rgba(22,163,74,.5); animation:pulse 2s infinite; }
+  .live.down { background:#dc2626; animation:none; }
+  @keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(22,163,74,0); } 100% { box-shadow:0 0 0 0 rgba(22,163,74,0); } }
+  .head-actions { display:flex; gap:8px; align-items:center; }
+  .btn { font-size:13px; font-weight:600; padding:7px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted); cursor:pointer; }
+  .btn:hover { background:var(--card-2); color:var(--text); }
+  .btn.icon { width:34px; height:34px; padding:0; display:grid; place-items:center; font-size:15px; }
+
+  main { max-width:1120px; margin:0 auto; padding:20px 16px 40px; }
+
+  /* ───── stats ───── */
+  .summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:18px; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+  .stat::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--c, var(--accent)); }
+  .stat b { display:block; font-size:28px; line-height:1.1; }
+  .stat span { color:var(--muted); font-size:13px; }
+
+  /* ───── toolbar ───── */
+  .toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .search { flex:1 1 220px; position:relative; }
+  .search input { width:100%; padding:10px 12px 10px 36px; font:inherit; font-size:14px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); }
+  .search input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .search::before { content:"🔍"; position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:14px; opacity:.6; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { font-size:13px; font-weight:600; padding:7px 13px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted); cursor:pointer; }
+  .chip .n { margin-left:6px; font-weight:700; opacity:.75; }
+  .chip[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+  /* ───── bus cards ───── */
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+  .bus { all:unset; box-sizing:border-box; display:block; cursor:pointer; background:var(--card); border:1px solid var(--border); border-radius:14px;
+         padding:14px 16px 12px 20px; box-shadow:var(--shadow); position:relative; overflow:hidden; transition:transform .12s, box-shadow .12s, border-color .12s; }
+  .bus::before { content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--c); }
+  .bus:hover { transform:translateY(-2px); border-color:var(--c); box-shadow:var(--shadow-lg); }
+  .bus:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  .bus-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .num { font-weight:700; font-size:17px; letter-spacing:.2px; }
+  .pill { font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; color:var(--c); background:var(--bg-c); white-space:nowrap; display:inline-flex; align-items:center; gap:6px; }
+  .pill::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--c); }
+  .route { margin-top:10px; font-size:14px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .route .arrow { color:var(--muted); }
+  .route.none { color:var(--muted); }
+  .meta { margin-top:8px; display:flex; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:12.5px; }
+  .more { margin-top:10px; font-size:12px; font-weight:600; color:var(--accent); }
+  .running  { --c:var(--ok);   --bg-c:var(--ok-bg); }
+  .silent   { --c:var(--warn); --bg-c:var(--warn-bg); }
+  .idle     { --c:var(--off);  --bg-c:var(--off-bg); }
+
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); background:var(--card); border:1px dashed var(--border); border-radius:14px; padding:36px 20px; line-height:1.5; }
+  .skeleton { height:112px; border-radius:14px; background:linear-gradient(90deg, var(--card) 25%, var(--card-2) 50%, var(--card) 75%); background-size:200% 100%; animation:shimmer 1.3s infinite; border:1px solid var(--border); }
+  @keyframes shimmer { to { background-position:-200% 0; } }
+  .banner { display:none; margin-bottom:14px; padding:10px 14px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-size:13px; font-weight:600; }
+  .banner.show { display:block; }
+
+  /* ───── detail drawer ───── */
+  .backdrop { position:fixed; inset:0; background:rgba(8,12,20,.45); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40; }
+  .backdrop.open { opacity:1; pointer-events:auto; }
+  .drawer { position:fixed; top:0; right:0; bottom:0; width:min(460px, 100vw); background:var(--card); z-index:50; box-shadow:var(--shadow-lg);
+            transform:translateX(100%); transition:transform .25s ease; display:flex; flex-direction:column; border-left:1px solid var(--border); }
+  .drawer.open { transform:none; }
+  .d-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px 18px; padding-top:calc(16px + env(safe-area-inset-top)); border-bottom:1px solid var(--border); }
+  .d-head h2 { margin:0 0 6px; font-size:20px; }
+  .d-body { overflow-y:auto; padding:16px 18px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:16px; }
+  .kv { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .kv > div { background:var(--card-2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+  .kv .wide { grid-column:1/-1; }
+  .kv small { display:block; color:var(--muted); font-size:12px; margin-bottom:3px; }
+  .kv b { font-size:15px; }
+  .map-wrap { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--card-2); }
+  #map { height:250px; }
+  .map-note { padding:22px 16px; text-align:center; color:var(--muted); font-size:13px; }
+  .map-foot { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 12px; font-size:12.5px; color:var(--muted); border-top:1px solid var(--border); }
+  .map-foot a { color:var(--accent); font-weight:600; text-decoration:none; white-space:nowrap; }
+  .d-sec h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+  .trip { display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+  .trip:last-child { border-bottom:0; }
+  .trip small { color:var(--muted); display:block; margin-top:2px; }
+  .trip .tag { align-self:center; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; background:var(--ok-bg); color:var(--ok); }
+  .bus-marker { width:38px; height:38px; border-radius:50%; background:#fff; border:3px solid var(--accent); box-shadow:0 2px 8px rgba(0,0,0,.4); overflow:hidden; }
+  .bus-marker img { width:100%; height:100%; display:block; }
+  .bus-marker.silent { border-color:var(--warn); }
+
+  /* ───── request / report panel ───── */
+  :root { --bad:#dc2626; --bad-bg:#fdecec; }
+  :root[data-theme="dark"] { --bad:#f87171; --bad-bg:#331616; }
+  .btn .badge { margin-left:6px; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; display:inline-grid; place-items:center; }
+  .btn .badge[hidden] { display:none; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary:hover { filter:brightness(1.08); color:#fff; background:var(--accent); }
+  .btn[disabled] { opacity:.6; cursor:default; }
+  .types { display:flex; flex-wrap:wrap; gap:8px; }
+  .types .chip { display:inline-flex; gap:6px; align-items:center; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-size:12.5px; font-weight:700; color:var(--muted); }
+  .field input, .field select, .field textarea { font:inherit; font-size:14px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); width:100%; }
+  .field textarea { resize:vertical; min-height:110px; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .hint { font-size:12.5px; color:var(--muted); line-height:1.4; }
+  .count { text-align:right; font-size:11.5px; color:var(--muted); }
+  .form-msg { font-size:13px; font-weight:600; min-height:18px; }
+  .form-msg.ok { color:var(--ok); } .form-msg.err { color:var(--bad); }
+  .req { padding:12px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+  .req:last-child { border-bottom:0; }
+  .req-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .req-desc { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text); }
+  .req small { color:var(--muted); display:block; margin-top:4px; }
+  .reply { margin-top:8px; padding:9px 12px; border-radius:10px; background:var(--accent-bg); border-left:4px solid var(--accent); }
+  .reply b { display:block; font-size:12px; color:var(--accent); margin-bottom:2px; }
+  .newtag { font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:999px; background:var(--bad); color:#fff; margin-left:6px; }
+  .s-new { --c:var(--accent); --bg-c:var(--accent-bg); }
+  .s-review { --c:var(--warn); --bg-c:var(--warn-bg); }
+  .s-info { --c:var(--warn); --bg-c:var(--warn-bg); }
+  .s-ok { --c:var(--ok); --bg-c:var(--ok-bg); }
+  .s-no { --c:var(--bad); --bg-c:var(--bad-bg); }
+
+  /* ───── tabs + routes ───── */
+  .tabs { display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border); }
+  .tab { background:none; border:0; border-bottom:3px solid transparent; padding:10px 16px; font-size:14px; font-weight:700; color:var(--muted); cursor:pointer; margin-bottom:-1px; }
+  .tab[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab:hover { color:var(--text); }
+  [hidden] { display:none !important; }
+  .rt { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px 16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px; }
+  .rt-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .rt-name { font-weight:700; font-size:16px; overflow-wrap:anywhere; }
+  .rt-sub { color:var(--muted); font-size:12.5px; }
+  .own { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; background:var(--accent-bg); color:var(--accent); white-space:nowrap; }
+  .own.ro { background:var(--off-bg); color:var(--off); }
+  .rt-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; font-size:12.5px; color:var(--muted); }
+  .tag { font-size:12px; font-weight:600; padding:3px 9px; border-radius:8px; background:var(--card-2); border:1px solid var(--border); color:var(--text); }
+  .rt-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+  .btn.danger { color:var(--bad); }
+  .btn.danger:hover { background:var(--bad-bg); color:var(--bad); }
+  a.btn { text-decoration:none; display:inline-block; }
+  .chk { display:flex; gap:10px; align-items:flex-start; font-size:13.5px; line-height:1.4; cursor:pointer; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:var(--card-2); }
+  .chk input { margin-top:3px; }
+  .field input[type="file"] { padding:8px; }
+  .pickrow { display:flex; gap:6px; flex-wrap:wrap; }
+  .pick { font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; border:1px dashed var(--border); background:var(--card); color:var(--muted); cursor:pointer; }
+  .pick[aria-pressed="true"] { border-style:solid; border-color:var(--accent); background:var(--accent-bg); color:var(--accent); }
+  .toast { position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translate(-50%, 20px); background:var(--text); color:var(--bg); padding:10px 18px; border-radius:999px; font-size:13.5px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:80; max-width:90vw; text-align:center; }
+  .toast.show { opacity:1; transform:translate(-50%, 0); }
+
+  @media (max-width:700px) {
+    .btn .lbl { display:none; }
+    .summary { grid-template-columns:repeat(2, 1fr); }
+    .drawer { top:auto; width:100%; height:90vh; height:90dvh; border-left:0; border-radius:20px 20px 0 0; transform:translateY(100%); }
+    .drawer.open { transform:none; }
+    header { padding-left:14px; padding-right:14px; }
+  }
+  /* ═════ UI refresh: matches passenger app (indigo, rounded, app-like) ═════ */
+  :root { --accent:#4f46e5; --accent-bg:#eef0ff; --grad:linear-gradient(135deg,#6366f1,#4338ca); --r:18px; }
+  :root[data-theme="dark"] { --accent:#818cf8; --accent-bg:#1c2040; --grad:linear-gradient(135deg,#4f46e5,#3730a3); }
+  body { background:radial-gradient(1200px 400px at 50% -120px, color-mix(in srgb,var(--accent) 14%,transparent), transparent) var(--bg) no-repeat; }
+
+  header { background:var(--grad); color:#fff; border-bottom:0; box-shadow:0 4px 18px rgba(67,56,202,.35); }
+  .brand .logo { background:#fff; border-radius:12px; padding:3px; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+  .brand small { color:rgba(255,255,255,.8); }
+  header .btn { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.28); color:#fff; backdrop-filter:blur(6px); }
+  header .btn:hover { background:rgba(255,255,255,.28); color:#fff; }
+  header .btn.primary { background:#fff; color:#4338ca; border-color:#fff; }
+  header .btn.primary:hover { background:#fff; color:#4338ca; }
+  .btn { transition:background .15s, transform .1s, filter .15s; }
+  .btn:active, .chip:active, .tab:active { transform:scale(.96); }
+
+  /* stats */
+  .summary { gap:12px; margin-top:4px; }
+  .stat { border-radius:var(--r); padding:16px 16px 14px 18px; border:1px solid color-mix(in srgb,var(--c) 22%,var(--border));
+          background:linear-gradient(160deg, color-mix(in srgb,var(--c) 11%,var(--card)), var(--card) 70%); }
+  .stat::before { width:0; }
+  .stat::after { content:""; position:absolute; right:-14px; top:-14px; width:64px; height:64px; border-radius:50%; background:color-mix(in srgb,var(--c) 14%,transparent); }
+  .stat b { font-size:32px; font-weight:800; color:var(--c); letter-spacing:-.5px; position:relative; z-index:1; }
+  .stat span { font-weight:600; position:relative; z-index:1; }
+
+  /* segmented tabs */
+  .tabs { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:5px; gap:4px; box-shadow:var(--shadow); margin:4px 0 16px; }
+  .tab { flex:1; border:0; border-radius:10px; padding:10px 8px; margin:0; text-align:center; transition:background .15s, color .15s; }
+  .tab:hover { background:var(--card-2); }
+  .tab[aria-selected="true"] { background:var(--grad); color:#fff; box-shadow:0 4px 12px rgba(79,70,229,.35); }
+
+  /* toolbar + chips */
+  .search input { border-radius:14px; padding:12px 14px 12px 38px; box-shadow:var(--shadow); }
+  .chip { transition:all .15s; }
+  .chip[aria-pressed="true"] { background:var(--grad); border-color:transparent; box-shadow:0 3px 10px rgba(79,70,229,.3); }
+
+  /* bus + route cards */
+  .bus, .rt { border-radius:var(--r); }
+  .bus { padding:16px 18px 14px 22px; }
+  .bus::before { width:6px; border-radius:0 6px 6px 0; }
+  .bus:hover { transform:translateY(-3px); }
+  .num { font-size:18px; font-weight:800; }
+  .pill { padding:5px 11px; }
+  .route { background:var(--card-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px; margin-top:12px; }
+  .route.none { background:transparent; border-style:dashed; }
+  .more { display:inline-block; padding:5px 12px; border-radius:999px; background:var(--accent-bg); }
+  .rt { transition:transform .12s, box-shadow .12s; }
+  .rt:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+  .btn.primary { background:var(--grad); border-color:transparent; }
+  .empty { border-radius:var(--r); }
+  .skeleton { border-radius:var(--r); }
+
+  /* drawers */
+  .drawer { border-radius:24px 0 0 24px; }
+  .d-head { background:linear-gradient(180deg,var(--card-2),var(--card)); }
+  .kv > div, .map-wrap { border-radius:14px; }
+  .field input, .field select, .field textarea { border-radius:14px; }
+
+  @media (max-width:700px) {
+    main { padding:14px 12px calc(96px + env(safe-area-inset-bottom)); }
+    header { border-radius:0 0 20px 20px; }
+    .brand h1 { font-size:16px; }
+    .stat b { font-size:28px; }
+    /* bottom navigation bar */
+    .tabs { position:fixed; left:12px; right:12px; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:30; margin:0; padding:6px;
+            border-radius:20px; box-shadow:0 10px 30px rgba(16,24,40,.28); background:color-mix(in srgb,var(--card) 92%,transparent); backdrop-filter:blur(10px); }
+    .tab { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; padding:8px 4px; }
+    .toolbar { gap:10px; }
+    .chips { flex-wrap:nowrap; overflow-x:auto; width:100%; padding-bottom:4px; scrollbar-width:none; }
+    .chips::-webkit-scrollbar { display:none; }
+    .chip { white-space:nowrap; flex:none; }
+    .grid { grid-template-columns:1fr; }
+    .drawer { border-radius:24px 24px 0 0; }
+    .drawer::before { content:""; align-self:center; width:42px; height:5px; border-radius:3px; background:var(--border); margin:8px 0 0; flex:none; }
+    .toast { bottom:calc(90px + env(safe-area-inset-bottom)); }
+  }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><img src="/images/logo.png" alt="Where Is My Bus"></div>
+    <div>
+      <h1 id="title">Depot Dashboard</h1>
+      <small><span class="live" id="liveDot"></span><span id="updated">Connecting…</span></small>
+    </div>
+  </div>
+  <div class="head-actions">
+    <button class="btn primary" id="reqBtn" type="button" aria-label="Request or report to admin">📝<span class="lbl">&nbsp;Request / report</span><span class="badge" id="reqBadge" hidden>0</span></button>
+    <button class="btn icon" id="themeBtn" type="button" title="Switch theme" aria-label="Switch theme">🌓</button>
+    <form action="/logout" method="post" style="margin:0">
+      <input type="hidden" name="_csrf" id="csrfToken">
+      <button class="btn" type="submit">Sign out</button>
+    </form>
+  </div>
+</header>
+
+<main>
+  <div class="banner" id="banner">Connection lost – retrying…</div>
+
+  <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+    <button class="tab" id="tabBuses" role="tab" aria-selected="true" type="button"><img src="/images/logo.png" alt="" style="width:1.2em;height:1.2em;vertical-align:-0.22em;border-radius:50%;"> Buses</button>
+    <button class="tab" id="tabRoutes" role="tab" aria-selected="false" type="button">🗺️ Routes</button>
+    <button class="tab" id="tabFinder" role="tab" aria-selected="false" type="button">🔎 Find route</button>
+  </nav>
+
+  <div id="viewBuses">
+  <section class="summary" aria-label="Summary">
+    <div class="stat" style="--c:var(--accent)"><b id="sTotal">–</b><span>Total buses</span></div>
+    <div class="stat" style="--c:var(--ok)"><b id="sRunning">–</b><span>Running now</span></div>
+    <div class="stat" style="--c:var(--warn)"><b id="sSilent">–</b><span>Not reporting</span></div>
+    <div class="stat" style="--c:var(--off)"><b id="sIdle">–</b><span>Idle</span></div>
+  </section>
+
+  <div class="toolbar">
+    <label class="search"><input id="q" type="search" placeholder="Search bus number or route…" autocomplete="off" aria-label="Search buses"></label>
+    <div class="chips" id="chips" role="group" aria-label="Filter by status"></div>
+  </div>
+
+  <div class="grid" id="list" aria-live="polite">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </div>
+  </div>
+
+  <div id="viewRoutes" hidden>
+    <div class="toolbar">
+      <label class="search"><input id="rtq" type="search" placeholder="Search routes…" autocomplete="off" aria-label="Search routes"></label>
+      <a class="btn" href="/depot/api/routes/template">⬇ Excel template</a>
+      <button class="btn primary" id="rtAdd" type="button" style="padding:9px 16px">＋ Add route</button>
+    </div>
+    <div class="grid" id="routeList" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div></div>
+  </div>
+  <div id="viewFinder" hidden>
+    <div class="hint" style="margin-bottom:12px">Look up any route between two places. You can open every route to see its stops; you can change only the routes that start at your depot or that your depot added.</div>
+    <div id="finderRoot"></div>
+  </div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle" aria-hidden="true">
+  <div class="d-head">
+    <div>
+      <h2 id="dTitle">–</h2>
+      <span class="pill idle" id="dPill">–</span>
+    </div>
+    <button class="btn icon" id="dClose" type="button" aria-label="Close details">✕</button>
+  </div>
+  <div class="d-body" id="dBody"></div>
+</aside>
+
+<aside class="drawer" id="routePanel" role="dialog" aria-modal="true" aria-labelledby="rtTitle" aria-hidden="true">
+  <div class="d-head">
+    <div>
+      <h2 id="rtTitle">Add route</h2>
+      <span class="hint" id="rtSub">Starts at your depot.</span>
+    </div>
+    <button class="btn icon" id="rtClose" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="d-body">
+    <div class="field">
+      <label for="rfName">Route name</label>
+      <input id="rfName" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Alipurduar ⇄ Falakata">
+    </div>
+    <div class="field">
+      <label for="rfDest">Ends at (destination depot / town)</label>
+      <input id="rfDest" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Falakata">
+    </div>
+    <div class="field">
+      <label for="rfFile" id="rfFileLabel">Stops file (Excel)</label>
+      <input id="rfFile" type="file" accept=".xlsx,.xls,.xlsm">
+      <div class="hint" id="rfFileHint">Use the Excel template: stop order, name, latitude, longitude, distance and slack. It must have at least 2 stops.</div>
+    </div>
+    <div class="field">
+      <label for="rfBuses">Buses on this route <span style="font-weight:400">(optional, comma separated)</span></label>
+      <input id="rfBuses" type="text" autocomplete="off" placeholder="e.g. WB-23A-1245, WB-23A-1290">
+      <div class="pickrow" id="rfPicks"></div>
+    </div>
+    <div class="field">
+      <label for="rfTimes">Departure times <span style="font-weight:400">(optional, comma separated)</span></label>
+      <input id="rfTimes" type="text" autocomplete="off" placeholder="e.g. 06:00, 09:30, 14:15">
+    </div>
+    <label class="chk" id="rfReturnWrap">
+      <input type="checkbox" id="rfReturn" checked>
+      <span id="rfReturnText">Also add the return route</span>
+    </label>
+    <div class="form-msg" id="rfMsg" role="status" aria-live="polite"></div>
+    <button class="btn primary" id="rfSave" type="button" style="padding:11px 16px;font-size:14px">Save route</button>
+    <div class="hint">A route you add goes live straight away for passengers. The admin is notified and can fix or remove it.</div>
+  </div>
+</aside>
+
+<aside class="drawer" id="reqPanel" role="dialog" aria-modal="true" aria-labelledby="rTitle" aria-hidden="true">
+  <div class="d-head">
+    <div>
+      <h2 id="rTitle">Request / report to admin</h2>
+      <span class="hint">Ask for a new route, a correction, or report a problem.</span>
+    </div>
+    <button class="btn icon" id="rClose" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="d-body">
+    <div>
+      <div class="hint" style="margin-bottom:8px;font-weight:700">What is this about?</div>
+      <div class="types" id="rTypes" role="group" aria-label="Type of request"></div>
+    </div>
+    <div class="field">
+      <label for="rBus">Related bus <span style="font-weight:400">(optional)</span></label>
+      <select id="rBus"></select>
+    </div>
+    <div class="field">
+      <label for="rPlace" id="rPlaceLabel">Route / place</label>
+      <input id="rPlace" type="text" maxlength="150" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="rDesc">Details</label>
+      <textarea id="rDesc" maxlength="1000"></textarea>
+      <div class="hint" id="rHint"></div>
+      <div class="count" id="rCount">0 / 1000</div>
+    </div>
+    <div class="form-msg" id="rMsg" role="status" aria-live="polite"></div>
+    <button class="btn primary" id="rSend" type="button" style="padding:11px 16px;font-size:14px">Send to admin</button>
+
+    <div class="d-sec" style="margin-top:6px">
+      <h3>Your requests</h3>
+      <div id="rList"><div class="map-note">Loading…</div></div>
+    </div>
+  </div>
+</aside>
+
+<script src="/js/route-finder.js"></script>
+<script>
+/* ───────── helpers ───────── */
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  return e;
+}
+const STATUS = {
+  running: { label: 'Running' },
+  silent:  { label: 'Not reporting' },
+  idle:    { label: 'Idle' }
+};
+function statusOf(b) { return !b.running ? 'idle' : (b.stale ? 'silent' : 'running'); }
+
+function ago(seconds) {
+  if (seconds == null || seconds < 0) return '–';
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return Math.round(seconds) + ' s ago';
+  const m = Math.round(seconds / 60);
+  if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60);
+  return h + ' h ' + (m % 60) + ' min ago';
+}
+function duration(ms) {
+  if (ms == null || ms < 0) return '–';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return m + ' min';
+  return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+}
+function clock(ms) {
+  if (ms == null) return '–';
+  const d = new Date(ms), now = new Date();
+  const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === now.toDateString() ? t : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ', ' + t;
+}
+function routeText(b) { return (b.source || '') + ' ' + (b.destination || ''); }
+
+/* ───────── theme ───────── */
+(function () {
+  let saved = null;
+  try { saved = localStorage.getItem('wimb-theme'); } catch (e) {}
+  const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('themeBtn').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('wimb-theme', next); } catch (e) {}
+  });
+})();
+
+let csrf = { header: 'X-CSRF-TOKEN', token: '' };
+function loadCsrf() {
+  return fetch('/csrf-token').then(r => r.json()).then(d => {
+    csrf = { header: d.headerName || 'X-CSRF-TOKEN', token: d.token };
+    $('csrfToken').value = d.token;
+  }).catch(() => {});
+}
+loadCsrf();
+
+/* ───────── state ───────── */
+let buses = [];
+let filter = 'all';
+let query = '';
+let selected = null;         // bus number whose drawer is open
+let detailTimer = null;
+let lastFocus = null;
+
+/* ───────── list ───────── */
+function renderChips(counts) {
+  // (no double square brackets anywhere in this file: Thymeleaf would read them as inline expressions)
+  const defs = [
+    { key: 'all', label: 'All' }, { key: 'running', label: 'Running' },
+    { key: 'silent', label: 'Not reporting' }, { key: 'idle', label: 'Idle' }
+  ];
+  const box = $('chips');
+  box.replaceChildren();
+  defs.forEach(({ key, label }) => {
+    const c = el('button', 'chip', label);
+    c.type = 'button';
+    c.setAttribute('aria-pressed', String(filter === key));
+    c.append(el('span', 'n', counts[key]));
+    c.addEventListener('click', () => { filter = key; renderList(); });
+    box.append(c);
+  });
+}
+
+function renderList() {
+  const counts = { all: buses.length, running: 0, silent: 0, idle: 0 };
+  buses.forEach(b => counts[statusOf(b)]++);
+  $('sTotal').textContent = counts.all;
+  $('sRunning').textContent = counts.running;
+  $('sSilent').textContent = counts.silent;
+  $('sIdle').textContent = counts.idle;
+  renderChips(counts);
+
+  const q = query.trim().toLowerCase();
+  const order = { running: 0, silent: 1, idle: 2 };
+  const shown = buses
+    .filter(b => filter === 'all' || statusOf(b) === filter)
+    .filter(b => !q || b.busNumber.toLowerCase().includes(q) || routeText(b).toLowerCase().includes(q))
+    .sort((a, b) => (order[statusOf(a)] - order[statusOf(b)]) || a.busNumber.localeCompare(b.busNumber));
+
+  const list = $('list');
+  list.replaceChildren();
+  if (!buses.length) {
+    list.append(el('div', 'empty',
+      'No buses in this depot yet. A bus appears here automatically the first time its driver signs in with this depot\u2019s code.'));
+    return;
+  }
+  if (!shown.length) {
+    list.append(el('div', 'empty', 'No buses match your search or filter.'));
+    return;
+  }
+  shown.forEach(b => {
+    const st = statusOf(b);
+    const card = el('button', 'bus ' + st);
+    card.type = 'button';
+    card.setAttribute('aria-label', 'Open details for bus ' + b.busNumber + ', ' + STATUS[st].label);
+
+    const top = el('div', 'bus-top');
+    top.append(el('span', 'num', b.busNumber), el('span', 'pill', STATUS[st].label));
+    card.append(top);
+
+    if (b.running) {
+      const r = el('div', 'route');
+      r.append(el('b', null, b.source || '?'), el('span', 'arrow', '\u2192'), el('b', null, b.destination || '?'));
+      card.append(r);
+      const meta = el('div', 'meta');
+      if (b.remainingDistanceKm != null) meta.append(el('span', null, '\uD83D\uDCCF ' + Number(b.remainingDistanceKm).toFixed(1) + ' km left'));
+      if (b.silentSeconds != null) meta.append(el('span', null, '\uD83D\uDCE1 ' + ago(b.silentSeconds)));
+      if (meta.childNodes.length) card.append(meta);
+    } else {
+      card.append(el('div', 'route none', 'Not on a trip'));
+    }
+    card.append(el('div', 'more', 'View details \u203A'));
+    card.addEventListener('click', () => openDrawer(b.busNumber, card));
+    list.append(card);
+  });
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/depot/api/buses', { cache: 'no-store' });
+    if (r.redirected || r.status === 401 || r.status === 403) { location.href = '/login.html'; return; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    $('title').textContent = data.depot + ' Depot';
+    document.title = data.depot + ' Depot \u2013 WIMB';
+    buses = data.buses || [];
+    depotName = data.depot || depotName;
+    renderList();
+    $('banner').classList.remove('show');
+    $('liveDot').classList.remove('down');
+    $('updated').textContent = 'Live \u00B7 updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    $('banner').classList.add('show');
+    $('liveDot').classList.add('down');
+    $('updated').textContent = 'Offline \u2013 retrying';
+  }
+}
+
+$('q').addEventListener('input', e => { query = e.target.value; renderList(); });
+
+/* ───────── drawer + map ───────── */
+let map = null, marker = null, leafletState = 'idle';   // idle | loading | ready | failed
+let leafletWaiters = [];
+
+function loadLeaflet(cb) {
+  if (leafletState === 'ready') return cb(true);
+  if (leafletState === 'failed') return cb(false);
+  leafletWaiters.push(cb);
+  if (leafletState === 'loading') return;
+  leafletState = 'loading';
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.append(css);
+  const js = document.createElement('script');
+  js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  js.onload = () => { leafletState = 'ready'; leafletWaiters.splice(0).forEach(f => f(true)); };
+  js.onerror = () => { leafletState = 'failed'; leafletWaiters.splice(0).forEach(f => f(false)); };
+  document.head.append(js);
+}
+
+function destroyMap() {
+  if (map) { map.remove(); map = null; marker = null; }
+}
+
+function setMarker(lat, lng, silent) {
+  loadLeaflet(ok => {
+    const holder = $('map');
+    if (!holder || !selected) return;    // drawer closed while the map library was loading
+    if (!ok) { holder.replaceWith(el('div', 'map-note', 'Map could not be loaded. Use \u201COpen in Google Maps\u201D below.')); return; }
+    const icon = L.divIcon({
+      className: '', iconSize: [38, 38], iconAnchor: [19, 19],
+      html: '<div class="bus-marker' + (silent ? ' silent' : '') + '"><img src="/images/logo.png" alt=""></div>'
+    });
+    if (!map) {
+      map = L.map(holder, { zoomControl: true, attributionControl: true }).setView([lat, lng], 14);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      marker = L.marker([lat, lng], { icon }).addTo(map);
+    } else {
+      marker.setLatLng([lat, lng]);
+      marker.setIcon(icon);
+      if (!map.getBounds().contains([lat, lng])) map.panTo([lat, lng]);
+    }
+  });
+}
+
+function kv(label, value, wide) {
+  const d = el('div', wide ? 'wide' : null);
+  d.append(el('small', null, label), el('b', null, value));
+  return d;
+}
+
+function renderDetail(d) {
+  const st = !d.running ? 'idle' : (d.stale ? 'silent' : 'running');
+  $('dTitle').textContent = d.busNumber;
+  const pill = $('dPill');
+  pill.className = 'pill ' + st;
+  pill.textContent = STATUS[st].label;
+
+  const body = $('dBody');
+  const hasPos = d.running && d.latitude != null && d.longitude != null;
+  const oldMapWrap = (map && hasPos) ? body.querySelector('.map-wrap') : null;   // keep the live map between refreshes
+  if (!oldMapWrap) destroyMap();
+  if (oldMapWrap) oldMapWrap.remove();    // detach (not destroy) so Leaflet keeps its state
+  body.replaceChildren();
+
+  const grid = el('div', 'kv');
+  if (d.running) {
+    grid.append(kv('Route', (d.source || '?') + ' \u2192 ' + (d.destination || '?'), true));
+    grid.append(kv('Trip started', clock(d.startedAt)));
+    grid.append(kv('Running for', duration(d.startedAt ? Date.now() - d.startedAt : null)));
+    grid.append(kv('Last update', d.lastUpdate ? ago((Date.now() - d.lastUpdate) / 1000) : (d.silentSeconds != null ? ago(d.silentSeconds) : '–')));
+    grid.append(kv('Depot', d.depot));
+  } else {
+    grid.append(kv('Current status', 'Not on a trip', true));
+    grid.append(kv('Depot', d.depot, true));
+  }
+  body.append(grid);
+
+  if (d.running) {
+    if (hasPos) {
+      const wrap = oldMapWrap || (() => {
+        const w = el('div', 'map-wrap');
+        const m = el('div'); m.id = 'map';
+        w.append(m);
+        return w;
+      })();
+      let foot = wrap.querySelector('.map-foot');
+      if (!foot) { foot = el('div', 'map-foot'); wrap.append(foot); }
+      foot.replaceChildren();
+      foot.append(el('span', null, d.latitude.toFixed(5) + ', ' + d.longitude.toFixed(5)));
+      const a = el('a', null, 'Open in Google Maps \u2197');
+      a.href = 'https://www.google.com/maps?q=' + encodeURIComponent(d.latitude + ',' + d.longitude);
+      a.target = '_blank'; a.rel = 'noopener noreferrer';
+      foot.append(a);
+      body.append(wrap);
+      if (oldMapWrap && map) map.invalidateSize();
+      setMarker(d.latitude, d.longitude, d.stale);
+    } else {
+      const w = el('div', 'map-wrap');
+      w.append(el('div', 'map-note', 'Waiting for the first GPS location from this bus\u2026'));
+      body.append(w);
+    }
+  }
+
+  const sec = el('div', 'd-sec');
+  sec.append(el('h3', null, 'Recent trips'));
+  const trips = d.recentTrips || [];
+  if (!trips.length) sec.append(el('div', 'map-note', 'No trips recorded yet.'));
+  trips.forEach(t => {
+    const row = el('div', 'trip');
+    const left = el('div');
+    left.append(el('b', null, (t.source || '?') + ' \u2192 ' + (t.destination || '?')));
+    const when = clock(t.startedAt) + (t.endedAt ? ' \u2013 ' + clock(t.endedAt) + ' (' + duration(t.endedAt - t.startedAt) + ')' : '');
+    left.append(el('small', null, when));
+    row.append(left);
+    if (t.active) row.append(el('span', 'tag', 'LIVE'));
+    sec.append(row);
+  });
+  body.append(sec);
+}
+
+async function loadDetail(number, first) {
+  try {
+    const r = await fetch('/depot/api/bus?number=' + encodeURIComponent(number), { cache: 'no-store' });
+    if (r.redirected || r.status === 401 || r.status === 403) { location.href = '/login.html'; return; }
+    if (selected !== number) return;                       // drawer was closed / switched meanwhile
+    if (r.status === 404) {
+      $('dBody').replaceChildren(el('div', 'map-note', 'This bus is no longer part of your depot.'));
+      return;
+    }
+    if (!r.ok) throw new Error();
+    renderDetail(await r.json());
+  } catch (e) {
+    if (first && selected === number) $('dBody').replaceChildren(el('div', 'map-note', 'Could not load details. Retrying\u2026'));
+  }
+}
+
+function openDrawer(number, trigger) {
+  selected = number;
+  lastFocus = trigger || null;
+  destroyMap();
+  $('dTitle').textContent = number;
+  $('dPill').className = 'pill idle';
+  $('dPill').textContent = 'Loading\u2026';
+  $('dBody').replaceChildren(el('div', 'skeleton'), el('div', 'skeleton'));
+  $('drawer').classList.add('open');
+  $('backdrop').classList.add('open');
+  $('drawer').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('dClose').focus();
+  loadDetail(number, true);
+  clearInterval(detailTimer);
+  detailTimer = setInterval(() => { if (selected) loadDetail(selected, false); }, 5000);
+}
+
+function closeDrawer() {
+  selected = null;
+  clearInterval(detailTimer);
+  $('drawer').classList.remove('open');
+  $('backdrop').classList.remove('open');
+  $('drawer').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  destroyMap();
+  if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+}
+
+$('dClose').addEventListener('click', closeDrawer);
+$('backdrop').addEventListener('click', () => { closeDrawer(); closeReq(); closeRoute(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (selected) closeDrawer();
+  else if ($('reqPanel').classList.contains('open')) closeReq();
+  else if ($('routePanel').classList.contains('open')) closeRoute();
+});
+
+/* ───────── requests / reports to admin ───────── */
+const REQ_TYPES = [
+  { key: 'ROUTE_REQUEST',    icon: '\uD83D\uDDFA\uFE0F', label: 'Add a route',
+    place: 'Route (from \u2192 to)', ph: 'e.g. Alipurduar \u2192 Falakata',
+    hint: 'Give the start and end, the main stops in order, and the usual timings.' },
+  { key: 'ROUTE_CORRECTION', icon: '\u270F\uFE0F', label: 'Fix a route',
+    place: 'Which route?', ph: 'e.g. Alipurduar \u2192 Falakata',
+    hint: 'What is wrong (missing stop, wrong order, wrong name) and what it should be.' },
+  { key: 'STOP_REQUEST',     icon: '\uD83D\uDCCD', label: 'Add a stop',
+    place: 'Stop name and route', ph: 'e.g. College More, on Alipurduar \u2192 Falakata',
+    hint: 'Where the stop is and between which two existing stops it comes.' },
+  { key: 'BUS_PROBLEM',      icon: '\uD83D\uDD27', label: 'Bus problem',
+    place: 'Where (optional)', ph: 'e.g. Depot yard',
+    hint: 'What is wrong with the bus, and whether it is off the road.' },
+  { key: 'OTHER',            icon: '\uD83D\uDCAC', label: 'Other',
+    place: 'Subject (optional)', ph: '',
+    hint: 'Anything else the admin should know.' }
+];
+const REQ_LABEL = {};
+REQ_TYPES.forEach(t => { REQ_LABEL[t.key] = t.icon + ' ' + t.label; });
+const REQ_STATUS = {
+  NEW:          { label: 'Sent',            cls: 's-new' },
+  UNDER_REVIEW: { label: 'Under review',    cls: 's-review' },
+  NEED_INFO:    { label: 'Needs more info', cls: 's-info' },
+  APPROVED:     { label: 'Approved',        cls: 's-ok' },
+  REJECTED:     { label: 'Rejected',        cls: 's-no' }
+};
+let reqType = 'ROUTE_REQUEST';
+let requests = [];
+let freshIds = new Set();      // replies that were new when the panel was opened
+
+function seenMap() {
+  try { return JSON.parse(localStorage.getItem('wimb-seen-replies') || '{}'); } catch (e) { return {}; }
+}
+function saveSeen(m) { try { localStorage.setItem('wimb-seen-replies', JSON.stringify(m)); } catch (e) {} }
+function isUnseen(r, seen) { return !!r.adminReply && seen[r.id] !== r.repliedAt; }
+
+function updateBadge() {
+  const seen = seenMap();
+  const n = requests.filter(r => isUnseen(r, seen)).length;
+  const b = $('reqBadge');
+  b.textContent = n;
+  b.hidden = n === 0;
+}
+
+function renderTypes() {
+  const box = $('rTypes');
+  box.replaceChildren();
+  REQ_TYPES.forEach(t => {
+    const c = el('button', 'chip', t.icon + ' ' + t.label);
+    c.type = 'button';
+    c.setAttribute('aria-pressed', String(reqType === t.key));
+    c.addEventListener('click', () => { reqType = t.key; renderTypes(); applyType(); });
+    box.append(c);
+  });
+}
+function applyType() {
+  const t = REQ_TYPES.find(x => x.key === reqType);
+  $('rPlaceLabel').textContent = t.place;
+  $('rPlace').placeholder = t.ph;
+  $('rHint').textContent = t.hint;
+  $('rDesc').placeholder = t.hint;
+}
+function fillBusSelect() {
+  const sel = $('rBus');
+  const keep = sel.value;
+  sel.replaceChildren();
+  const none = el('option', null, 'Not about one particular bus');
+  none.value = '';
+  sel.append(none);
+  buses.map(b => b.busNumber).sort().forEach(n => {
+    const o = el('option', null, n);
+    o.value = n;
+    sel.append(o);
+  });
+  sel.value = keep;
+}
+
+function renderRequests() {
+  const box = $('rList');
+  box.replaceChildren();
+  if (!requests.length) {
+    box.append(el('div', 'map-note', 'You have not sent any requests yet.'));
+    return;
+  }
+  requests.forEach(r => {
+    const st = REQ_STATUS[r.status] || { label: r.status, cls: 's-new' };
+    const row = el('div', 'req');
+    const top = el('div', 'req-top');
+    const title = el('b', null, REQ_LABEL[r.type] || r.type);
+    if (freshIds.has(r.id)) title.append(el('span', 'newtag', 'NEW REPLY'));
+    top.append(title, el('span', 'pill ' + st.cls, st.label));
+    row.append(top);
+    const sub = [];
+    if (r.busNumber) sub.push('Bus ' + r.busNumber);
+    if (r.place) sub.push(r.place);
+    if (sub.length) row.append(el('small', null, sub.join(' \u00B7 ')));
+    row.append(el('div', 'req-desc', r.description));
+    if (r.adminReply) {
+      const rep = el('div', 'reply');
+      rep.append(el('b', null, 'Admin replied' + (r.repliedAt ? ' \u00B7 ' + clock(Date.parse(r.repliedAt)) : '')), el('div', null, r.adminReply));
+      row.append(rep);
+    }
+    row.append(el('small', null, 'Sent ' + clock(Date.parse(r.createdAt))));
+    box.append(row);
+  });
+}
+
+async function loadRequests() {
+  try {
+    const r = await fetch('/depot/api/reports', { cache: 'no-store' });
+    if (r.redirected || r.status === 401 || r.status === 403) return;
+    if (!r.ok) return;
+    requests = await r.json();
+    updateBadge();
+    if ($('reqPanel').classList.contains('open')) renderRequests();
+  } catch (e) { /* keep the last list; the main refresh shows the offline banner */ }
+}
+
+function setMsg(text, kind) {
+  const m = $('rMsg');
+  m.textContent = text || '';
+  m.className = 'form-msg' + (kind ? ' ' + kind : '');
+}
+
+async function sendRequest() {
+  const desc = $('rDesc').value.trim();
+  if (desc.length < 10) { setMsg('Please describe it in at least 10 characters.', 'err'); $('rDesc').focus(); return; }
+  const btn = $('rSend');
+  btn.disabled = true;
+  setMsg('Sending\u2026');
+  const body = JSON.stringify({
+    type: reqType, busNumber: $('rBus').value, place: $('rPlace').value.trim(), description: desc
+  });
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const headers = { 'Content-Type': 'application/json' };
+      headers[csrf.header] = csrf.token;
+      const r = await fetch('/depot/api/reports', { method: 'POST', headers, body });
+      if (r.status === 403 && attempt === 0) { await loadCsrf(); continue; }   // token went stale: refresh once
+      if (r.redirected || r.status === 401) { location.href = '/login.html'; return; }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { setMsg(data.error || 'Could not send. Please try again.', 'err'); break; }
+      $('rDesc').value = '';
+      $('rPlace').value = '';
+      $('rCount').textContent = '0 / 1000';
+      setMsg('Sent to admin. Their reply will appear below.', 'ok');
+      await loadRequests();
+      break;
+    }
+  } catch (e) {
+    setMsg('Connection problem. Please try again.', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function openReq() {
+  closeDrawer();
+  lastFocus = $('reqBtn');
+  const seen = seenMap();
+  freshIds = new Set(requests.filter(r => isUnseen(r, seen)).map(r => r.id));
+  requests.forEach(r => { if (r.adminReply) seen[r.id] = r.repliedAt; });
+  saveSeen(seen);
+  updateBadge();
+  renderTypes(); applyType(); fillBusSelect(); renderRequests(); setMsg('');
+  $('reqPanel').classList.add('open');
+  $('backdrop').classList.add('open');
+  $('reqPanel').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('rClose').focus();
+  loadRequests();
+}
+function closeReq() {
+  if (!$('reqPanel').classList.contains('open')) return;
+  $('reqPanel').classList.remove('open');
+  $('backdrop').classList.remove('open');
+  $('reqPanel').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  freshIds = new Set();
+  if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+}
+
+$('reqBtn').addEventListener('click', openReq);
+$('rClose').addEventListener('click', closeReq);
+$('rSend').addEventListener('click', sendRequest);
+$('rDesc').addEventListener('input', () => { $('rCount').textContent = $('rDesc').value.length + ' / 1000'; });
+
+/* ───────── routes ───────── */
+let depotName = '';
+let routes = [];
+let routesLoaded = false;
+let routeQuery = '';
+let editing = null;            // route being edited (null = adding)
+
+function toast(text, ms) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), ms || 3500);
+}
+
+function updateReturnText() {
+  const to = $('rfDest').value.trim() || 'the destination';
+  const from = depotName || 'your depot';
+  $('rfReturnText').textContent = 'Also add the return route (' + to + ' \u2192 ' + from + '). Its Excel sheet is made for you: '
+    + 'stops reversed and distances recalculated. Buses are copied; add departure times later.';
+}
+
+async function send(url, method, body) {
+  let r = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const headers = {};
+    headers[csrf.header] = csrf.token;
+    r = await fetch(url, { method, headers, body });
+    if (r.status === 403 && attempt === 0) { await loadCsrf(); continue; }   // stale token: refresh once
+    break;
+  }
+  return r;
+}
+
+function showTab(name) {
+  $('viewBuses').hidden = name !== 'buses';
+  $('viewRoutes').hidden = name !== 'routes';
+  $('viewFinder').hidden = name !== 'finder';
+  $('tabBuses').setAttribute('aria-selected', String(name === 'buses'));
+  $('tabRoutes').setAttribute('aria-selected', String(name === 'routes'));
+  $('tabFinder').setAttribute('aria-selected', String(name === 'finder'));
+  if (name === 'routes' && !routesLoaded) loadRoutes();
+  if (name === 'finder') mountFinder();
+}
+
+// The Route Finder is built the first time its tab is opened.
+let finder = null;
+function mountFinder() {
+  if (finder) { finder.reload(); return; }       // already built: just refresh the list
+  finder = WIMBRouteFinder.mount($('finderRoot'), {
+    base: '/depot/api/route-finder',
+    csrf: () => csrf,
+    refreshCsrf: loadCsrf,
+    canChangeSource: false,
+    fileUrl: code => '/depot/api/routes/' + encodeURIComponent(code) + '/file'
+  });
+}
+
+async function loadRoutes() {
+  try {
+    const r = await fetch('/depot/api/routes', { cache: 'no-store' });
+    if (r.redirected || r.status === 401 || r.status === 403) { location.href = '/login.html'; return; }
+    if (!r.ok) throw new Error();
+    routes = await r.json();
+    routesLoaded = true;
+    renderRoutes();
+  } catch (e) {
+    $('routeList').replaceChildren(el('div', 'empty', 'Could not load routes. Please try again.'));
+  }
+}
+
+function chipRow(label, items, empty) {
+  const row = el('div', 'rt-row');
+  row.append(el('span', null, label));
+  if (!items.length) row.append(el('span', null, empty));
+  items.forEach(x => row.append(el('span', 'tag', x)));
+  return row;
+}
+
+function renderRoutes() {
+  const q = routeQuery.trim().toLowerCase();
+  const shown = routes.filter(r => !q || (r.routeName + ' ' + r.routeCode + ' ' + (r.destinationDepot || '')).toLowerCase().includes(q));
+  const list = $('routeList');
+  list.replaceChildren();
+  if (!routes.length) {
+    list.append(el('div', 'empty', 'No routes yet. Click \u201CAdd route\u201D to upload your first one.'));
+    return;
+  }
+  if (!shown.length) { list.append(el('div', 'empty', 'No routes match your search.')); return; }
+  shown.forEach(r => {
+    const card = el('div', 'rt');
+    const top = el('div', 'rt-top');
+    const left = el('div');
+    left.append(el('div', 'rt-name', r.routeName),
+      el('div', 'rt-sub', (r.sourceDepot || '?') + ' \u2192 ' + (r.destinationDepot || '?') + ' \u00B7 ' + r.stopCount + ' stops \u00B7 ' + r.routeCode));
+    const badge = r.canDelete ? 'Added by you' : (r.canEdit ? 'Starts at your depot' : 'Read-only');
+    top.append(left, el('span', r.canEdit ? 'own' : 'own ro', badge));
+    card.append(top);
+    card.append(chipRow('Buses', r.busNumbers, 'none added'));
+    card.append(chipRow('Departures', r.departureTimes, 'none added'));
+    const actions = el('div', 'rt-actions');
+    if (r.canEdit) {
+      const e = el('button', 'btn', '\u270F\uFE0F Edit');
+      e.type = 'button';
+      e.addEventListener('click', () => openRoute(r, e));
+      actions.append(e);
+    }
+    const dl = el('a', 'btn', '\u2B07 Stops file');
+    dl.href = '/depot/api/routes/' + encodeURIComponent(r.routeCode) + '/file';
+    actions.append(dl);
+    if (r.canDelete) {
+      const d = el('button', 'btn danger', '\uD83D\uDDD1 Delete');
+      d.type = 'button';
+      d.addEventListener('click', () => deleteRoute(r));
+      actions.append(d);
+    }
+    card.append(actions);
+    list.append(card);
+  });
+}
+
+function splitList(text) {
+  return text.split(',').map(x => x.trim()).filter(x => x);
+}
+function renderPicks() {
+  const box = $('rfPicks');
+  box.replaceChildren();
+  const chosen = new Set(splitList($('rfBuses').value).map(x => x.toUpperCase()));
+  buses.map(b => b.busNumber).sort().forEach(n => {
+    const b = el('button', 'pick', n);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(chosen.has(n.toUpperCase())));
+    b.addEventListener('click', () => {
+      const cur = splitList($('rfBuses').value);
+      const i = cur.findIndex(x => x.toUpperCase() === n.toUpperCase());
+      if (i >= 0) cur.splice(i, 1); else cur.push(n);
+      $('rfBuses').value = cur.join(', ');
+      renderPicks();
+    });
+    box.append(b);
+  });
+}
+
+function rfMsg(text, kind) {
+  const m = $('rfMsg');
+  m.textContent = text || '';
+  m.className = 'form-msg' + (kind ? ' ' + kind : '');
+}
+
+function openRoute(route, trigger) {
+  closeDrawer(); closeReq();
+  lastFocus = trigger || $('rtAdd');
+  editing = route || null;
+  $('rtTitle').textContent = editing ? 'Edit route' : 'Add route';
+  $('rtSub').textContent = editing ? editing.routeCode + ' \u00B7 starts at ' + (editing.sourceDepot || 'your depot') : 'Starts at your depot.';
+  $('rfName').value = editing ? editing.routeName : '';
+  $('rfDest').value = editing ? (editing.destinationDepot || '') : '';
+  $('rfFile').value = '';
+  $('rfFileLabel').textContent = editing ? 'Replace stops file (optional)' : 'Stops file (Excel)';
+  $('rfFileHint').textContent = editing
+    ? 'Leave empty to keep the current stops. To change stops, download the current file, edit it and upload it here.'
+    : 'Use the Excel template: stop order, name, latitude, longitude, distance and slack. It must have at least 2 stops.';
+  $('rfBuses').value = editing ? editing.busNumbers.join(', ') : '';
+  $('rfTimes').value = editing ? editing.departureTimes.join(', ') : '';
+  renderPicks();
+  rfMsg('');
+  $('rfReturnWrap').hidden = !!editing;      // the return route is only created together with a NEW route
+  $('rfReturn').checked = true;
+  updateReturnText();
+  $('routePanel').classList.add('open');
+  $('backdrop').classList.add('open');
+  $('routePanel').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('rfName').focus();
+}
+function closeRoute() {
+  if (!$('routePanel').classList.contains('open')) return;
+  $('routePanel').classList.remove('open');
+  $('backdrop').classList.remove('open');
+  $('routePanel').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+}
+
+async function saveRoute() {
+  const name = $('rfName').value.trim();
+  const dest = $('rfDest').value.trim();
+  const file = $('rfFile').files && $('rfFile').files.length ? $('rfFile').files[0] : null;
+  if (!name) { rfMsg('Please enter a route name.', 'err'); $('rfName').focus(); return; }
+  if (!dest) { rfMsg('Please enter where the route ends.', 'err'); $('rfDest').focus(); return; }
+  if (!editing && !file) { rfMsg('Please choose the stops Excel file.', 'err'); return; }
+
+  const fd = new FormData();
+  if (!editing) fd.append('createReturn', $('rfReturn').checked ? 'true' : 'false');
+  fd.append('routeName', name);
+  fd.append('destinationDepot', dest);
+  fd.append('busNumbers', $('rfBuses').value);
+  fd.append('departureTimes', $('rfTimes').value);
+  if (file) fd.append('file', file);
+
+  const btn = $('rfSave');
+  btn.disabled = true;
+  rfMsg('Saving\u2026');
+  try {
+    const url = editing ? '/depot/api/routes/' + encodeURIComponent(editing.routeCode) : '/depot/api/routes';
+    const r = await send(url, editing ? 'PUT' : 'POST', fd);
+    if (r.redirected || r.status === 401) { location.href = '/login.html'; return; }
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { rfMsg(data.error || 'Could not save. Please try again.', 'err'); return; }
+    closeRoute();
+    let note = (data.message || 'Saved') + (data.stopCount ? ' \u00B7 ' + data.stopCount + ' stops' : '');
+    if (data.returnRoute && data.returnRoute.created) {
+      note += ' \u00B7 return route ' + data.returnRoute.routeCode + ' added (' + data.returnRoute.stopCount + ' stops)';
+    }
+    if (data.returnWarning) note += ' \u00B7 ' + data.returnWarning;
+    toast(note, data.returnWarning ? 8000 : 3500);
+    await loadRoutes();
+  } catch (e) {
+    rfMsg('Connection problem. Please try again.', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteRoute(r) {
+  if (!confirm('Delete route \u201C' + r.routeName + '\u201D? Passengers will no longer see it.')) return;
+  try {
+    const res = await send('/depot/api/routes/' + encodeURIComponent(r.routeCode), 'DELETE');
+    const data = await res.json().catch(() => ({}));
+    toast(res.ok ? 'Route deleted' : (data.error || 'Could not delete the route'));
+    if (res.ok) await loadRoutes();
+  } catch (e) { toast('Connection problem. Please try again.'); }
+}
+
+$('tabBuses').addEventListener('click', () => showTab('buses'));
+$('tabRoutes').addEventListener('click', () => showTab('routes'));
+$('tabFinder').addEventListener('click', () => showTab('finder'));
+$('rtAdd').addEventListener('click', () => openRoute(null, $('rtAdd')));
+$('rtClose').addEventListener('click', closeRoute);
+$('rfSave').addEventListener('click', saveRoute);
+$('rfBuses').addEventListener('input', renderPicks);
+$('rfDest').addEventListener('input', updateReturnText);
+$('rtq').addEventListener('input', e => { routeQuery = e.target.value; renderRoutes(); });
+
+refresh();
+loadRequests();
+setInterval(refresh, 10000);
+setInterval(loadRequests, 30000);
+</script>
+</body>
+</html>

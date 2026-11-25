@@ -264,7 +264,7 @@ async function loadQuickResults() {
       <div class="quick-card fade-up"
            style="animation-delay:${i * 80}ms"
            onclick="track(${jsArg(routeKey)}, ${Number(bus.rideId)}, ${jsArg(bus.routeCode || "")})">
-        <div class="bus-icon-wrap">🚌</div>
+        <div class="bus-icon-wrap"><img src="/images/logo.png" alt="" style="width:30px;height:30px;display:block;"></div>
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:700; color:var(--text-primary);">
             ${escapeHtml(bus.busNumber)}
@@ -321,7 +321,7 @@ function renderBusCards(buses, routeKey, opts = {}) {
         card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div style="display:flex; align-items:center; gap:12px;">
-          <div class="bus-icon-wrap">🚌</div>
+          <div class="bus-icon-wrap"><img src="/images/logo.png" alt="" style="width:30px;height:30px;display:block;"></div>
           <div>
             <div style="font-size:16px; font-weight:700; color:var(--text-primary);">
               ${escapeHtml(bus.busNumber)}

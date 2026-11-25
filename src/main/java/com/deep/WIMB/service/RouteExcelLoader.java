@@ -272,6 +272,15 @@ public class RouteExcelLoader {
         updateStopsJson();
     }
 
+    /** Parses a route workbook WITHOUT touching the cache or the database, so an upload can be
+     *  checked before anything live is replaced. */
+    public List<RouteStop> parseBytes(byte[] bytes) throws Exception {
+        try (InputStream is = new ByteArrayInputStream(bytes);
+             Workbook wb = WorkbookFactory.create(is)) {
+            return parseWorkbook(wb);
+        }
+    }
+
     public void reloadRoute(String routeCode) {
         Route route = routeRepository.findByRouteCode(routeCode)
                 .orElseThrow(() -> new RuntimeException("Route not found: " + routeCode));

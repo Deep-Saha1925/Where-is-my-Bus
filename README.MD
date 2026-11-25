@@ -21,7 +21,7 @@
 **🔗 Live: [where-is-my-bus-8z4a.onrender.com](https://where-is-my-bus-8z4a.onrender.com)**
 *(Free-tier hosting — the app sleeps after 15 minutes idle, so the first request after a gap may take 30–50s to wake up.)*
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Tap-Anywhere Cards](#-tap-anywhere-on-a-bus-card) · [Splash Screen](#-splash-screen) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author)
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Screenshots](#-screenshots) · [Live Updates](#-live-updates-websocket) · [Tracking Page](#-the-tracking-page) · [Bus Number Search](#-search-by-bus-number) · [Tap-Anywhere Cards](#-tap-anywhere-on-a-bus-card) · [Splash Screen](#-splash-screen) · [Upcoming Buses](#-upcoming-scheduled-buses) · [Testing Without a Bus](#-testing-without-a-bus-simulate-location) · [Login Rate Limiting](#-login-rate-limiting--cors) · [Ghost Rides](#-ghost-rides-auto-end) · [Automated Tests](#-automated-tests) · [Driver App](#-driver-app-background-gps) · [Location Clean-up](#-location-history-clean-up) · [Redis Outages](#-when-redis-is-down) · [Use My Location](#-use-my-location-passenger) · [Notices & Driver Reports](#-notices--driver-reports) · [Setup](#-setup--run) · [Deployment](#-deployment) · [API Docs](#-api-endpoints) · [License](#-license) · [Author](#-author) · [Depot Dashboard](#-depot-dashboard) · [Return Routes](#-return-routes) · [Route Finder](#-route-finder)
 
 </div>
 
@@ -44,7 +44,7 @@
 ### 🧑‍💼 For Passengers
 - 🔍 Search buses by source & destination
 - 📍 **Use my location**: a crosshair button in the From field fills in the nearest stop; the tracking page shows how far the bus is from you and can send your location to a friend (WhatsApp, SMS...), see [Use My Location](#-use-my-location-passenger)
-- 🚌 **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
+- <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> **Search by bus number** — a third tab next to Live Buses and Depot Routes; type `wb23a1245` and find `WB-23A-1245` (case, spaces and dashes ignored, partial numbers work), see [Search by Bus Number](#-search-by-bus-number)
 - 🕒 **Upcoming scheduled buses** — if no bus is running right now (say it is 10:55 and the next bus leaves at 11:00), the search no longer ends at *"not available"*: it lists the next buses from the timetable (*Due in 5 min*, *In 25 min*) and any that are **late / not live yet**, see [Upcoming Scheduled Buses](#-upcoming-scheduled-buses)
 - ⚠️ **Report a problem** — wrong bus location, bus not running, staff behaviour, app problem: from the tracking page (⋮ menu or ⚠️ Report chip) or the home page footer, no login needed, see [Notices & Driver Reports](#-notices--driver-reports)
 - 📱 **Phone-friendly pages** — safe-area padding on notched phones, pinch-zoom allowed, 44px tap targets, a header that fits 320px screens, and toasts that sit above the bottom sheet
@@ -88,10 +88,11 @@
 - 🔎 Search by bus number, source or destination
 - 📡 Live updates pushed via WebSocket the instant a ride starts, ends, or moves — 30s fallback poll only if the socket ever drops
 - 🏢 **Depot Codes tab** — upload an Excel file to add/update every depot's driver code, no restart needed
-- 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart
+- 🛣️ **Routes tab** — add new routes via Excel upload, rename a route and/or replace its stops, or delete one entirely — all without a restart. Each new route can also create its **return route** (B → A) automatically, with the Excel sheet reversed for you, see [Return Routes](#-return-routes)
+- 🔎 **Route Finder tab** — type *From* and *To*, see every route between them (direct, passing through both, or running the other way), open one and **update its details and stops** (add / insert / move / remove a stop, with a live sketch of the route), see [Route Finder](#-route-finder)
 - 📄 Built-in "download example template" for both depot codes and routes, so the file format is never a guessing game
 - 📢 **Notices tab** — publish, hide or delete passenger notices, with severity, optional route / bus tag and auto-expiry
-- 📥 **Driver Reports tab** — an inbox of **driver and passenger** reports (each tagged 🚌 Driver / 🧍 Passenger, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, **a reply the driver reads in the app**, a "new" counter on the tab, and one-step **Publish as notice**
+- 📥 **Reports tab** — an inbox of **driver, passenger and depot** reports and requests (each tagged <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> Driver / 🧍 Passenger / 🏢 Depot, passenger contact shown) with a status workflow (New → Under review → Need info → Approved / Rejected), internal notes, **a reply the driver or depot reads on their own screen**, a "new" counter on the tab, and one-step **Publish as notice**
 
 </td>
 <td width="50%">
@@ -116,6 +117,32 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%">
+
+### 🏢 For Depot Staff
+- 🔐 Own sign-in: pick the depot, enter its **depot code** (the same code the drivers use), land on `/depot/dashboard`, see [Depot Dashboard](#-depot-dashboard)
+- <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> **Buses tab** — every bus of the depot as a live card (*Running* / *Not reporting* / *Idle*), summary counts, search and status filters, refreshed every 10 seconds
+- 👆 **Tap a bus** — side panel with its route, when the trip started, last GPS update, a **live map** with the bus on it, and its last 10 trips
+- 📝 **Request / report to the admin** — add a route, fix a route, add a stop, bus problem, other; the admin's status **and reply** come back on the same screen (a red count flags unread replies)
+- 🗺️ **Routes tab** — add, edit (details, buses, departure times, stops file) and delete the depot's **own** routes without waiting for the admin, with an automatic return route
+- 🔎 **Find route tab** — look up any route between two places and update the ones the depot is allowed to change
+- 🌗 Dark / light theme, phone-friendly side panels
+
+</td>
+<td width="50%">
+
+### 🛣️ Route Management Highlights
+- 🔁 **Return routes**: upload A → B and B → A is created with it — stops reversed, stop numbers renumbered, distances recalculated, same buses copied, see [Return Routes](#-return-routes)
+- 🔎 **Route Finder** for admin **and** depot: search by *From → To*, edit stops in a table, spread distances by coordinates, optionally update the return route in the same save
+- 🧱 **Ownership rules**: a depot can edit routes it added or that start at it, delete only its own; the admin can do everything
+- ✅ **Checked before it goes live**: every uploaded or edited stop list is validated (2–300 stops, names, real coordinates, distances never going backwards) and the old route stays untouched if it fails
+- 🚦 **Safe while buses run**: stops can't be replaced and a route can't be deleted while a bus is running on it
+- 🧾 **Audit trail**: every depot route change appears in the admin's Reports tab as an already-approved entry
+- <img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> **One logo everywhere**: the project logo replaces the old bus emoji across the passenger site, driver page, admin and depot screens
+
+</td>
+</tr>
 </table>
 
 ---
@@ -129,7 +156,7 @@
 | Spring Boot | 4.x | REST API framework |
 | Spring Security | 6.x | Admin authentication |
 | Spring WebSocket (STOMP) | — | Live push for GPS locations & active-ride list — see [Live Updates](#-live-updates-websocket) |
-| Thymeleaf | 3.x | Server-rendered views for `driver.html`, `admin.html`, `admin-buses.html` |
+| Thymeleaf | 3.x | Server-rendered views for `driver.html`, `admin.html`, `admin-buses.html`, `depot-dashboard.html` |
 | Apache POI | 5.x | Excel processing (routes **and** depot codes, via `WorkbookFactory` — accepts `.xlsx`, `.xls`, `.xlsm`) |
 | PostgreSQL (Neon, hosted) | 16+ | Persistent ride, location & route storage |
 | Redis (Upstash, hosted) | — | High-frequency GPS location buffer + driver token store |
@@ -147,7 +174,7 @@
 | Vanilla JavaScript | All interactivity, including a custom-built autocomplete dropdown (stop search) with keyboard navigation and match highlighting, and a reusable type-to-search picker (`searchable-select.js`) for the driver's route |
 | SockJS + stomp.js | WebSocket client for live bus tracking (loaded via cdnjs), with a graceful fallback poll if the connection ever drops |
 | Font Awesome | Icons (admin map view, header shortcuts, stop dropdown) |
-| Leaflet.js | Live map view of all active buses |
+| Leaflet.js + OpenStreetMap tiles | Live map view of all active buses, and the bus map in the depot dashboard (loaded from a CDN; the page falls back to a Google Maps link if it can't load) |
 
 ---
 
@@ -206,6 +233,13 @@
 │   RouteController ──►  RouteExcelLoader ─► Cache           │
 │   AdminDepotController ─► DriverAccessService.reload()   │
 │   AdminRouteController ─► RouteRepository + RouteExcelLoader│
+│        └─ new route ─► ReverseRouteService (return route B→A)│
+│   AdminRouteFinderController  ─┐                          │
+│   DepotRouteFinderController  ─┴► RouteFinderService       │
+│   DepotController (buses + bus detail) ─► DepotService,    │
+│        DepotBusDetailService                                │
+│   DepotReportController (requests to admin)                 │
+│   DepotRouteController (depot's own routes) ─► RouteAccess  │
 │                              │                          │
 │                              ▼                          │
 │                     RedisLocationService                 │
@@ -253,7 +287,17 @@
               (credentials from environment variables)
                          │
                          ▼
-     /admin-buses.html (Active Buses / Depot Codes / Routes / Notices / Driver Reports tabs)
+     /admin-buses.html (Active Buses / Depot Codes / Routes / Route Finder / Schedule / Notices / Reports tabs)
+
+                    DEPOT ACCESS
+                         │
+                         ▼
+              Same filter chain, role DEPOT
+              (username "depot:NAME", password = that depot's code)
+                         │
+                         ▼
+     /depot/dashboard  (Buses / Routes / Find route tabs + Request / report)
+     /depot/api/**     (only the depot's own data; routes it may edit)
 ```
 
 ---
@@ -356,7 +400,7 @@ Ride starts / ends
 
 ---
 
-## 🚌 Search by Bus Number
+## <img src="src/main/resources/static/images/logo.png" width="28" alt="bus"> Search by Bus Number
 
 Passengers can find a running bus directly by its number — the **Bus Number** tab on the home page (next to *Live Buses* and *Depot Routes*). Each result card shows the bus number, ride ID, source → destination and a Live badge, and **Track Bus** opens the normal tracking page for that ride (tapping anywhere on the card does the same). ETA is intentionally not shown on these cards: an ETA is measured to a passenger's boarding stop, and a bus-number search doesn't have one.
 
@@ -495,6 +539,8 @@ Every ride action (start / location / cancel) sends the token in the
 X-Driver-Token header. The server checks the token resolves to the
 same bus number the request claims to control.
 ```
+
+> 🏢 **Linking the bus to its depot:** a successful login also attaches the bus to the depot it logged in with (`DepotService.claimBusForLogin`), so a bus that is genuinely running always shows on that depot's dashboard — nobody has to pre-assign it. A bus with no depot is attached, a bus already in that depot is left alone, and a bus that belongs to **another** depot is never moved (a warning is logged). A problem here never blocks the driver's login. See [Depot Dashboard](#-depot-dashboard).
 
 ### Depot codes Excel format
 
@@ -751,7 +797,7 @@ Three layers, from "always runs" to "opt in":
 
 | Layer | Command | Needs | What it covers |
 |---|---|---|---|
-| **Java unit tests** | `./mvnw test` | nothing but Maven | Login rate limiter (per IP / depot / bus, lockout expiry), client-IP resolution (spoof-proof `X-Forwarded-For`), the driver login flow through `DriverAuthController` (200 / 400 / 401 / 429), ghost-ride tracker, bus-search cache, bus-number normalisation (including SQL wildcards), startup password check, CORS config |
+| **Java unit tests** | `./mvnw test` | nothing but Maven | Login rate limiter (per IP / depot / bus, lockout expiry), client-IP resolution (spoof-proof `X-Forwarded-For`), the driver login flow through `DriverAuthController` (200 / 400 / 401 / 429), ghost-ride tracker, bus-search cache, bus-number normalisation (including SQL wildcards), startup password check, CORS config, **return-route rules** (`ReverseRouteLogicTest`: codes, names, stops reversed, distances recalculated), **Route Finder rules** (`RouteFinderLogicTest`: matching *From → To*, validation of edited stops, bus / time cleaning) |
 | **Browser-script tests** | `npm test` (or `node tests/js/run-all.js`) | Node 20+, no `npm install` | The passenger tracking logic in `track.js`: where the bus is (`locateBus`: at a stop, between stops, off route, GPS-accuracy radius, backwards-wobble filter), timestamp parsing (run in India time on purpose), the per-stop ETA (speed learning, halts), the short-lived cache and the reload path, the recorded arrival / departure times, the bus marker, distance maths; plus search normalisation and the driver page's distance and route-label helpers |
 | **Extra tests (opt in)** | `./mvnw test -Pextra-tests` | Maven, downloads H2 and the build-helper plugin | `RideRepository.searchByBusNumber` against an in-memory H2 database, the real `SecurityConfig` rules (public vs admin, login, CSRF exemptions) through `MockMvc`, and `RideService`'s auto-end / search-hiding logic with Mockito |
 
@@ -767,6 +813,7 @@ tests/js/                browser-script tests (Node's built-in test runner)
 .github/workflows/tests.yml   runs all three layers on every push / pull request
 ```
 
+- Java tests must live in `src/test/java/...`, **never** under `src/main/java`: JUnit is a test-scope dependency, so a test file in `src/main` fails the build with `package org.junit.jupiter.api does not exist`.
 - The Docker build uses `-DskipTests`, so tests never affect deployment.
 - `WhereIsMyBusApplicationTests` (a context-loads test that needed a real database and failed on every `mvn test`) was replaced by `WhereIsMyBusApplicationIT`, which is never run automatically. Run it by hand against a throwaway database only.
 - In CI the extra-tests job has `continue-on-error: true` until you have seen it pass once; then delete that line so it counts.
@@ -806,7 +853,7 @@ A driver who closes the tab, loses signal or runs out of battery never presses *
 
 ## 📢 Notices & Driver Reports
 
-Linked features that move information between drivers, passengers, the admin and the passenger banner:
+Linked features that move information between drivers, passengers, depots, the admin and the passenger banner:
 
 ```
  DRIVER                         ADMIN                            PASSENGER
@@ -852,7 +899,7 @@ Each report also has an optional **place / route** line and a **details** box (5
 - **Status the driver sees:** *Sent*, *Under review*, *Admin needs more info (contact your depot)*, *Approved*, *Rejected*. The driver also sees the **reply the admin writes for them** (next bullet). The admin's *internal note* is **never** sent to the driver app.
 - **Admin reply (read in the app):** under the status, a green **💬 Reply from admin** box shows what the admin wrote (what information is needed, why a request was rejected, the next step) with the time it was sent. A reply the driver has not opened yet carries a red **NEW** tag, and the **⚠️ Report an issue** button shows a red count of unread replies. The count is checked when the driver logs in and then once a minute while the app is open and visible; opening the report list marks everything as read. "Read" is remembered in the browser only (`localStorage["wimb_rpt_seen"]`), nothing extra is stored on the server, and an edited reply counts as new again. When a report is *Need info* and has a reply, the status line is shortened to *Admin needs more info*, because the reply says what is needed.
 
-**Admin workflow** (**Driver Reports** tab):
+**Admin workflow** (the **Reports** tab, which holds driver, passenger and depot reports):
 
 ```
 NEW ──► UNDER_REVIEW ──► NEED_INFO ──► APPROVED
@@ -878,13 +925,31 @@ Passengers can report a problem without logging in: the **⚠️ Report** chip a
 
 Optional: bus number, route / place, and a **phone or email** if the passenger wants a reply (admin-only, never shown to drivers). Details must be 5 to 1000 characters. There is no passenger account, so there is no status shown back to the passenger.
 
-- **Same inbox as driver reports:** it lands in the admin **Driver Reports** tab with a 🧍 Passenger badge, the contact line, and the same status workflow and **Publish as notice**. (A passenger report with no bus number is stored with the placeholder `-`, and a notice made from it gets no bus tag.)
+- **Same inbox as driver reports:** it lands in the admin **Reports** tab with a 🧍 Passenger badge, the contact line, and the same status workflow and **Publish as notice**. (A passenger report with no bus number is stored with the placeholder `-`, and a notice made from it gets no bus tag.)
 - **Drivers never see them:** a driver's own list and hourly quota count only `source = DRIVER` reports (old rows with no source count as driver reports), so passenger complaints about a bus never appear in that driver's app or use up their 5 reports an hour.
 - **Spam guards** (the endpoint is public, so it is limited three ways): **3 reports per IP per hour** (real IP via `ClientIpResolver`), **10 per bus per hour**, **60 per hour in total**, plus a hidden honeypot field that only bots fill in (they get a fake "sent" and nothing is stored). Over a limit: HTTP 429. Counters are in memory, per instance, like the login limiter.
 - The bus number is checked (letters, digits, space, `-`, `/`, `.` only, up to 40 characters) and control characters are stripped.
 - Text is always shown escaped, so nothing a passenger types can run as HTML in the admin tab.
 
 > ⚠️ Not covered by automated tests yet. Reports are not de-duplicated, and a passenger cannot attach a photo.
+
+### 2c. Depot requests (depot → admin)
+
+Depot staff send requests from the **📝 Request / report** button on the [Depot Dashboard](#-depot-dashboard). They land in the **same Reports tab**, tagged **🏢 Depot NAME**, and use the same status workflow, internal note, reply and **Publish as notice**.
+
+| Request type | Typical use |
+|---|---|
+| 🗺️ Add a route | A new corridor the depot wants (start, end, main stops, timings) |
+| ✏️ Fix a route | A missing stop, wrong order or wrong name |
+| 📍 Add a stop | A new stop between two existing ones |
+| 🔧 Bus problem | A bus is off the road or needs attention |
+| 💬 Other | Anything else |
+
+- **Who sent it:** the depot name comes from the depot's login, never from the request, so one depot cannot file as another. An optional *related bus* must be one of **that depot's** buses (`400` otherwise).
+- **Spam limit:** at most **10 requests per depot per hour** (HTTP 429 after that).
+- **What the depot sees back:** the status (*Sent*, *Under review*, *Needs more info*, *Approved*, *Rejected*) and the **reply the admin wrote**. The admin's internal note is never sent. A reply the depot has not opened yet carries a **NEW REPLY** tag and the header button shows a red count; "read" is remembered in the browser only (`localStorage["wimb-seen-replies"]`).
+- **Reply box for depots:** unlike passenger reports, depot reports can be answered, because the depot has a login to read the reply.
+- **Not only requests:** every route change a depot makes itself (add, new stops file, new stops, delete) is also written here as an already-**Approved** entry, so the admin has a record of who changed what (see [Depot Dashboard](#-depot-dashboard)).
 
 ### 3. Type-to-search route picker (driver)
 
@@ -904,12 +969,69 @@ Optional: bus number, route / place, and a **phone or email** if the passenger w
 | Admin endpoints | Under `/admin/**`, so admin login is required; CSRF token is sent as `_csrf` |
 | Driver endpoints | Under `/api/driver/**` (already public + CSRF-exempt), authorised by `X-Driver-Token` |
 | Passenger endpoint | `POST /api/passenger/reports`: public and CSRF-exempt (`/api/passenger/**` in `SecurityConfig`), protected by the rate limits above |
-| `driver_report` columns | `source` (`DRIVER` / `PASSENGER`) and `contact` were added; `ddl-auto=update` creates them, old rows stay valid |
+| `driver_report` columns | `source` (`DRIVER` / `PASSENGER` / `DEPOT`) and `contact` were added; `ddl-auto=update` creates them, old rows stay valid |
+| `driver_report` depot column | `depotName` (nullable) holds the depot that sent a `DEPOT` report; the new types `ROUTE_CORRECTION`, `STOP_REQUEST`, `BUS_PROBLEM` are plain strings, so no migration |
+| Depot endpoints | `POST` / `GET /depot/api/reports`, under `/depot/**` (depot login + CSRF token required) |
 | `driver_report` reply columns | `adminReply` (text the driver sees) and `repliedAt` were added as nullable columns; `ddl-auto=update` creates them, old rows stay valid and simply have no reply |
 
-Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `PassengerReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `passenger-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
+Files: `Notice`, `NoticeRepository`, `NoticeController`, `AdminNoticeController`, `DriverReport`, `DriverReportRepository`, `DriverReportController`, `PassengerReportController`, `DepotReportController`, `AdminReportController` (Java); `notices.js`, `admin-notices.js`, `driver-reports.js`, `passenger-reports.js`, `admin-reports.js`, `searchable-select.js` (static JS).
 
 > ⚠️ Not covered by automated tests yet. Reports are not de-duplicated (two drivers can report the same blockage), and the notice banner is polled every 60 seconds rather than pushed over WebSocket.
+
+---
+
+## 🏢 Depot Dashboard
+
+Depot staff get their own sign-in and a dashboard at `/depot/dashboard`. It answers the questions the admin used to get by phone — *is my bus running? where is it? can you add this route?* — without the admin being involved.
+
+### Signing in
+- On `login.html`, switch **Admin / Depot** to **Depot**, pick the depot and enter its **depot code** (the same code the drivers use, from the depot-codes Excel).
+- Behind the scenes the username is `depot:NAME`, the role is `DEPOT` and the password is that depot's code, read when you sign in — so changing a code in the Depot Codes tab applies from the next sign-in. `/depot/**` needs the `DEPOT` role; a depot cannot open `/admin/**`, and can only read its own buses.
+
+### How a bus gets onto a depot's dashboard
+A bus belongs to a depot when the admin assigned it **or** when its driver signs in with that depot's code (see [Driver Verification](#-driver-verification-depot-codes)). Nobody has to pre-assign buses; a bus that is running under the depot's code appears by itself.
+
+### 🚌 Buses tab
+```
+┌────────────┬────────────┬────────────────┬──────────┐
+│ Total buses│ Running now│ Not reporting  │  Idle    │   ← counts
+└────────────┴────────────┴────────────────┴──────────┘
+ [ Search bus number or route… ]  [All] [Running] [Not reporting] [Idle]
+ ┌───────────────────────────┐ ┌───────────────────────────┐
+ │ WB 23A 1245   ● Running   │ │ WB 74 5566  ● Not reporting│  ← tap a card
+ │ Alipurduar → Falakata     │ │ …                          │
+ └───────────────────────────┘ └───────────────────────────┘
+```
+- **Running** = a ride is active and its GPS is fresh. **Not reporting** = a ride is active but no GPS has arrived for more than 5 minutes (`wimb.ride.stale-after-seconds` / `RIDE_STALE_AFTER_SECONDS`, the same rule that hides ghost buses from the passenger search). **Idle** = no ride.
+- The list refreshes every 10 seconds and shows a banner if the connection drops.
+- **Tap a bus** → a side panel (a bottom sheet on phones) with the route, when the trip started, how long it has been running, the last update, a **live map** with the bus marker (Leaflet + OpenStreetMap tiles, refreshed every 5 seconds, marker turns amber when the bus is not reporting), an *Open in Google Maps* link, and the bus's **last 10 trips**. If the map library can't load, the Google Maps link still works.
+- `GET /depot/api/bus?number=…` only answers for a bus **in this depot**; any other number is a `404`, so numbers cannot be probed.
+
+### 📝 Request / report to the admin
+See [2c. Depot requests](#2c-depot-requests-depot--admin). The button sits in the header; the panel has the request form on top and **Your requests** (status + the admin's reply) below.
+
+### 🗺️ Routes tab — the depot's own routes
+A depot can add and manage routes without waiting for the admin.
+
+| | Routes the depot **added** | Admin-created routes that **start at** the depot | Routes that only **end at** the depot |
+|---|:---:|:---:|:---:|
+| See / download the stops file | ✅ | ✅ | ✅ (read-only) |
+| Edit name, destination, buses, departure times, stops file | ✅ | ✅ | ❌ |
+| Delete | ✅ | ❌ (admin only) | ❌ |
+
+- **Add route:** name, where it ends, an Excel stops file (same template as the admin's), optional buses and departure times. The route starts at the depot (a depot cannot create a route for another depot), the route code is **generated** (`ALIPURDUAR_FALAKATA`, then `_2`, `_3`… if taken), and it **goes live immediately**. A tick box adds the [return route](#-return-routes) too.
+- **Checked before anything changes:** the sheet must parse, have 2–300 stops, named stops, real coordinates (not 0,0). A bad file is rejected and nothing live is touched; if loading a replacement fails, the old stops are put back.
+- **Blocked while a bus is running on the route:** the stops file can't be replaced and the route can't be deleted until the trip ends.
+- **Limit:** 50 routes per depot (`MAX_OWNED_ROUTES` in `DepotRouteController`).
+- **Audit trail:** adds, new stops files and deletes are written to the admin's **Reports** tab as already-approved entries.
+
+### 🔎 Find route tab
+The depot version of the [Route Finder](#-route-finder): it can **look at every route** (passengers can already see them), but can only **edit** the ones in the table above.
+
+### Files
+`DepotController`, `DepotService`, `DepotBusDetailService`, `DepotReportController`, `DepotRouteController`, `DepotRouteFinderController`, `RouteAccess` (Java); `templates/depot-dashboard.html`, `js/route-finder.js` (front end).
+
+> ⚠️ The dashboard's own endpoints are not covered by automated tests yet (the route rules they share with the Route Finder are; see [Automated Tests](#-automated-tests)).
 
 ---
 
@@ -926,6 +1048,7 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
   - **Delete** — removes the route from the in-memory cache, deletes its Excel file off disk, and removes the DB row.
   - **Download example template** — a ready-to-edit `.xlsx` with the right headers, same as the depot codes template.
 - Drivers now **pick their Route explicitly** before choosing Start Location / Destination (mirrors picking a Depot). The stop pickers are then scoped to only that route's stops — not a global list — which is what makes it safe for the same stop name (a shared junction town, say) to legitimately appear on more than one route without any ambiguity.
+- **Who can add routes:** the admin from the Routes tab, and each **depot** for its own routes from the [Depot Dashboard](#-depot-dashboard). A `Route` has an optional `ownerDepot` (set when a depot created it; empty for admin-created routes) which decides who may edit or delete it.
 - Registered route file paths are **normalized at load time** (forward slashes, regardless of the OS they were originally saved on) — a route added during local development on Windows still loads correctly once deployed to a Linux container.
 
 ### Route Excel format (same shape, whichever route it's for)
@@ -944,6 +1067,96 @@ Originally WIMB shipped with exactly **one** hardcoded route (`routes/route_APD_
 ### Rides know their route
 
 `Ride` stores the `routeCode` it actually runs on (set from the route the driver picked, and returned in `ActiveRideResponse`). `track.html` and the driver's Simulate tab use it to load the right stop list, so rides on admin-added routes resolve correctly, not just the legacy one. Rides started before this was stored (or with a blank code) fall back to the legacy route.
+
+---
+
+## 🔁 Return Routes
+
+Passengers search *from A to B*, and the search matches a route's **source and destination**. So a bus going B → A needs its **own route** — with its own correctly ordered stop list. Doing that by hand for every corridor meant a second Excel file and easy mistakes in the distances. Now it is automatic.
+
+### What happens on upload
+Upload (or add, as a depot) a route **A → B**, leave **"Also add the return route"** ticked, and WIMB creates **B → A** in the same step:
+
+| | Route A → B (what you upload) | Return route B → A (generated) |
+|---|---|---|
+| Code | `APD_FLK` | `FLK_APD` |
+| Name | `Alipurduar ⇄ Falakata` | `Falakata ⇄ Alipurduar` |
+| Source → destination | Alipurduar → Falakata | Falakata → Alipurduar |
+| Excel sheet | your file | **a new sheet, built for you** |
+| Buses | the ones you listed | the **same buses** (the same bus runs both ways) |
+| Departure times | the ones you listed | **empty** — the way back has its own timetable (Schedule tab) |
+
+### The generated Excel sheet
+Stops in reverse order, `stop_order` renumbered 1…n, and `distance_km` measured from the **new** first stop. Coordinates, names and halts stay with their stop.
+
+| stop_order | stop_name | latitude | longitude | distance_km | slack_min |
+|:---:|---|:---:|:---:|:---:|:---:|
+| 1 | Falakata | 26.51721 | 89.20694 | **0** | 0 |
+| 2 | Sonapur | 26.494 | 89.368 | **4.5** | 2 |
+| 3 | Alipurduar Chowpathy | 26.48083 | 89.526 | **13.5** | 2 |
+| 4 | Alipurduar | 26.4799 | 89.5355 | **15** | 0 |
+
+(The example is the `APD_FLK` sheet from [Multi-Route Support](#-multi-route-support), reversed: 0 / 1.5 / 10.5 / 15 km becomes 0 / 4.5 / 13.5 / 15 km.) The sheet uses the same columns as the downloadable template, so it can be downloaded, checked and re-uploaded.
+
+### Code and name rules
+- **Code:** `X_Y` becomes `Y_X` (`A_B` → `B_A`). A code that is not exactly two parts (`COOCH_BEHAR_APD`) gets `_RETURN` added; the admin can type their own return code in the form (the field previews the automatic one). Depot-added routes use `DESTINATION_DEPOT`.
+- **Name:** the separator is kept (`→`, `⇄`, `↔`, `to`, `_`, `/`), so `Alipurduar to Cooch Behar` becomes `Cooch Behar to Alipurduar` (and `Toto Para → X` is not split inside the word). A name with no separator falls back to `DESTINATION → SOURCE`.
+
+### It never breaks the upload
+The A → B route is saved and live first. The return route is a bonus: if it can't be made, the upload still succeeds and the response says why. It is **skipped** when:
+- a route with that code already exists;
+- a B → A route already exists under another code (no doubling);
+- the source or destination depot is blank, or both are the same place;
+- the route has fewer than 2 stops;
+- (depots) the depot is at its 50-route limit.
+
+### Keeping the two in step
+Editing stops in the [Route Finder](#-route-finder) has an **"Also update the return route"** tick box: the return route's sheet is rebuilt in reverse from the new stops (its name, buses and timetable stay). Replacing a route's whole file from the admin's Routes tab does **not** touch the return route.
+
+### Where it lives
+`ReverseRouteLogic` (codes, names, reversing stops: pure, unit-tested), `ReverseRouteService` (creates the route, loads it, saves it), `RouteSheetWriter` (writes the Excel). Used by `AdminRouteController` (upload) and `DepotRouteController` (add).
+
+---
+
+## 🔎 Route Finder
+
+A tab for the **admin** (🔎 Route Finder) and the **depot** (🔎 Find route) to look up the route between two places and update it. Both use one shared script, `js/route-finder.js`.
+
+### Searching
+Type **From** and **To** (the ⇄ button swaps them) and press **Search**. Spelling, case and spaces don't matter, and `Falakata` matches `Falakata Bus Stand`. Leave one box empty to list everything that serves that place; **Show all** lists every route.
+
+| Result | Meaning |
+|---|---|
+| ✅ **Direct route** | Registered as exactly *From → To* |
+| ✅ **Passes through both** | Its stops contain *From* and then *To*, in that order (for example *Chowpathy → Sonapur* on `APD_FLK`) |
+| ↩ **Runs the other way** | Its stops contain both but in the opposite order: that is the way back for what you searched |
+| *Serves …* | Only one place was typed and the route serves it |
+
+Best matches come first (direct, then passing through, then the other way); at most 100 are shown. Each card shows the code, stops, buses, departures, who added it, and whether you **can edit** it or it is **view only**.
+
+### Opening and updating a route
+Click a route to open the editor:
+
+- **Details:** name, starts at (admin only), ends at, buses, departure times. *Save details* applies them at once.
+- **Stops:** a table of every stop (name, latitude, longitude, distance, halt), with a **live sketch** of the route drawn from the coordinates (so a typo in a latitude is obvious). Per row: ↑ ↓ move, ＋ insert below (starts from the midpoint of its neighbours), ✕ remove. **Spread distances by coordinates** keeps the last stop's distance as the trip length and shares it between the stops in proportion to the straight-line gaps (handy after inserting a stop).
+- **Checked as you type**, with the offending row highlighted and the message under the table; the same rules run again on the server: 2–300 stops, a name on every stop, real coordinates (not 0,0), distances that never go backwards, halt 0–180 minutes.
+- **Save stops** writes a new Excel sheet from the table, reloads the route and updates the passenger search. Tick **Also update the return route** to rebuild it in reverse in the same save.
+- **⬇ Excel** downloads the stored sheet; closing with unsaved changes asks first.
+
+### Rules
+| Rule | Admin | Depot |
+|---|---|---|
+| Search and read every route | ✅ | ✅ |
+| Edit details and stops | every route | routes it added, or admin-created routes that **start** at it |
+| Change *Starts at* | ✅ | ❌ (it would hand the route to someone else) |
+| Update the return route in the same save | ✅ | only if it may edit that route too |
+
+- **Blocked while a bus is running** on the route (`409`): change the stops after the trip ends. Details (name, buses, times) can still be edited.
+- **Depot edits leave a record:** each stops change is written to the admin's Reports tab as an already-approved entry.
+- A new stop list that fails to load is rolled back: the old sheet stays in use.
+
+### Files
+`RouteFinderLogic` (matching + validation, pure, unit-tested), `RouteFinderService`, `AdminRouteFinderController`, `DepotRouteFinderController`, `RouteAccess`, `RouteSheetWriter` (Java); `js/route-finder.js` (shared UI, built only with `textContent`, never `innerHTML`).
 
 ---
 
@@ -976,6 +1189,11 @@ wimb.admin.password=${ADMIN_PASSWORD}
 | `/api/passenger/reports` | 🌐 Everyone *(rate-limited per IP / bus / overall, honeypot-protected)* |
 | `/api/routes/upcoming` | 🌐 Everyone *(read-only scheduled-bus suggestions, covered by `/api/routes/**`)* |
 | `/admin/notices/**`, `/admin/reports/**` | 🔐 Admin only |
+| `/admin/route-finder/**` | 🔐 Admin only |
+| `/depot/dashboard`, `/depot/api/**` | 🏢 Depot staff only (`ROLE_DEPOT`) — a depot only ever sees its own buses and may only change its own routes |
+
+### Depot sign-in
+Depots use the same login form (switch to **Depot**). The server receives `depot:NAME` as the username and the depot code as the password, builds the user from the current depot-codes list, and gives it the `DEPOT` role only. All depot identity is taken from this login: request bodies can never name the depot. State-changing depot calls need the CSRF token (`X-CSRF-TOKEN` header), like the admin's.
 
 > On the homepage (`/`), a small bus icon and lock icon in the header link directly to `/driver.html` and `/login.html` respectively — a navigation convenience, not an additional access-control layer (both pages were already public/gated as shown above).
 
@@ -1028,7 +1246,7 @@ Returns a token on success, tied to the given bus number for ~12 hours:
 </details>
 
 <details>
-<summary><b>🚌 Ride APIs</b></summary>
+<summary><b><img src="src/main/resources/static/images/logo.png" width="18" alt="bus"> Ride APIs</b></summary>
 
 #### Start Ride
 ```http
@@ -1150,9 +1368,9 @@ GET /api/routes/upcoming?source=ALIPURDUAR&destination=FALAKATA&liveRoutes=APD_F
 `liveRoutes` is optional: route codes that already have a live bus for this search, so those routes are not reported as *late*. See [Upcoming Scheduled Buses](#-upcoming-scheduled-buses).
 ```json
 [ { "routeCode": "APD_FLK", "routeName": "Alipurduar ⇄ Falakata", "status": "DUE",
-    "startStop": "Alipurduar", "departsStart": "11:00", "atSource": "11:00", "atDestination": "12:10",
-    "minutesUntil": 5, "nextDay": false, "approximate": false, "stopsBetween": 4, "distanceKm": 35.0,
-    "busNumbers": ["WB-23A-1245"] } ]
+  "startStop": "Alipurduar", "departsStart": "11:00", "atSource": "11:00", "atDestination": "12:10",
+  "minutesUntil": 5, "nextDay": false, "approximate": false, "stopsBetween": 4, "distanceKm": 35.0,
+  "busNumbers": ["WB-23A-1245"] } ]
 ```
 `status` is `DUE`, `UPCOMING` or `LATE`; times are `HH:mm`; at most 5 upcoming plus 3 late entries.
 
@@ -1202,6 +1420,14 @@ file: route.xlsx
 ```
 Fails if the route code already exists — use Update instead.
 
+Optional extra fields (the admin form sends them):
+```
+sourceDepot / destinationDepot: where the route starts and ends (needed for the return route)
+createReturn:     true (default) | false   — also create the return route B → A
+returnRouteCode:  optional; blank = derived (APD_FLK → FLK_APD)
+```
+The response gains `returnRoute` (`created`, `routeCode`, `routeName`, `stopCount`, `message`) and, if it could not be made, `returnWarning`. The upload itself has succeeded either way. See [Return Routes](#-return-routes).
+
 #### Update a Route (name and/or file)
 ```http
 PUT /admin/routes/{routeCode}
@@ -1225,6 +1451,70 @@ GET /admin/routes/template
 </details>
 
 <details>
+<summary><b>🔎 Admin Route Finder APIs</b></summary>
+
+```http
+GET /admin/route-finder/search?from=Alipurduar&to=Falakata     (either may be empty)
+GET /admin/route-finder/{routeCode}/stops                      details + every stop + the return route, if any
+PUT /admin/route-finder/{routeCode}/stops                      JSON, below
+PUT /admin/route-finder/{routeCode}/details                    JSON, below
+```
+```json
+// PUT .../stops
+{ "alsoReturn": true,
+  "stops": [ { "stopName": "Alipurduar", "latitude": 26.4799, "longitude": 89.5355,
+    "distanceFromStartKm": 0, "slackTimeMin": 0 } ] }
+
+// PUT .../details
+{ "routeName": "Alipurduar ⇄ Falakata", "sourceDepot": "ALIPURDUAR", "destinationDepot": "FALAKATA",
+  "busNumbers": ["WB-23A-1245"], "departureTimes": ["06:00", "09:30"] }
+```
+Search results carry `match` (`DIRECT`, `VIA`, `OPPOSITE`, `TOUCHES`), `fromStop` / `toStop`, `canEdit` and `ownerDepot`. Errors come back as `{ "error": "..." }`: `400` (invalid stops, with the stop number), `404`, `409` (a bus is running on the route). Admin login and the CSRF token are required. See [Route Finder](#-route-finder).
+
+</details>
+
+<details>
+<summary><b>🏢 Depot APIs</b></summary>
+
+All under `/depot/**`: depot login required, and the depot is always the logged-in one. `POST` / `PUT` / `DELETE` need the CSRF token.
+
+#### Dashboard
+```http
+GET /depot/dashboard                          the page
+GET /depot/api/buses                          { depot, buses: [ { busNumber, running, source, destination, stale, silentSeconds, ... } ] }
+GET /depot/api/bus?number=WB%2023A%201245     one bus: current trip, last position, last 10 trips (404 if not this depot's)
+```
+
+#### Requests to the admin
+```http
+POST /depot/api/reports      { "type": "ROUTE_REQUEST", "busNumber": "", "place": "Alipurduar → Falakata", "description": "…" }
+GET  /depot/api/reports      this depot's last 30 requests, with status and the admin's reply (never the internal note)
+```
+`type` is `ROUTE_REQUEST`, `ROUTE_CORRECTION`, `STOP_REQUEST`, `BUS_PROBLEM` or `OTHER`; description 10–1000 characters; max 10 per depot per hour (`429`).
+
+#### The depot's routes
+```http
+GET    /depot/api/routes                        routes it can edit + routes ending at it (read-only)
+GET    /depot/api/routes/template               the Excel template
+GET    /depot/api/routes/{routeCode}/file       the stored stops sheet
+POST   /depot/api/routes                        multipart: routeName, destinationDepot, file, busNumbers?, departureTimes?, createReturn? (default true)
+PUT    /depot/api/routes/{routeCode}            multipart: routeName, destinationDepot?, busNumbers?, departureTimes?, file?
+DELETE /depot/api/routes/{routeCode}            only routes the depot added
+```
+`404` for a route the depot may not see, `403` for one it may see but not change, `409` while a bus is running on it.
+
+#### Route Finder (same shape as the admin's)
+```http
+GET /depot/api/route-finder/search?from=…&to=…
+GET /depot/api/route-finder/{routeCode}/stops
+PUT /depot/api/route-finder/{routeCode}/stops       { "alsoReturn": false, "stops": [ … ] }
+PUT /depot/api/route-finder/{routeCode}/details     { "routeName": …, "destinationDepot": …, "busNumbers": […], "departureTimes": […] }
+```
+Any route can be read; changes need the edit rights in [Depot Dashboard](#-depot-dashboard) (`403` otherwise). `sourceDepot` in `details` is ignored for depots.
+
+</details>
+
+<details>
 <summary><b>📢 Notice APIs</b></summary>
 
 #### Live Notices (public, passenger banner)
@@ -1233,7 +1523,7 @@ GET /api/notices/active
 ```
 ```json
 [ { "id": 3, "title": "Route APD_FLK diverted", "message": "Via NH31 until 6 PM.", "severity": "WARNING",
-    "routeCode": "APD_FLK", "busNumber": null, "createdAt": "2026-11-05T09:30:00" } ]
+  "routeCode": "APD_FLK", "busNumber": null, "createdAt": "2026-11-05T09:30:00" } ]
 ```
 Only active, non-expired notices, most severe first.
 
@@ -1304,7 +1594,7 @@ PUT    /admin/reports/{id}                  status, adminNote?, adminReply?
 POST   /admin/reports/{id}/publish          title, message, severity, expiresInHours?
 DELETE /admin/reports/{id}
 ```
-Admin login required. The list holds driver **and** passenger reports (`source`, and `contact` for passengers). `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published. `adminReply` (max 500 characters) is the message the driver sees: leave the parameter out to keep the current reply, send it blank to remove it, send text to set it (only a real change updates `repliedAt`, so the driver is not told "new" again for an unchanged reply). It returns `400` when it is too long or the report came from a passenger.
+Admin login required. The list holds driver, passenger **and depot** reports (`source`; `contact` for passengers; `depotName` for depots). `status` is `NEW`, `UNDER_REVIEW`, `NEED_INFO`, `APPROVED` or `REJECTED`. Publishing creates a notice, sets the report to `APPROVED`, and returns `409` if it was already published. `adminReply` (max 500 characters) is the message the driver sees: leave the parameter out to keep the current reply, send it blank to remove it, send text to set it (only a real change updates `repliedAt`, so the driver is not told "new" again for an unchanged reply). It returns `400` when it is too long or the report came from a passenger.
 
 </details>
 
@@ -1317,8 +1607,9 @@ Admin login required. The list holds driver **and** passenger reports (`source`,
 | `index.html` | Passenger | Notice banner at the top, then three search tabs — **Live Buses** (source → destination, custom autocomplete), **Depot Routes**, **Bus Number**; tap-anywhere bus cards, recent searches, quick results, an **Upcoming scheduled buses** box under the live results, a **Report a problem** footer link, header shortcuts to Driver/Admin |
 | `track.html` | Passenger | Train-tracker style live timeline — arrival / departure per stop, per-stop ETA, bus on the rail, bottom status sheet, reload button, alarm, my-location panel, **Report a problem** (⋮ menu and ⚠️ chip), dark / light mode, see [The Tracking Page](#-the-tracking-page) |
 | `driver.html` | Driver | Loading screen → bus number + depot + code login → straight into the live ride screen if that bus already has a running ride, otherwise the new-ride form → live ride screen with **Current stop position** card, **Live GPS / Simulate location** tabs and Stop Ride. The route picker is type-to-search, and a floating **Report an issue** button appears once logged in |
-| `login.html` | Admin | Secure login form |
-| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add, update, delete, template, current list), **Notices** (publish / hide / delete), **Driver Reports** (review, status, notes, publish as notice) |
+| `login.html` | Admin / Depot | Secure login form with an **Admin / Depot** switch (depot: pick the depot, enter its code) |
+| `admin-buses.html` | Admin | Tabbed panel — **Active Buses** (live cards, search), **Depot Codes** (upload, template, current list), **Routes** (add with optional return route, update, delete, template, current list), **Route Finder** (search *From → To*, edit details and stops), **Schedule**, **Notices** (publish / hide / delete), **Reports** (driver, passenger and depot reports: review, status, notes, reply, publish as notice) |
+| `/depot/dashboard` (`depot-dashboard.html`) | Depot staff | **Buses** (live cards, filters, tap for the bus map and trips), **Routes** (add / edit / delete the depot's own routes, with return route), **Find route** (search and edit), and a **Request / report** panel with the admin's replies |
 
 ---
 
@@ -1336,9 +1627,14 @@ WIMB/
 │   │   ├── RideController.java
 │   │   ├── LocationController.java
 │   │   ├── RouteController.java         # public route lookup/list/stops
-│   │   ├── DriverAuthController.java    # /api/driver/verify, /api/driver/depots
+│   │   ├── DriverAuthController.java    # /api/driver/verify (also links the bus to its depot), /api/driver/depots
 │   │   ├── AdminDepotController.java    # /admin/depots (view/upload/template)
-│   │   ├── AdminRouteController.java    # /admin/routes (view/add/update/delete/template)
+│   │   ├── AdminRouteController.java    # /admin/routes (view/add/update/delete/template); an upload can also create the return route
+│   │   ├── AdminRouteFinderController.java # /admin/route-finder (search, stops, update stops / details)
+│   │   ├── DepotController.java         # /depot/dashboard, /depot/api/buses, /depot/api/bus
+│   │   ├── DepotReportController.java   # /depot/api/reports (depot requests to the admin + replies)
+│   │   ├── DepotRouteController.java    # /depot/api/routes (the depot's own routes)
+│   │   ├── DepotRouteFinderController.java # /depot/api/route-finder
 │   │   ├── NoticeController.java        # public GET /api/notices/active (passenger banner)
 │   │   ├── AdminNoticeController.java   # /admin/notices (list/publish/hide/delete)
 │   │   ├── DriverReportController.java  # /api/driver/reports (driver sends + sees own status and the admin's reply)
@@ -1357,7 +1653,15 @@ WIMB/
 │   │   ├── BusSearchCache.java          # 5s TTL cache for bus-number search, cleared when a ride starts/ends
 │   │   ├── UpcomingBusService.java      # next scheduled buses between two stops, from route departure times
 │   │   ├── RedisLocationService.java    # Redis read/write/clear
-│   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized)
+│   │   ├── RouteExcelLoader.java        # loads/caches every registered route's Excel (path-normalized); parseBytes() checks a sheet without saving it
+│   │   ├── DepotService.java            # depot buses, depot login names, links a bus to its depot
+│   │   ├── DepotBusDetailService.java   # one bus's trip, last position and recent trips (own depot only)
+│   │   ├── ReverseRouteLogic.java       # pure rules: return code / name, stops reversed + distances recalculated
+│   │   ├── ReverseRouteService.java     # creates the return route B→A for an uploaded A→B
+│   │   ├── RouteSheetWriter.java        # writes stops as the standard Excel route sheet
+│   │   ├── RouteAccess.java             # who may edit / delete which route (admin vs depot)
+│   │   ├── RouteFinderLogic.java        # pure rules: From→To matching, stop validation, bus / time cleaning
+│   │   ├── RouteFinderService.java      # search + read + update stops / details for admin and depot
 │   │   ├── DriverAccessService.java     # loads/reloads depot codes (DB-backed via AdminUpload), constant-time code check
 │   │   ├── LoginRateLimiter.java        # failed-login counters per IP / depot / bus, lockouts
 │   │   ├── RideActivityTracker.java     # when each ride last sent a location (drives stale/auto-end)
@@ -1377,10 +1681,10 @@ WIMB/
 │   ├── model/
 │   │   ├── Ride.java
 │   │   ├── Bus.java
-│   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount
+│   │   ├── Route.java                   # routeCode, routeName, filePath, fileData (DB-backed), stopCount, ownerDepot (set when a depot added it)
 │   │   ├── AdminUpload.java             # DB-backed store for depot codes / bus rosters / timetables
 │   │   ├── Notice.java                  # passenger notice (severity, optional route/bus, expiry)
-│   │   ├── DriverReport.java            # driver / passenger report (source, contact) + status workflow + adminReply / repliedAt
+│   │   ├── DriverReport.java            # driver / passenger / depot report (source, contact, depotName) + status workflow + adminReply / repliedAt
 │   │   └── Location.java               # implements Serializable; ride is @JsonIgnore (see Active Ride Cache)
 │   ├── enums/
 │   │   └── RideStatus.java
@@ -1404,7 +1708,8 @@ WIMB/
 │   ├── templates/                       # Thymeleaf views
 │   │   ├── driver.html
 │   │   ├── admin.html
-│   │   └── admin-buses.html
+│   │   ├── admin-buses.html
+│   │   └── depot-dashboard.html         # depot staff dashboard (Buses / Routes / Find route / Request)
 │   ├── static/
 │   │   ├── index.html                   # Passenger search, custom stop dropdown, clickable bus cards, once-per-session splash, Driver/Admin shortcuts
 │   │   ├── track.html                   # Passenger tracking page: header, chips, arrival/departure timeline, bottom status sheet, themes
@@ -1420,9 +1725,12 @@ WIMB/
 │   │   │   ├── driver-reports.js        # driver Report an issue button, form, status list + admin replies + unread badge
 │   │   │   ├── passenger-reports.js     # passenger Report a problem bottom sheet (home + tracking page)
 │   │   │   ├── upcoming-buses.js        # "Upcoming scheduled buses" box under the live search results
-│   │   │   ├── admin-reports.js         # admin Driver Reports tab (driver + passenger reports, reply to driver)
+│   │   │   ├── admin-reports.js         # admin Reports tab (driver, passenger and depot reports, reply)
+│   │   │   ├── route-finder.js          # Route Finder UI shared by the admin and depot pages (search, stop editor, route sketch)
 │   │   │   ├── searchable-select.js     # type-to-search <select> (driver route picker)
 │   │   │   └── admin-buses.js
+│   │   ├── images/
+│   │   │   └── logo.png                 # the project logo (used instead of the old bus emoji)
 │   │   └── data/
 │   │       └── stops.json               # auto-generated from the legacy route's Excel
 │   ├── routes/
@@ -1511,7 +1819,8 @@ Set the actual values as real environment variables. The easiest way locally:
 # 4. Open in browser
 open http://localhost:8080             # Passenger view
 open http://localhost:8080/driver.html # Driver panel
-open http://localhost:8080/login.html  # Admin login
+open http://localhost:8080/login.html  # Admin or Depot login (switch the role on the form)
+open http://localhost:8080/depot/dashboard # Depot dashboard (after signing in as a depot)
 ```
 ```bash
 # 5. First-time setup
@@ -1519,6 +1828,8 @@ open http://localhost:8080/login.html  # Admin login
 #   Depot Codes tab: download the example template, fill in real depots, upload.
 #   Routes tab: download the example template, fill in a real route, upload.
 # Drivers can verify and start rides immediately after — no restart required.
+# Depot staff: Login page → switch to Depot → pick the depot → enter its depot code.
+#   Their buses appear on the dashboard as soon as a driver signs in with that depot's code.
 ```
 
 ### Verify Redis is working
@@ -1590,6 +1901,16 @@ A multi-stage `Dockerfile`:
 - [x] ~~Drivers could only scroll to find a route~~ — done: type-to-search route picker
 - [x] ~~"Not available" dead end when a bus is about to leave~~ — done: upcoming scheduled buses (due soon, later, late / not live yet), see [Upcoming Scheduled Buses](#-upcoming-scheduled-buses)
 - [x] ~~Passengers could not report problems~~ — done: public report sheet, same admin inbox as driver reports
+- [x] ~~Bus running but not shown on its depot's dashboard~~ — done: a bus is attached to the depot when its driver signs in with that depot's code
+- [x] ~~Depot staff dashboard~~ — done: live buses, filters, tap a bus for its map and trips, see [Depot Dashboard](#-depot-dashboard)
+- [x] ~~Depots asking the admin for routes / stops by phone~~ — done: request panel, same Reports inbox, replies come back to the depot
+- [x] ~~Depots waiting for the admin to add every route~~ — done: depots add and manage their own routes, with ownership rules, validation and an audit trail
+- [x] ~~Second Excel file for every B → A route~~ — done: the return route is generated automatically, see [Return Routes](#-return-routes)
+- [x] ~~Finding and fixing the route between two places~~ — done: Route Finder for admin and depot with a stop editor, see [Route Finder](#-route-finder)
+- [x] ~~Bus emoji in the UI~~ — done: the project logo is used everywhere it can be (not in plain-text share messages)
+- [ ] Regenerate the return route when a route's **whole file** is replaced from the Routes tab (the Route Finder already offers it for stop edits)
+- [ ] Optional admin approval before a depot-added route goes live (today it is live at once and the admin is notified in Reports)
+- [ ] Hidden waypoints for road bends: a bus on a road that curves more than about 1.5 km away from the straight line between two far-apart stops is treated as off route until more stops are added
 - [ ] Tie a bus number to each departure time (so the box can say *"BUS1 at 11:00"*, not just the route)
 - [ ] A real per-stop timetable instead of estimating the time at middle stops
 - [x] ~~Show the admin's reply (not just the status) to the driver in the driver app~~ — done: separate `adminReply` text, green reply box with a NEW tag and an unread count on the Report button, see [Notices & Driver Reports](#-notices--driver-reports)
@@ -1626,9 +1947,7 @@ This is **proprietary software**, not open source. Seeing the code on GitHub doe
 - Full terms: [LICENSE](LICENSE)
 - Open-source libraries used (they keep their own licenses): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - Want to use, license, or collaborate on this project? Contact the author via [GitHub](https://github.com/Deep-Saha1925) and ask for written permission.
-
 ---
-
 ## 👨‍💻 Author
 
 <div align="center">

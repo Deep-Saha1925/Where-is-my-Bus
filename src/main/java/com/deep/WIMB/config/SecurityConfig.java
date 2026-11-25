@@ -11,7 +11,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import com.deep.WIMB.service.DepotService;
+import com.deep.WIMB.service.DriverAccessService;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,14 +39,33 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService() {
+    public UserDetailsService userDetailsService(DriverAccessService driverAccessService) {
         var admin = User.builder()
                 .username(adminUsername)
                 .password(passwordEncoder().encode(adminPassword))
                 .roles("ADMIN")
                 .build();
+        var adminOnly = new InMemoryUserDetailsManager(admin);
 
-        return new InMemoryUserDetailsManager(admin);
+        // Admin comes from the environment as before. A depot signs in with its name from the
+        // Depot Codes list (the login page sends "depot:NAME") and that depot's code as password.
+        // (Only ONE UserDetailsService bean may exist, or Spring skips building the login provider.)
+        return username -> {
+            if (username != null && username.startsWith(DepotService.LOGIN_PREFIX)) {
+                String name = username.substring(DepotService.LOGIN_PREFIX.length()).trim().toUpperCase();
+                String code = driverAccessService.getAllDepotCodes().get(name);
+                if (code == null) throw new UsernameNotFoundException("Unknown depot");
+                return User.builder()
+                        .username(DepotService.LOGIN_PREFIX + name)
+                        .password(passwordEncoder().encode(code))
+                        .roles("DEPOT")
+                        .build();
+            }
+            if (adminUsername.equals(username)) {
+                return adminOnly.loadUserByUsername(username);
+            }
+            throw new UsernameNotFoundException("Unknown user");
+        };
     }
 
     @Bean
@@ -102,6 +124,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).hasRole("ADMIN")
+                        // ── Depot staff pages & APIs — depot login required ──
+                        .requestMatchers("/depot/**").hasRole("DEPOT")
                         // ── Everything else requires login ──
                         .anyRequest().authenticated()
                 )
@@ -112,7 +136,10 @@ public class SecurityConfig {
                         .loginProcessingUrl("/do-login") // Spring processes this URL
                         .successHandler((req, res, auth) -> {
                             adminLoginThrottle.reset(req);
-                            res.sendRedirect(req.getContextPath() + "/admin/active/all-buses");
+                            boolean isDepot = auth.getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_DEPOT"));
+                            res.sendRedirect(req.getContextPath()
+                                    + (isDepot ? "/depot/dashboard" : "/admin/active/all-buses"));
                         })
                         .failureHandler((req, res, ex) -> {
                             adminLoginThrottle.recordFailure(req);
