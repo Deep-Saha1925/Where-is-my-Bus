@@ -692,6 +692,39 @@
             .app-header a[href="/admin"] { display: none; }
             .theme-btn { width: 40px; height: 40px; }
         }
+
+        /* ── Mobile: search modes become a stacked accordion (tap a row → it expands) ── */
+        @media (max-width: 640px) {
+            .search-card { display: flex; flex-direction: column; }
+            .search-title { order: 0; }
+            .search-tabs { display: contents; }
+            #tabBtnLive { order: 1; } #liveSearchPanel  { order: 2; }
+            #tabBtnDepot{ order: 3; } #depotSearchPanel { order: 4; }
+            #tabBtnBus  { order: 5; } #busSearchPanel   { order: 6; }
+            #recentSection { order: 7; }
+            .search-tab-btn {
+                flex: none; width: 100%; justify-content: flex-start;
+                padding: 14px 14px; margin-top: 10px; font-size: 14px;
+                border-radius: 12px; position: relative;
+            }
+            .search-tab-btn i { width: 18px; text-align: center; }
+            .search-tab-btn::after {
+                content: "\203A"; margin-left: auto; font-size: 22px; line-height: 1;
+                transition: transform 0.2s;
+            }
+            .search-tab-btn.active {
+                padding: 18px 14px; font-size: 15.5px;
+                border-radius: 12px 12px 0 0; margin-bottom: 0;
+                box-shadow: 0 6px 18px rgba(79,70,229,0.28);
+            }
+            .search-tab-btn.active::after { transform: rotate(90deg); }
+            #liveSearchPanel, #depotSearchPanel, #busSearchPanel {
+                padding: 14px; border: 1px solid var(--border); border-top: none;
+                border-radius: 0 0 12px 12px; background: var(--bg-input);
+                animation: tabOpen 0.25s ease both;
+            }
+            @keyframes tabOpen { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        }
     </style>
 </head>
 
