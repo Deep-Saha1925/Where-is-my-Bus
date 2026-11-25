@@ -699,15 +699,17 @@
             background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
             box-shadow: 0 12px 32px rgba(0,0,0,0.25); padding: 6px; animation: tabOpen 0.18s ease both;
         }
+        .header-menu button { width: 100%; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; color: var(--text-primary, inherit); }
+        .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
         .header-menu.open { display: block; }
-        .header-menu a {
+        .header-menu a, .header-menu button {
             display: flex; align-items: center; gap: 10px; padding: 12px 12px; border-radius: 10px;
             color: var(--text-primary, inherit); text-decoration: none; font-size: 14px; font-weight: 600;
         }
-        .header-menu a i { width: 18px; text-align: center; color: #6366f1; }
-        .header-menu a:hover, .header-menu a:active { background: var(--bg-input); }
+        .header-menu a i, .header-menu button i { width: 18px; text-align: center; color: #6366f1; }
+        .header-menu a:hover, .header-menu button:hover, .header-menu a:active, .header-menu button:active { background: var(--bg-input); }
         @media (max-width: 640px) {
-            .hdr-login { display: none !important; }
+            .hdr-login, .app-header button[data-lang-toggle], .app-header #themeBtn { display: none !important; }
             .menu-wrap { display: block; }
         }
 
@@ -790,6 +792,13 @@
                 <div class="header-menu" id="headerMenu" role="menu">
                     <a href="/driver" role="menuitem"><i class="fa-solid fa-bus"></i> Driver login</a>
                     <a href="/admin" role="menuitem"><i class="fa-solid fa-lock"></i> Staff / Admin login</a>
+                    <div class="menu-sep"></div>
+                    <button type="button" role="menuitem" onclick="document.querySelector('.app-header button[data-lang-toggle]').click()">
+                        <i class="fa-solid fa-language"></i> Language: <span data-lang-toggle style="pointer-events:none;font-weight:800;">বাং</span>
+                    </button>
+                    <button type="button" role="menuitem" onclick="document.getElementById('themeBtn').click()">
+                        <i class="fa-solid fa-circle-half-stroke"></i> <span id="themeMenuLabel">Dark mode</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1038,6 +1047,8 @@
         function applyTheme() {
             appBody.classList.toggle("dark-mode", isDark);
             themeBtn.textContent = isDark ? "☀️" : "🌙";
+            const tl = document.getElementById("themeMenuLabel");
+            if (tl) tl.textContent = isDark ? "Light mode" : "Dark mode";
         }
         function toggleTheme() {
             isDark = !isDark;
